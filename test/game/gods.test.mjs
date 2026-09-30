@@ -178,35 +178,220 @@ test('stands aside while an inherited combo that swaps gods and auras is running
     }
 });
 
+/** Runs in the page: the system's report, the gods in the three slots by key, the running buffs. */
+function godsNow() {
+    const M = Game.Objects['Temple'].minigame;
+    return {
+        report: MushieCookies.gods.report(),
+        keys: M.slot.map((id) => (id === -1 ? null : Object.keys(M.gods)[id])),
+        swaps: M.swaps,
+        buffs: Object.keys(Game.buffs),
+    };
+}
+
+/**
+ * Two mouse upgrades and clicking: each click adds 2% of CpS, and the game reads the buffed CpS
+ * (main.js:4692-4693), so a CpS buff raises what clicking earns. With no buff Jeremy is the best
+ * god here and Muridal the next; valued under a x1.5 CpS buff, Muridal is the best.
+ */
+function clickingBakery() {
+    Game.Upgrades['Plastic mouse'].earn();
+    Game.Upgrades['Iron mouse'].earn();
+    FrozenCookies.autoClick = 1;
+    FrozenCookies.cookieClickSpeed = 35;
+    FrozenCookies.autoWorshipToggle = 0;
+    FrozenCookies.autoDragonToggle = 0;
+}
+
 test('a CpS buff does not make a clicking god look worth a swap', { skip }, async () => {
     const game = await launchWithMod();
     try {
         await openTemple(game);
+        await game.eval(clickingBakery);
         await game.eval(() => {
-            // One mouse upgrade: each click adds 1% of CpS, and the game reads the buffed CpS
-            // (main.js:4692). Between buffs Jeremy is the best god here; under a Frenzy the model
-            // sees seven times the clicking and Muridal wins.
-            Game.Upgrades['Plastic mouse'].earn();
-            FrozenCookies.autoClick = 1;
-            FrozenCookies.cookieClickSpeed = 50;
             FrozenCookies.autoGods = 1;
-            FrozenCookies.autoWorshipToggle = 0;
             Game.gainBuff('frenzy', 20 * 60, 7);
         });
         await game.advanceSeconds(6 * 60);
-        const during = await game.eval(() => MushieCookies.gods.report());
-        assert.equal(during.swaps, 0, `swapped during the Frenzy: ${during.last}`);
+        const during = await game.eval(godsNow);
+        assert.equal(during.report.swaps, 1, `the decision is made during the Frenzy: ${JSON.stringify(during.report)}`);
+        assert.deepEqual(during.keys, ['industry', null, null], 'and it is the best god between buffs');
 
         await game.eval(() => {
             Game.buffs['Frenzy'].time = 0;
         });
         await game.advanceSeconds(60);
-        const after = await game.eval(() => {
-            const M = Game.Objects['Temple'].minigame;
-            return { report: MushieCookies.gods.report(), keys: M.slot.map((id) => (id === -1 ? null : Object.keys(M.gods)[id])) };
-        });
+        const after = await game.eval(godsNow);
         assert.equal(after.report.swaps, 1, JSON.stringify(after.report));
-        assert.deepEqual(after.keys, ['industry', null, null], 'once the buff is over, the best god between buffs');
+        assert.deepEqual(after.keys, ['industry', null, null], 'nothing to undo once the buff is over');
+    } finally {
+        await game.close();
+    }
+});
+
+test('a long CpS buff changes neither what gods and auras are worth nor which god is chosen', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        await game.eval(clickingBakery);
+        const plans = await game.eval(() => {
+            Game.dragonLevel = 20; // auras 0 to 16 (Dragon's Fortune) can be chosen: level >= id + 4
+            const plain = MushieCookies.gods.plan();
+            // A modest loan: x1.5 CpS for two hours (minigameMarket.js:350, 376), longer than
+            // anything worth waiting out.
+            Game.gainBuff('loan 1', 2 * 60 * 60, 1.5);
+            const loaned = MushieCookies.gods.plan();
+            // The what-ifs put the buffs back: the loan still multiplies CpS.
+            const restored = !!Game.hasBuff('Loan 1') && Math.abs(Game.cookiesPs / Game.unbuffedCps - 1.5) < 1e-9;
+            FrozenCookies.autoGods = 1;
+            return { plain, loaned, restored };
+        });
+        assert.equal(plans.restored, true, 'the buffs are restored after the what-ifs');
+        // A payback is Infinity (null here) for an aura that adds nothing once the building is rebought.
+        const close = (a, b) => a === b || Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+        assert.ok(plans.plain.gods.length > 0 && plans.plain.auras.length > 0, 'gods and auras are measured');
+        for (const m of plans.plain.gods) {
+            const l = plans.loaned.gods.find((x) => x.god === m.god && x.slot === m.slot);
+            assert.ok(l && close(l.gain, m.gain), `${m.god} in slot ${m.slot}: +${(m.gain * 100).toFixed(3)}% with no buff, +${l && (l.gain * 100).toFixed(3)}% under the loan`);
+        }
+        for (const m of plans.plain.auras) {
+            const l = plans.loaned.auras.find((x) => x.id === m.id && x.slot === m.slot);
+            assert.ok(l && close(l.gain, m.gain) && close(l.payback, m.payback), `${m.name}: ${JSON.stringify(m)} with no buff, ${JSON.stringify(l)} under the loan`);
+        }
+        const best = plans.plain.gods.reduce((a, b) => (b.gain > a.gain ? b : a));
+        assert.ok(best.gain > 0.01, 'a god is worth a swap');
+
+        await game.advanceSeconds(6 * 60);
+        const after = await game.eval(godsNow);
+        assert.ok(after.buffs.includes('Loan 1'), 'the loan is still running');
+        const expected = [null, null, null];
+        expected[best.slot] = best.god;
+        assert.deepEqual(after.keys, expected, `chose ${after.report.last}; the best with no buff is ${best.god} in slot ${best.slot}`);
+    } finally {
+        await game.close();
+    }
+});
+
+test('a CpS debuff does not hold decisions back', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        await game.eval(clickingBakery);
+        await game.eval(() => {
+            FrozenCookies.autoGods = 1;
+            // A pawnshop loan's interest: x0.1 CpS for 40 minutes (minigameMarket.js:351, 380).
+            Game.gainBuff('loan 2 interest', 40 * 60, 0.1);
+        });
+        await game.advanceSeconds(6 * 60);
+        const after = await game.eval(godsNow);
+        assert.ok(after.buffs.includes('Loan 2 (interest)'), 'the interest is still being paid');
+        assert.equal(after.report.swaps, 1, `no decision while the interest ran: ${JSON.stringify(after.report)}`);
+        assert.deepEqual(after.keys, ['industry', null, null], 'the best god with no buff or debuff');
+    } finally {
+        await game.close();
+    }
+});
+
+/** Runs in the page: drags gods into slots the way a player does, each drop spending a swap. */
+function playerSlots(pairs) {
+    const M = Game.Objects['Temple'].minigame;
+    for (const [key, slot] of pairs) {
+        M.dragGod(M.gods[key]);
+        M.slotHovered = slot;
+        M.dropGod();
+        M.slotHovered = -1;
+    }
+}
+
+test('gods the system never slots keep the slots the player put them in', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        // Rigidel and Holobore are worth nothing and 15% to the income model: removing Rigidel
+        // looked free. Nothing clicks golden cookies, so Holobore stays put too.
+        await game.eval(playerSlots, [
+            ['order', 0],
+            ['asceticism', 1],
+        ]);
+        const before = await game.eval(() => {
+            FrozenCookies.autoGC = 0;
+            FrozenCookies.autoFate = 0;
+            FrozenCookies.autoWorshipToggle = 0;
+            FrozenCookies.autoGods = 1;
+            const M = Game.Objects['Temple'].minigame;
+            return { swaps: M.swaps, keys: M.slot.map((id) => (id === -1 ? null : Object.keys(M.gods)[id])) };
+        });
+        assert.deepEqual(before.keys, ['order', 'asceticism', null]);
+        await game.advanceSeconds(11 * 60);
+        const after = await game.eval(godsNow);
+        assert.deepEqual(after.keys.slice(0, 2), ['order', 'asceticism'], `slots now ${after.keys.join(', ')}: ${after.report.last}`);
+        // The system still works around them: the swap left goes to the free slot.
+        assert.equal(after.report.swaps, 1, JSON.stringify(after.report));
+        assert.ok(after.keys[2] !== null, `slots now ${after.keys.join(', ')}`);
+        assert.equal(before.swaps - after.swaps, after.report.swaps, 'each slotting spent one swap');
+    } finally {
+        await game.close();
+    }
+});
+
+test('while golden cookies are clicked, Holobore is taken out before a click takes every swap with him', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        await game.eval(playerSlots, [
+            ['order', 0],
+            ['asceticism', 1],
+        ]);
+        const before = await game.eval(() => {
+            FrozenCookies.autoGC = 1;
+            FrozenCookies.autoWorshipToggle = 0;
+            FrozenCookies.autoGods = 1;
+            return Game.Objects['Temple'].minigame.swaps;
+        });
+        assert.equal(before, 1, 'the player spent two of the three swaps');
+        await game.advanceSeconds(2);
+        // A golden cookie, clicked as it appears (fc_main.js:1311-1315). With Holobore slotted it
+        // would unslot him and take the swap left.
+        await game.eval(() => {
+            window.__cookie = new Game.shimmer('golden');
+            window.__cookie.life = Game.fps * 60; // it cannot fade before it is clicked
+        });
+        await game.advanceSeconds(2);
+        const out = await game.eval(godsNow);
+        const gone = await game.eval(() => !Game.shimmers.includes(window.__cookie));
+        assert.equal(gone, true, 'the golden cookie was clicked');
+        assert.equal(out.swaps, 1, `the click cost the swap left: ${JSON.stringify(out.report)}`);
+        assert.deepEqual(out.keys, ['order', null, null], `slots now ${out.keys.join(', ')}`);
+        assert.equal(out.report.unslotted, 1, 'the system took Holobore out; taking a god out of a slot is free (minigamePantheon.js:271-277)');
+
+        // The swap left goes to the best god for a free slot; Rigidel keeps his.
+        await game.advanceSeconds(5 * 60);
+        const after = await game.eval(godsNow);
+        assert.equal(after.keys[0], 'order', `slots now ${after.keys.join(', ')}`);
+        assert.ok(!after.keys.includes('asceticism'));
+        assert.equal(after.report.swaps, 1, JSON.stringify(after.report));
+        assert.equal(after.swaps, 0);
+    } finally {
+        await game.close();
+    }
+});
+
+test('with the Golden switch on, a slotted Holobore stays even with golden cookie clicking on', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        await game.eval(playerSlots, [['asceticism', 1]]);
+        await game.eval(() => {
+            // No golden cookie spawns while the switch is on (main.js:5673-5676).
+            Game.Upgrades['Golden switch [off]'].earn();
+            FrozenCookies.autoGC = 1;
+            FrozenCookies.autoWorshipToggle = 0;
+            FrozenCookies.autoGods = 1;
+        });
+        await game.advanceSeconds(6 * 60);
+        const after = await game.eval(godsNow);
+        assert.equal(after.keys[1], 'asceticism', `slots now ${after.keys.join(', ')}: ${after.report.last}`);
+        assert.equal(after.report.unslotted, 0);
     } finally {
         await game.close();
     }
@@ -235,6 +420,51 @@ test('picks the dragon aura that adds the most income and pays the game\'s price
         assert.equal(after.owned, out.owned - 1, 'and only that one');
         assert.equal(after.report.auraChanges, 1);
         assert.equal(after.prompt, false, 'no prompt is left open');
+    } finally {
+        await game.close();
+    }
+});
+
+test('an aura switch must repay its building within the time the run is expected to last', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        const start = await game.eval(() => {
+            Game.Earn(1e15);
+            for (const name of ['Cursor', 'Grandma', 'Farm', 'Mine', 'Factory', 'Bank']) Game.Objects[name].buy(60);
+            Game.Objects['Shipment'].buy(10);
+            // The highest building is a single Alchemy lab, a large share of income: Radiant
+            // Appetite repays it in about two hours.
+            Game.Objects['Alchemy lab'].buy(1);
+            Game.dragonLevel = 20;
+            Game.dragonAura = 0;
+            Game.CalculateGains();
+            FrozenCookies.autoGods = 1;
+            FrozenCookies.autoDragonToggle = 0;
+            return {
+                appetite: MushieCookies.gods.plan().auras.find((m) => m.name === 'Radiant Appetite'),
+                run: (Date.now() - Game.startDate) / 1000,
+                owned: Game.BuildingsOwned,
+            };
+        });
+        const { appetite } = start;
+        assert.ok(appetite.gain > 0.02 && appetite.payback > 3600 && appetite.payback < 3 * 3600, JSON.stringify(appetite));
+        assert.ok(start.run < 60, 'the run has just begun');
+
+        // A run minutes old is expected to last about an hour more (at least): too short.
+        await game.advanceSeconds(6 * 60);
+        const fresh = await game.eval(() => ({ aura: Game.dragonAura, owned: Game.BuildingsOwned, report: MushieCookies.gods.report() }));
+        assert.equal(fresh.aura, 0, `switched: ${fresh.report.last}`);
+        assert.equal(fresh.owned, start.owned);
+
+        // The same bakery three hours into the run is expected to last about three hours more.
+        await game.eval(() => {
+            Game.startDate -= 3 * 60 * 60 * 1000;
+        });
+        await game.advanceSeconds(5 * 60);
+        const later = await game.eval(() => ({ name: Game.dragonAuras[Game.dragonAura].name, owned: Game.BuildingsOwned, report: MushieCookies.gods.report() }));
+        assert.equal(later.name, 'Radiant Appetite', JSON.stringify(later.report));
+        assert.equal(later.report.auraChanges, 1);
+        assert.equal(later.owned, start.owned - 1, 'the Alchemy lab is sacrificed');
     } finally {
         await game.close();
     }

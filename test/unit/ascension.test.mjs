@@ -73,3 +73,15 @@ test('rates are reported for the menu even when not ascending', () => {
     const out = shouldAscend(run((t) => 100 + t, 7200));
     assert.ok(Number.isFinite(out.instantRate) && Number.isFinite(out.averageRate));
 });
+
+test('the verdict says whether the rate comparison decided it, for systems that time things to it', () => {
+    // Sugar frenzy starts as the rate closes on the average; before the rule is live (a short run,
+    // a thin history, a first ascension) the rates are not a judgement of the run's end.
+    const f = (t) => 100 + t;
+    assert.equal(shouldAscend(run(f, 7200)).rated, true);
+    assert.equal(shouldAscend({ ...run(f, 1500), minRunSeconds: 1800 }).rated, false, 'run too short');
+    assert.equal(shouldAscend({ ...run((t) => t / 10, 3000, 0), firstTarget: 365 }).rated, false, 'first ascension');
+    assert.equal(shouldAscend({ prestige: 100, projected: 100.9, history: [{ t: 0, projected: 100 }], runSeconds: 99999 }).rated, false);
+    const flat = (t) => 100 + (t < 7200 ? Math.exp(t / 900) : Math.exp(8) + (t - 7200) / 100);
+    assert.equal(shouldAscend(run(flat, 10800)).rated, true, 'an ascension the rule decided');
+});
