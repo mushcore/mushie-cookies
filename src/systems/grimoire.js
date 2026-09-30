@@ -1,12 +1,21 @@
 // Casts Force the Hand of Fate at the right moment: the next outcome is forecast, bad ones are
-// burnt with the cheapest spell, good ones wait for a buff to land on unless mana is full.
+// burnt with a harmless spell, good ones wait for a buff to land on unless mana is full.
 import { forecastFate } from '../game/fate.js';
 import { decideCast } from '../core/grimoire.js';
 import { readState } from '../game/measure.js';
 
 const TICK_EVERY = 15; // frames
 const FATE = 'hand of fate';
-const SKIP = "haggler's charm"; // the cheapest spell; its backfire is a mild price rise on upgrades
+// A skip only moves the spell count on, which reseeds the next cast (minigameGrimoire.js:312).
+// It draws the same first number as the cast it replaces (:313), so skipping a backfire makes the
+// skip backfire too, unless golden cookies on screen raised the fate spell's chance. Haggler's
+// Charm is harmless either way: upgrades 2% cheaper for a minute, or 2% dearer for an hour that
+// does not stack (:149-168, main.js:14022-14031). The spells that can cost less are not:
+// Gambler's Fever Dream casts a random spell a second later at 50% or more to backfire, Force the
+// Hand of Fate and Spontaneous Edifice among them (:189-216); below 27, 20 and 50 max magic,
+// Conjure Baked Goods, Stretch Time and Diminish Ineptitude backfire into a 15-minute clot,
+// running buffs cut by a fifth, or five times the backfires for 10 minutes (:27-34, 99-111, 251-256).
+const SKIP = "haggler's charm";
 
 /**
  * @param {object} deps
