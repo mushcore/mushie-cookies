@@ -47,13 +47,14 @@ export function extraReserveFrom(settings, helpers) {
 /** Starts the new systems once the legacy code has started. Returns them by name. */
 export function startSystems({ game, loop, legacy, log }) {
     const settings = legacy.settings;
+    let lumps = null; // created below; the buyer keeps the bank a golden lump is timed to pay on
     const buyer = createBuyer({
         game,
         settings,
         loop,
         log,
         policy: () => policyFrom(game, settings, legacy.blacklistPresets, legacy.prerequisites),
-        extraReserve: () => extraReserveFrom(settings, legacy),
+        extraReserve: () => Math.max(extraReserveFrom(settings, legacy), lumps ? lumps.hold() : 0),
     });
     const ascension = createAscension({
         game,
@@ -64,7 +65,17 @@ export function startSystems({ game, loop, legacy, log }) {
         extras: () => legacy.wrinklerValue() + legacy.chocolateValue(),
         prepare: () => legacy.prepareForAscension(),
     });
-    const lumps = createLumps({ game, settings, loop, log });
+    lumps = createLumps({
+        game,
+        settings,
+        loop,
+        log,
+        buyer,
+        // The ascension's growth verdict times Sugar frenzy; while its verdict is not yet known the
+        // growth reads as unknown, and with it off nothing ends the run.
+        run: () => (settings.autoAscendToggle == 1 ? ascension.verdict() || { instantRate: Infinity, averageRate: 0, rated: false } : null),
+        ascending: () => settings.autoAscendToggle == 1 && ascension.phase() === 'settling',
+    });
     const grimoire = createGrimoire({ game, settings, loop, log });
     const garden = createGarden({ game, settings, loop, log, reserve: () => buyer.reserve() });
     const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
