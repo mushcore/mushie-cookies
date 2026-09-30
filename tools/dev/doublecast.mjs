@@ -7,8 +7,10 @@
 //
 // Casting outcomes come from the game's seed and the spell count (minigameGrimoire.js:312), so
 // with natural golden cookies off (--no-golden) both variants of a seed face the same outcomes:
-// a luck-free, paired comparison. With them on, golden cookie luck dominates single runs; use
-// many seeds.
+// a luck-free, paired comparison. With them on, natural golden cookies and storm drops draw from
+// generators of their own seeded by the seed (pairGoldenLuck), so both variants of a seed see the
+// same natural cookies at the same moments until what the variants did changes an outcome (a
+// Lucky's payout follows the bank, a chain the bank too); the seeds differ in their luck.
 //
 // Usage: node tools/dev/doublecast.mjs <gameHours> <seed> <single|double> [--no-golden]
 //        [--prestige=N] [--towers=N] [--payback=seconds] [--calibrate] [--mod=built main.js] > out.json
@@ -183,7 +185,73 @@ try {
     });
     await game.waitFor(() => !!(Game.Objects['Wizard tower'].minigame && Game.Objects['Wizard tower'].minigame.spells));
     const start = await game.eval(
-        ({ variant, golden }) => {
+        ({ variant, golden, seed }) => {
+            /**
+             * Test fixture: pairs the golden cookie luck of the two variants of a seed. Natural
+             * golden cookies (the spawn roll, the cookie, its outcome, any chain it starts) and
+             * storm drops draw from generators of their own, seeded by the seed, instead of
+             * Math.random, which each purchase also draws from (its sound, main.js choose()) and so
+             * parts as soon as the variants buy differently. Spawning is main.js:5249-5286 with
+             * those generators; cookies a spell makes draw from Math.random as before.
+             */
+            function pairGoldenLuck(name) {
+                const generator = (text) => {
+                    let a = 2166136261;
+                    for (let i = 0; i < text.length; i++) a = Math.imul(a ^ text.charCodeAt(i), 16777619);
+                    return () => {
+                        a = (a + 0x6d2b79f5) | 0;
+                        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+                        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+                    };
+                };
+                const natural = generator(`${name} natural golden`);
+                const storm = generator(`${name} storm drops`);
+                const using = (random, f) => {
+                    const own = Math.random;
+                    Math.random = random;
+                    try {
+                        return f();
+                    } finally {
+                        Math.random = own;
+                    }
+                };
+                Game.updateShimmers = function () {
+                    for (const i in Game.shimmers) Game.shimmers[i].update();
+                    using(storm, () => {
+                        if (Game.hasBuff('Cookie storm') && Math.random() < 0.5) {
+                            const drop = new Game.shimmer('golden', { type: 'cookie storm drop' }, 1);
+                            drop.dur = Math.ceil(Math.random() * 4 + 1);
+                            drop.life = Math.ceil(Game.fps * drop.dur);
+                            drop.sizeMult = Math.random() * 0.75 + 0.25;
+                            drop.__luck = storm;
+                        }
+                    });
+                    for (const i in Game.shimmerTypes) {
+                        const me = Game.shimmerTypes[i];
+                        if (!me.spawnsOnTimer || !me.spawnConditions() || me.spawned) continue;
+                        me.time++;
+                        using(i === 'golden' ? natural : Math.random, () => {
+                            if (Math.random() < Math.pow(Math.max(0, (me.time - me.minTime) / (me.maxTime - me.minTime)), 5)) {
+                                const lead = new Game.shimmer(i);
+                                lead.spawnLead = 1;
+                                lead.__luck = natural;
+                                if (Game.Has('Distilled essence of redoubled luck') && Math.random() < 0.01) new Game.shimmer(i).__luck = natural;
+                                me.spawned = 1;
+                            }
+                        });
+                    }
+                };
+                const pop = Game.shimmerTypes.golden.popFunc;
+                Game.shimmerTypes.golden.popFunc = function (me) {
+                    if (!me.__luck) return pop.call(this, me);
+                    const before = new Set(Game.shimmers);
+                    const out = using(me.__luck, () => pop.call(this, me));
+                    // A chain goes on with a cookie of its own, as lucky as the one before.
+                    for (const s of Game.shimmers) if (!before.has(s)) s.__luck = me.__luck;
+                    return out;
+                };
+            }
             const M = Game.Objects['Wizard tower'].minigame;
             M.computeMagicM();
             M.magic = M.magicM;
@@ -192,6 +260,7 @@ try {
             // An hour of CpS in the bank.
             Game.cookies = Game.cookiesPs * 3600;
             if (!golden) Game.shimmerTypes.golden.spawnConditions = () => false;
+            else pairGoldenLuck(seed);
             Object.assign(FrozenCookies, {
                 autoBuy: 1,
                 autoGC: 1,
@@ -216,7 +285,7 @@ try {
                 spells: M.spellsCastTotal,
             };
         },
-        { variant, golden }
+        { variant, golden, seed }
     );
     if (calibrate) {
         await game.advanceSeconds(10);
