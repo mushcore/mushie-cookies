@@ -26,9 +26,13 @@ const DRAGON_COOKIE_LEVEL = 26; // level 25's sacrifice unlocks the Dragon cooki
  * @param {object} deps.loop
  * @param {() => number} [deps.reserve]  cookies the buyer is holding
  * @param {{invalidate(): void}} [deps.buyer]
+ * @param {() => number} [deps.runSeconds]  seconds of play in this run: the ascension system's
+ *   clock (src/systems/ascension.js runSeconds), which a machine sleep does not move. The wall
+ *   clock counted a night asleep as run, so a level looked hours more worth its sacrifice.
+ *   Without it (standalone), the wall clock.
  * @param {(what: string) => void} [deps.log]
  */
-export function createDragon({ game, settings, loop, reserve = () => 0, buyer = null, log = () => {} }) {
+export function createDragon({ game, settings, loop, reserve = () => 0, buyer = null, runSeconds = null, log = () => {} }) {
     // 'measured' is the rule this system is built on; 'eager' (train whatever the game's own cost
     // check allows, the inherited rule, fc_gods.js:562-589 before this system) is kept so the two
     // can be compared in the harness.
@@ -37,7 +41,7 @@ export function createDragon({ game, settings, loop, reserve = () => 0, buyer = 
     const listeners = [];
 
     const income = () => estimateIncome(readState(game, settings)).total;
-    const runSeconds = () => Math.max(0, (Date.now() - game.startDate) / 1000);
+    const playedSeconds = runSeconds || (() => Math.max(0, (Date.now() - game.startDate) / 1000));
 
     // --- Measuring auras ----------------------------------------------------------------------
 
@@ -180,7 +184,7 @@ export function createDragon({ game, settings, loop, reserve = () => 0, buyer = 
         const switchPrice = highestPrice();
         const switches = best.map((b) => [0, 1].filter((s) => b.auras[s] !== best[0].auras[s]).length);
         const switchCost = switches.map((n) => n * switchPrice);
-        const horizon = horizonSeconds(runSeconds());
+        const horizon = horizonSeconds(playedSeconds());
         const choice = chooseTarget({ level, steps, income: best.map((b) => b.income), horizon, switchCost, switches, minSwitchGain: AURA_GAIN });
         return { ...choice, level, horizon, auras: choice.target ? best[choice.target - level].auras.map((a) => game.dragonAuras[a].name) : null };
     }
