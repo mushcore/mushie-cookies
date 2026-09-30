@@ -128,8 +128,10 @@ export function installVirtualTime({ epoch, modUrls }) {
         loadNext(0);
     };
 
-    vt.takeover = (seed) => {
-        vt.start = epoch + 10 * 60 * 1000; // fixed, and later than any real boot
+    vt.takeover = (seed, startAt) => {
+        // Fixed, and later than any real boot; a run resumed from a checkpoint starts at the
+        // moment the checkpoint was taken, so the save's own dates line up with the clock.
+        vt.start = startAt || epoch + 10 * 60 * 1000;
         vt.now = vt.start;
         vt.frames = 0;
         vt.active = true;

@@ -239,6 +239,8 @@ function setOverrides(gameSaveData) {
         FrozenCookies.orbMax = preferenceParse("orbMax", 0);
 
         // Restore some possibly broken settings
+        // Auto Rigidel (autoSL 2) is gone; a player who chose it still wants the harvest.
+        if (FrozenCookies.autoSL == 2) FrozenCookies.autoSL = 1;
         if (
             !FrozenCookies.autoFTHOFCombo &&
             autoFTHOFComboAction.autobuyyes == 1
@@ -1240,20 +1242,7 @@ function autoCookieBody() {
         }
         FrozenCookies.hc_gain += changeAmount;
     }
-    if (FrozenCookies.autoSL == 1) {
-        var started = Game.lumpT;
-        var ripeAge = Math.ceil(Game.lumpRipeAge);
-        if (
-            Date.now() - started >= ripeAge &&
-            Game.dragonLevel >= 21 &&
-            FrozenCookies.dragonsCurve
-        ) {
-            autoDragonsCurve();
-        } else if (Date.now() - started >= ripeAge) {
-            Game.clickLump();
-        }
-    }
-    if (FrozenCookies.autoSL == 2) autoRigidel();
+    // Sugar lumps are harvested by the lump system (src/systems/lumps.js).
     if (FrozenCookies.autoWrinkler == 1) {
         var popCount = 0;
         var popList = shouldPopWrinklers();
@@ -1468,16 +1457,6 @@ function FCStart() {
         FrozenCookies.autoLoanBot = 0;
     }
 
-    if (FrozenCookies.autoDragonBot) {
-        clearInterval(FrozenCookies.autoDragonBot);
-        FrozenCookies.autoDragonBot = 0;
-    }
-
-    if (FrozenCookies.petDragonBot) {
-        clearInterval(FrozenCookies.petDragonBot);
-        FrozenCookies.petDragonBot = 0;
-    }
-
     if (FrozenCookies.autoDragonAura0Bot) {
         clearInterval(FrozenCookies.autoDragonAura0Bot);
         FrozenCookies.autoDragonAura0Bot = 0;
@@ -1624,19 +1603,7 @@ function FCStart() {
         );
     }
 
-    if (FrozenCookies.autoDragon) {
-        FrozenCookies.autoDragonBot = setInterval(
-            MushieCookies.guard("legacy:autoDragonAction", autoDragonAction),
-            FrozenCookies.frequency
-        );
-    }
-
-    if (FrozenCookies.petDragon) {
-        FrozenCookies.petDragonBot = setInterval(
-            MushieCookies.guard("legacy:petDragonAction", petDragonAction),
-            FrozenCookies.frequency * 10
-        );
-    }
+    // autoDragon and petDragon are read by src/systems/dragon.js on the mod's loop.
 
     if (FrozenCookies.autoDragonAura0) {
         FrozenCookies.autoDragonAura0Bot = setInterval(

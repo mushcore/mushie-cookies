@@ -51,7 +51,8 @@ export function shouldAscend({
     const span = past ? Math.max(1, runSeconds - past.t) : 0;
     const instantRate = past ? (now - u(past.projected)) / span : Infinity;
 
-    const verdict = (ascend, reason) => ({ ascend, reason, instantRate, averageRate });
+    // rated: the rate comparison decided, past every gate; other systems time things to it.
+    const verdict = (ascend, reason, rated = false) => ({ ascend, reason, instantRate, averageRate, rated });
 
     if (gain < 1) return verdict(false, 'no prestige to gain');
     if (prestige === 0) {
@@ -62,7 +63,7 @@ export function shouldAscend({
     if (runSeconds < minRunSeconds) return verdict(false, 'run too short');
     if (!past || span < windowSeconds / 2) return verdict(false, 'not enough history');
     if (instantRate < averageRate) {
-        return verdict(true, `growth has slowed: ${instantRate.toExponential(2)}/s now against ${averageRate.toExponential(2)}/s for the run`);
+        return verdict(true, `growth has slowed: ${instantRate.toExponential(2)}/s now against ${averageRate.toExponential(2)}/s for the run`, true);
     }
-    return verdict(false, 'still growing faster than the run average');
+    return verdict(false, 'still growing faster than the run average', true);
 }
