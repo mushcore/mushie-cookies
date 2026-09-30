@@ -43,16 +43,46 @@ if (!game) {
     process.exit(1);
 }
 const doubles = [];
+// --trace: every grimoire line to stderr, to see why two variants part.
+const trace = args.includes('--trace');
 game.page.on('console', (m) => {
     const text = m.text();
     if (text.includes('double cast')) doubles.push(text.replace('[Mushie Cookies] ', ''));
+    if (trace && /Hand of Fate|double cast|Haggler/.test(text)) process.stderr.write(`${text}\n`);
 });
 
 /** Runs the variant for `hours` from the fixture and prints the result. */
 async function measure(start, fixture, started) {
     const points = [];
     for (let h = 1; h <= hours; h++) {
-        await game.advanceSeconds(3600);
+        if (trace) {
+            // Minute by minute: cookies earned, what the double cast keeps from the buyer (in
+            // seconds of CpS), and the grimoire's last decisions.
+            for (let m = 1; m <= 60; m++) {
+                await game.advanceSeconds(60);
+                const k = await game.eval(() => {
+                    const r = MushieCookies.grimoire.report();
+                    return {
+                        earned: Game.cookiesEarned,
+                        kept: MushieCookies.buyer.kept('grimoire') / Game.unbuffedCps,
+                        towers: Game.Objects['Wizard tower'].amount,
+                        decision: r.decision && `${r.decision.action} ${r.decision.next}: ${r.decision.reason}`,
+                        double: r.double && `${r.double.action} ${r.double.second}: ${r.double.reason}`,
+                        buyer: MushieCookies.buyer.activity(),
+                        held: MushieCookies.buyer.held(),
+                        next: (() => {
+                            const n = MushieCookies.buyer.next();
+                            return n ? `${n.name} ${(n.price / Game.unbuffedCps).toFixed(0)} s` : null;
+                        })(),
+                        buffs: Object.keys(Game.buffs).join('+'),
+                    };
+                });
+                process.stderr.write(
+                    `${h - 1}h${m}m earned ${(k.earned - start.earned).toExponential(4)} kept ${k.kept.toFixed(0)} s towers ${k.towers} ` +
+                        `bought ${k.buyer.purchases} ranks ${k.buyer.ranks}${k.held ? ' HELD' : ''} next ${k.next} [${k.buffs}] | ${k.decision} | ${k.double}\n`
+                );
+            }
+        } else await game.advanceSeconds(3600);
         const p = await game.eval(() => ({
             earned: Game.cookiesEarned,
             cps: Game.unbuffedCps,
