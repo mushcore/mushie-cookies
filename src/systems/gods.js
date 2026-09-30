@@ -16,7 +16,8 @@ const AURA_GAIN = 0.02;
 // Gods whose worth the income model cannot see, or that would work against the mod:
 // Holobore unslots itself (and empties the swaps) when a golden cookie is clicked; Godzamok pays
 // only when buildings are sold; Cyclius follows the clock, which would have the mod chase it;
-// Rigidel affects only sugar lump timing.
+// Rigidel affects only sugar lump timing. These are the keys of the Pantheon's `gods` table; the
+// gods themselves carry no key (minigamePantheon.js:12, 123).
 const SKIP_GODS = new Set(['asceticism', 'ruin', 'ages', 'order']);
 // Auras whose effect is not income: selling, discounts, drops, minigames, lumps, orbs.
 const SKIP_AURAS = new Set(['Earth Shatterer', 'Master of the Armory', 'Fierce Hoarder', 'Mind Over Matter', "Dragon's Curve", 'Supreme Intellect', 'Dragon Orbs']);
@@ -53,8 +54,9 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
         if (!M || !M.godsById || M.swaps < 1) return;
         const now = income();
         let best = null;
-        for (const god of M.godsById) {
-            if (SKIP_GODS.has(god.key)) continue;
+        for (const key of Object.keys(M.gods)) {
+            if (SKIP_GODS.has(key)) continue;
+            const god = M.gods[key];
             for (let slot = 0; slot < 3; slot++) {
                 if (god.slot === slot) continue;
                 const after = measureGodMove(M, god, slot);
