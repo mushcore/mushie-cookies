@@ -1,0 +1,150 @@
+{
+ "hours": 3,
+ "fixture": "1e13 earned, 80 each of the first eight buildings, Wizard tower level 1; buying and clicking on; golden cookies on",
+ "runs": [
+  {
+   "seed": "cast1",
+   "variant": "none",
+   "earnedBeyondFixture": 11612460732976.176,
+   "spells": 0,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast1",
+   "variant": "inherited",
+   "earnedBeyondFixture": 27450986459335.65,
+   "spells": 8,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast1",
+   "variant": "forecast",
+   "earnedBeyondFixture": 21388437076931.723,
+   "spells": 9,
+   "casts": 9,
+   "skips": 0
+  },
+  {
+   "seed": "cast2",
+   "variant": "none",
+   "earnedBeyondFixture": 29263311098621.234,
+   "spells": 0,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast2",
+   "variant": "inherited",
+   "earnedBeyondFixture": 21284835898287.496,
+   "spells": 2,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast2",
+   "variant": "forecast",
+   "earnedBeyondFixture": 390627423456087.06,
+   "spells": 8,
+   "casts": 8,
+   "skips": 0
+  },
+  {
+   "seed": "cast3",
+   "variant": "none",
+   "earnedBeyondFixture": 52280650732862.25,
+   "spells": 0,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast3",
+   "variant": "inherited",
+   "earnedBeyondFixture": 8312053471553.223,
+   "spells": 9,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast3",
+   "variant": "forecast",
+   "earnedBeyondFixture": 22572139788214.47,
+   "spells": 10,
+   "casts": 7,
+   "skips": 3
+  },
+  {
+   "seed": "cast4",
+   "variant": "none",
+   "earnedBeyondFixture": 7467907829590.375,
+   "spells": 0,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast4",
+   "variant": "inherited",
+   "earnedBeyondFixture": 57657549669599.24,
+   "spells": 3,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast4",
+   "variant": "forecast",
+   "earnedBeyondFixture": 771342555785072.6,
+   "spells": 9,
+   "casts": 9,
+   "skips": 0
+  },
+  {
+   "seed": "cast5",
+   "variant": "none",
+   "earnedBeyondFixture": 23418416990987.637,
+   "spells": 0,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast5",
+   "variant": "inherited",
+   "earnedBeyondFixture": 24197998149475.746,
+   "spells": 7,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast5",
+   "variant": "forecast",
+   "earnedBeyondFixture": 781888515647414.9,
+   "spells": 11,
+   "casts": 8,
+   "skips": 3
+  },
+  {
+   "seed": "cast6",
+   "variant": "none",
+   "earnedBeyondFixture": 24341335389927.938,
+   "spells": 0,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast6",
+   "variant": "inherited",
+   "earnedBeyondFixture": 13789383371130.035,
+   "spells": 0,
+   "casts": 0,
+   "skips": 0
+  },
+  {
+   "seed": "cast6",
+   "variant": "forecast",
+   "earnedBeyondFixture": 30746355007769.695,
+   "spells": 8,
+   "casts": 8,
+   "skips": 0
+  }
+ ]
+}

@@ -146,6 +146,13 @@ Carried into M2: with the mod buying, the harness runs at about 25 times real ti
 
 Verified by: time to reach a target CpS from recorded starting states, new logic against legacy logic, in the harness.
 
+Status: done 2026-09-29, with a finding that changed how every later milestone is measured.
+
+- A single run is dominated by golden cookie luck. First readings of 2× to 35× over M1 were luck: with golden cookies switched off, which makes runs fully deterministic, the new buyer was at 0.81×.
+- Two real defects explained that gap, and both are fixed: the income model credited golden cookies when none could spawn, and chains read tier thresholds that are not always the real unlock count (Billion fingers unlocks at 100 cursors, not its tier's 150). Chains now come from the upstream prerequisite table.
+- Luck-free, the buyer is now 0.96× to 1.03× of M1 over two hours; the acceptance test guards that level. With golden cookies on, over nine seeds, the geometric mean is 1.53× but the spread (0.05× to 32×) makes that indistinguishable from parity. Purchase ordering was already close to optimal upstream; the buyer's gains are correctness (no phantom state, achievements counted, spawn rules honoured) and speed (the harness runs about four times faster with it).
+- Evidence: `test/baselines/m1-two-hours-nogolden.json`, `m2-vs-m1-9-seeds.json`, `m2-reserve-sweep.log`.
+
 ### M3 — Ascension
 
 - Timing rule: ascend when the current rate of prestige growth falls below the run's average rate, measured on a log scale and including rebuild time. This is the point where staying longer earns less than starting again.
@@ -157,6 +164,8 @@ Verified by: time to reach a target CpS from recorded starting states, new logic
 
 Verified by: prestige per day over multi-ascension runs in the harness, against the upstream "double your prestige" rule.
 
+Status: implemented 2026-09-29; the mechanics are verified, the rule comparison is not. A harness test runs a first ascension end to end (plan heavenly upgrades on the living bakery, ascend, buy, reincarnate, rebuild) and manual ascensions are left alone. The comparison with the doubling rule could not be made: luck-free, prestige grows so slowly that neither rule fires within twelve game hours even from prestige 5, and ascension plays out over game days. The rate rule is kept on theoretical grounds (it is the stopping rule that maximises long-run average yield for a repeated process) and the doubling rule stays available as an option.
+
 ### M4 — Sugar lumps
 
 - Harvest when ripe, never when merely mature.
@@ -166,6 +175,8 @@ Verified by: prestige per day over multi-ascension runs in the harness, against 
 Without this milestone the mod cannot unlock a minigame on its own, because upstream never spends a lump.
 
 Verified by: a fresh-save harness run unlocks all four minigames unattended.
+
+Status: done 2026-09-29 for spending: minigames, Farm 9, Cursor 12, then the best CpS gain per lump, holding 100 with Sugar baking. Harness tests show the minigames unlocking and the hold respected. Refills for combos are left to M5's later work.
 
 ### M5 — Combos
 
@@ -177,6 +188,12 @@ Verified by: a fresh-save harness run unlocks all four minigames unattended.
 
 Verified by: forecast checked against real casts in the harness, outcome by outcome; combo income per day against upstream.
 
+Status: single-cast forecasting done 2026-09-29; dual-casting, Godzamok, Golden Switch and loans are not yet replaced.
+
+- The forecast matched 200 of 200 real casts across five seasons, including backfires with golden cookies on screen, and leaves the game's own random sequence untouched (the inherited predictor reseeded the global generator).
+- The casting policy values the next outcome in cookies given the buffs running, burns bad outcomes with Haggler's Charm, and lands good ones on a running buff or casts when mana is full.
+- Over six seeds, three game hours from a mid-game bakery: forecast casting earned 6.0× what no casting did (geometric mean; range 0.43× to 103×); the inherited "smart" casting earned 1.04×. Forecast casting beat the inherited mode on five seeds of six. Evidence: `test/baselines/m5-casting-6-seeds.json`.
+
 ### M6 — Garden
 
 - Seed unlock planner that reads the mutation table from the live game and works at every plot size.
@@ -184,6 +201,8 @@ Verified by: forecast checked against real casts in the harness, outcome by outc
 - Soil policy. Seeds bought outside CpS buffs, since seed price scales with buffed CpS.
 
 Verified by: time to a full seed log in the harness, against published figures for existing garden bots.
+
+Status: unlock loop and sacrifice implemented 2026-09-29. Mutation rules are asked of the game's own `getMuts`; a layout optimiser places parents; sprouts of locked plants are kept until mature, which unlocks the seed, and a secured target frees the rest of the plot for the next. From a fresh log with a full plot: 7 of 34 seeds in 6 game hours. The time to a full log is being measured.
 
 ### M7 — Stock market
 
