@@ -1,6 +1,6 @@
 // Sugar lumps: harvests ripe lumps (a golden one timed by its payout), switches Sugar frenzy on
 // near the end of a run, and spends lumps on building levels. The only thing that clicks the lump.
-import { nextLevelUp, bestLevel, lumpWorth, decideHarvest, decideFrenzy, GOLDEN } from '../core/lumps.js';
+import { nextLevelUp, bestLevel, lumpWorth, decideHarvest, decideFrenzy, cpsBuffChance, GOLDEN } from '../core/lumps.js';
 import { readState } from '../game/measure.js';
 
 const TICK_EVERY = 30; // frames
@@ -17,6 +17,7 @@ const SUGAR_FRENZY = 'Sugar frenzy';
  * @param {() => boolean} [deps.ascending]  the ascension has begun: it collects a golden lump itself,
  *        through collectBeforeAscension, and a Sugar frenzy would be lost
  * @param {() => number} [deps.goldenWait]  expected seconds to the next golden cookie
+ * @param {() => number} [deps.buffChance]  chance a golden cookie gives a CpS buff of x7 or more
  * @param {(what: string) => void} [deps.log]
  */
 export function createLumps({
@@ -27,6 +28,7 @@ export function createLumps({
     run = () => null,
     ascending = () => false,
     goldenWait = () => readState(game, settings).golden.meanInterval,
+    buffChance = () => cpsBuffChance(readState(game, settings).golden),
     log = () => {},
 }) {
     const state = {
@@ -108,6 +110,7 @@ export function createLumps({
     function harvestBy(ascendingRule) {
         const age = Date.now() - game.lumpT;
         const golden = game.lumpCurrentType === GOLDEN;
+        const wait = golden && age >= game.lumpRipeAge ? goldenWait() : Infinity;
         const decision = decideHarvest({
             age,
             matureAge: game.lumpMatureAge,
@@ -120,7 +123,8 @@ export function createLumps({
             // Only a golden lump's timing reads these, and it is rare: they are not read otherwise.
             payback: golden ? bestPayback() : Infinity,
             lumpWorth: golden ? worthOfALump() : 0,
-            goldenWait: golden && age >= game.lumpRipeAge ? goldenWait() : Infinity,
+            goldenWait: wait,
+            buffChance: Number.isFinite(wait) ? buffChance() : 0,
             ascending: ascendingRule,
         });
         setHold(decision.hold);

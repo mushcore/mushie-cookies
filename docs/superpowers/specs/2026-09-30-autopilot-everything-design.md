@@ -123,7 +123,7 @@ Fixed in wave one (item pre-ascension): the routine (`prepareForAscension`) runs
 
 ### 4.8 Sugar lumps
 
-Harvest ripe lumps from the lump system (not the inherited clicker), including golden-lump timing: the payout is `min(CpS × 86400, bank)` with buffed CpS, so hold a golden lump inside its window for a buff when that pays. Spend a lump on Sugar frenzy (×3 CpS for an hour, once per ascension) when two hours of buffed CpS beats the best building level. Minigame and Farm/Cursor targets respect the Sugar baking hold.
+Harvest ripe lumps from the lump system (not the inherited clicker), including golden-lump timing: the payout is `min(CpS × 86400, bank)` with buffed CpS, so hold a golden lump inside its window for a buff when that pays: with the bank at the cap, only while the chance of a CpS buff before the last safe moment, times the payout it adds, beats the purchases held up and the next lump started later. Spend a lump on Sugar frenzy (×3 CpS for an hour, once per ascension) when two hours of buffed CpS beats the best building level; the CpS buffs running with it multiply its extra, as they multiply CpS (main.js:5159), and it waits for a second lump in the jar, since with one the game gives the hour but does not mark the switch used (main.js:11036-11043). Minigame and Farm/Cursor targets respect the Sugar baking hold.
 
 Measure: lumps per day and CpS against the current lump system.
 

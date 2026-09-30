@@ -7,6 +7,7 @@ import {
     frenzyValue,
     decideFrenzy,
     decideHarvest,
+    cpsBuffChance,
     GOLDEN,
     LEVEL_HORIZON_SECONDS,
     HARVEST_SAFETY_MS,
@@ -101,7 +102,7 @@ const DAY = 86400;
 const times = { matureAge: 20 * HOUR, ripeAge: 23 * HOUR, overripeAge: 24 * HOUR };
 const lastSafe = times.overripeAge - HARVEST_SAFETY_MS;
 const harvestAt = (over) =>
-    decideHarvest({ ...times, age: 0, type: 0, bank: 0, cps: 1, unbuffedCps: 1, payback: 3600, lumpWorth: 3600, goldenWait: 300, ascending: false, ...over });
+    decideHarvest({ ...times, age: 0, type: 0, bank: 0, cps: 1, unbuffedCps: 1, payback: 3600, lumpWorth: 3600, goldenWait: 300, buffChance: 0.5, ascending: false, ...over });
 
 test('a ripe lump is harvested at once: waiting for it to fall pays the same and starts the next later', () => {
     // A ripe click pays harvestLumps(1), as the fall at overripe does (main.js:4476-4483, 4605-4613).
@@ -136,6 +137,32 @@ test('with the bank at the cap, a golden lump waits for a CpS buff and takes it 
     assert.ok(waiting.hold >= 5 * DAY, 'the bank a buff would pay on is kept');
     assert.equal(harvestAt({ ...capped, cps: 7 }).harvest, true, 'a Frenzy lifts the cap to 7 x 24 h of CpS');
     assert.equal(harvestAt({ ...capped, cps: 1, goldenWait: Infinity }).harvest, true, 'no golden cookie will come');
+});
+
+test('the wait for a CpS buff lasts only while it is expected to pay more than it holds up', () => {
+    // Defect: at the cap the lump waited whenever a golden cookie was due before its last safe
+    // moment, holding the buyer for up to 59 minutes, even where no buff could raise the payout.
+    const capped = { type: GOLDEN, age: times.ripeAge, cps: 1, unbuffedCps: 1 };
+    // The bank just at the cap: a buff lifts the cap, not the bank the payout is taken from
+    // (main.js:4492-4496), so the wait would buy minutes of income for an hour of purchases.
+    const atCap = harvestAt({ ...capped, bank: DAY, payback: 60 });
+    assert.equal(atCap.harvest, true, atCap.reason);
+    assert.equal(harvestAt({ ...capped, bank: DAY }).harvest, true, 'even with purchases repaying in an hour');
+    // Five days banked, a Frenzy would pay five times as much: worth the wait with purchases that
+    // take an hour to repay, not with ones that repay in a minute, nor with a CpS buff unlikely.
+    assert.equal(harvestAt({ ...capped, bank: 5 * DAY }).harvest, false);
+    assert.equal(harvestAt({ ...capped, bank: 5 * DAY, payback: 60 }).harvest, true);
+    assert.equal(harvestAt({ ...capped, bank: 5 * DAY, buffChance: 0.001 }).harvest, true);
+    assert.equal(harvestAt({ ...capped, bank: 5 * DAY, buffChance: 0 }).harvest, true, 'no golden cookie gives a CpS buff');
+});
+
+test('the chance of a CpS buff counts the golden cookie outcomes of x7 or more', () => {
+    // Frenzy x7, Dragon Harvest x15, Elder frenzy x666; a building special multiplies by
+    // 1 + amount/10 of the building it picks (main.js:5505), x7 from 60 of it.
+    const probabilities = { frenzy: 0.5, 'dragon harvest': 0.125, 'blood frenzy': 0.0625, 'building special': 0.25, 'click frenzy': 0.25, clot: 0.5 };
+    assert.equal(cpsBuffChance({ probabilities, buildingSpecialMean: 60 }), 0.9375);
+    assert.equal(cpsBuffChance({ probabilities, buildingSpecialMean: 59 }), 0.6875);
+    assert.equal(cpsBuffChance({ probabilities: {} }), 0);
 });
 
 test('a known golden lump starts holding the bank a payback ahead of its harvest', () => {
@@ -178,6 +205,16 @@ test('Sugar frenzy is worth two hours of CpS, more when it lands on a running Cp
     assert.equal(frenzyValue([{ multCpS: 0.5, secondsLeft: 66 }]), 7200 - 2 * 0.5 * 66, 'a clot takes some away');
     assert.equal(frenzyValue([{ multCpS: 2, secondsLeft: 99999 }]), 7200 + 2 * 3600, 'only the hour it runs counts');
     assert.equal(frenzyValue([{ multClick: 777, secondsLeft: 13 }]), 7200, 'click buffs are not CpS');
+});
+
+test('buffs running together multiply the frenzy\'s extra, as they multiply CpS', () => {
+    // CalculateGains multiplies every buff's multCpS into CpS (main.js:5159). A Frenzy (x7, 77 s)
+    // with a x10 buff for 30 s: the frenzy's hour runs 30 s at x70, 47 s at x7, the rest at x1.
+    const both = 2 * (30 * 70 + 47 * 7 + (3600 - 77));
+    assert.equal(frenzyValue([{ multCpS: 7, secondsLeft: 77 }, { multCpS: 10, secondsLeft: 30 }]), both);
+    assert.equal(frenzyValue([{ multCpS: 10, secondsLeft: 30 }, { multCpS: 7, secondsLeft: 77 }]), both, 'in any order');
+    // A Cursed finger (x0, 10 s) stops CpS, and the frenzy with it, while it runs.
+    assert.equal(frenzyValue([{ multCpS: 0, secondsLeft: 10 }, { multCpS: 7, secondsLeft: 77 }]), 2 * (67 * 7 + (3600 - 77)));
 });
 
 const run = (ratio, rated = true) => ({ instantRate: ratio * 1e-6, averageRate: 1e-6, rated });

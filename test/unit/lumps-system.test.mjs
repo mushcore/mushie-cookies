@@ -126,6 +126,21 @@ test('the buyer is told when a golden hold starts and when it ends, not on every
     assert.equal(buyer.invalidations, 2, 'released');
 });
 
+test('at the cap a golden lump waits for a CpS buff only as likely as the golden cookies make it', () => {
+    // Five days banked: a Frenzy would pay five times as much. With the chance of a CpS buff read
+    // from the golden cookie odds, the wait is weighed; with none, it is not made.
+    const settings = { autoSL: 1, autoBuy: 1 };
+    const lumpAt = (chance) => {
+        const game = fakeGame({ lumpCurrentType: 2, cookies: 5 * 86400 });
+        const loop = fakeLoop();
+        createLumps({ game, settings, loop, buyer: fakeBuyer(3600), goldenWait: () => 300, buffChance: () => chance });
+        loop.run('lumpHarvest');
+        return game.clicks;
+    };
+    assert.equal(lumpAt(0.5), 0, 'a CpS buff is likely within the hour: waited for');
+    assert.equal(lumpAt(0), 1, 'no golden cookie gives one: harvested');
+});
+
 test('Sugar frenzy never acts on a verdict left from the run before', () => {
     // Right after a reincarnation the ascension still holds the ended run's verdict (rated, rate
     // under the average) until its next tick; a frenzy then would land at the start of the new run.
@@ -141,6 +156,34 @@ test('Sugar frenzy never acts on a verdict left from the run before', () => {
     verdict = { ...verdict, ascend: false, startDate };
     loop.run('sugarFrenzy');
     assert.equal(bought.length, 1, 'a verdict on this run is acted on');
+});
+
+test('Sugar frenzy waits for a second lump: with one, the game gives the buff but not the mark', () => {
+    // The switch's click spends the lump first, then buys the upgrade, whose own check wants a lump
+    // still in the jar (main.js:11036-11043, 4570-4589, 9480-9484, 9552): with a single lump the
+    // hour comes but the switch is not marked used, and the lump is gone.
+    const startDate = Date.now() - 3600 * 1000;
+    const game = fakeGame({ startDate, lumps: 1 });
+    const frenzy = {
+        unlocked: 1,
+        bought: 0,
+        hours: 0,
+        buy() {
+            if (game.lumps < 1) return;
+            game.lumps -= 1;
+            frenzy.hours++;
+            if (game.lumps >= 1) frenzy.bought = 1;
+        },
+    };
+    game.Upgrades = { 'Sugar frenzy': frenzy };
+    const loop = fakeLoop();
+    const nearTheEnd = { ascend: false, instantRate: 1, averageRate: 1, rated: true, startDate };
+    createLumps({ game, settings: { sugarFrenzy: 1 }, loop, run: () => nearTheEnd });
+    loop.run('sugarFrenzy');
+    assert.deepEqual([frenzy.hours, game.lumps], [0, 1], 'one lump: left alone');
+    game.lumps = 2;
+    loop.run('sugarFrenzy');
+    assert.deepEqual([frenzy.hours, frenzy.bought, game.lumps], [1, 1, 1], 'two: switched on and marked used');
 });
 
 test('Sugar frenzy stands aside while the inherited Sugar frenzy option is on', () => {

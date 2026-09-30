@@ -11,6 +11,8 @@
  * directly.
  */
 
+import { cpsMultOf } from './buffs.js';
+
 const MINIGAMES = ['Wizard tower', 'Temple', 'Farm', 'Bank'];
 const TARGETS = [
     ['Farm', 9], // 6×6 garden plot
@@ -139,7 +141,8 @@ export function lumpWorth({ bestPerLump, lumps, sugarBaking, secondsToLump, lump
  * A golden lump also pays min(CpS × 86400, bank), with buffs in the CpS (main.js:4492-4496). Its
  * hour between ripe and falling is the one timing choice lumps offer: keep the bank growing (the
  * buyer holds its spending) when the cookies gained beat the purchases delayed, and with the bank
- * already at the cap, wait for a CpS buff that lifts the cap. Never past the last safe moment.
+ * already at the cap, wait for a CpS buff that lifts the cap while that is expected to pay more
+ * than the wait holds up. Never past the last safe moment.
  *
  * @param {object} a
  * @param {number} a.age                ms since the lump began (Date.now() - Game.lumpT)
@@ -153,7 +156,8 @@ export function lumpWorth({ bestPerLump, lumps, sugarBaking, secondsToLump, lump
  * @param {number} a.payback            seconds the buyer's best purchase takes to repay (Infinity: nothing to buy)
  * @param {number} a.lumpWorth          seconds of CpS one lump is worth (lumpWorth)
  * @param {number} a.goldenWait         expected seconds until the next golden cookie (Infinity: none spawn)
- * @param {boolean} a.ascending         the ascension is collecting what it would otherwise lose
+ * @param {number} [a.buffChance]       chance a golden cookie gives a CpS buff of x7 or more (cpsBuffChance)
+ * @param {boolean} a.ascending        the ascension is collecting what it would otherwise lose
  * @returns {{harvest: boolean, hold: number, reason: string}}  hold: bank the buyer should keep, 0 for none
  */
 export function decideHarvest(a) {
@@ -194,25 +198,66 @@ export function decideHarvest(a) {
     const gain = Math.min(baseCap, a.bank + held) - payoutNow;
     const cost = (held * secondsLeft) / (2 * a.payback) + (secondsLeft / (a.ripeAge / 1000)) * a.lumpWorth * a.unbuffedCps;
     if (gain > cost && a.bank < baseCap) return out(false, baseCap, 'golden: holding the bank for its payout');
-    // At the cap only a CpS buff raises the payout, up to sevenfold for a Frenzy; the wait costs a
-    // fraction of a lump.
-    if (a.bank >= baseCap && a.goldenWait < secondsLeft) return out(false, FRENZY_MULT * baseCap, 'golden: waiting for a CpS buff');
+    if (a.bank >= baseCap && waitForBuffPays(a, baseCap, payoutNow, secondsLeft)) {
+        return out(false, FRENZY_MULT * baseCap, 'golden: waiting for a CpS buff');
+    }
     return out(true, 0, 'golden: holding would not pay');
+}
+
+/**
+ * The chance a golden cookie gives a CpS buff of x7 or more, from the outcome odds readState
+ * computes (src/game/measure.js golden.probabilities): Frenzy x7, Dragon Harvest x15, Elder frenzy
+ * x666, and a building special when the buildings it picks from average 60 or more, since it
+ * multiplies by 1 + amount/10 (main.js:5505).
+ *
+ * @param {{probabilities?: Object<string, number>, buildingSpecialMean?: number}} golden
+ */
+export function cpsBuffChance({ probabilities = {}, buildingSpecialMean = 0 }) {
+    const p = (outcome) => probabilities[outcome] || 0;
+    const special = 1 + buildingSpecialMean / 10 >= FRENZY_MULT ? p('building special') : 0;
+    return p('frenzy') + p('dragon harvest') + p('blood frenzy') + special;
+}
+
+/**
+ * At the cap only a CpS buff raises the payout: a Frenzy lifts the cap sevenfold (a Dragon
+ * Harvest or an Elder frenzy more), and the payout is then the bank (main.js:4492-4496), so the
+ * wait pays on the bank above the cap. CpS buffs come at buffChance / goldenWait a second; the
+ * wait ends at the first or at the last safe moment. It costs the payout's purchases held up
+ * that long (the hold stops the buyer, and payback prices a cookie delayed) and the next lump
+ * started later.
+ */
+function waitForBuffPays(a, baseCap, payoutNow, secondsLeft) {
+    const rate = a.goldenWait > 0 && a.buffChance > 0 ? a.buffChance / a.goldenWait : 0;
+    if (!(rate > 0)) return false;
+    const chance = 1 - Math.exp(-rate * secondsLeft);
+    const wait = chance / rate; // expected seconds held: the mean of min(first buff, secondsLeft)
+    const gain = chance * (Math.min(FRENZY_MULT * baseCap, a.bank + wait * a.unbuffedCps) - payoutNow);
+    const cost = (payoutNow * wait) / a.payback + (wait / (a.ripeAge / 1000)) * a.lumpWorth * a.unbuffedCps;
+    return gain > cost;
 }
 
 // --- Sugar frenzy ----------------------------------------------------------------------------
 
 /**
- * What Sugar frenzy adds if switched on now, in seconds of unbuffed CpS: two hours, plus the
- * extra it makes on top of every CpS buff running now for as long as both last.
+ * What Sugar frenzy adds if switched on now, in seconds of unbuffed CpS: two hours, times every
+ * CpS buff running now for as long as it lasts. Buffs multiply CpS together (main.js:5159), so
+ * over its hour the frenzy adds (3 - 1) times the product of the buffs still running.
  *
  * @param {Array<{multCpS?: number, secondsLeft: number}>} buffs
  */
 export function frenzyValue(buffs) {
-    let value = FRENZY_SECONDS;
-    for (const b of buffs) {
-        if (b.multCpS === undefined || b.multCpS === 1) continue;
-        value += (b.multCpS - 1) * Math.min(Math.max(0, b.secondsLeft), FRENZY_SECONDS);
+    const running = buffs
+        .filter((b) => cpsMultOf(b) !== 1)
+        .map((b) => ({ mult: cpsMultOf(b), end: Math.min(Math.max(0, b.secondsLeft), FRENZY_SECONDS) }));
+    const ends = [...new Set(running.map((b) => b.end)), FRENZY_SECONDS].sort((x, y) => x - y);
+    let value = 0;
+    let from = 0;
+    // Piece by piece between the moments a buff ends; a product, not a quotient, so a x0 buff
+    // (Cursed finger) needs no care.
+    for (const end of ends) {
+        const mult = running.filter((b) => b.end >= end).reduce((m, b) => m * b.mult, 1);
+        value += mult * (end - from);
+        from = end;
     }
     return (FRENZY_MULT_CPS - 1) * value;
 }
