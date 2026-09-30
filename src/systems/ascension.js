@@ -30,7 +30,8 @@ const FIRST_SHOPPING_LIST = [
  * @param {object} deps.loop
  * @param {() => number} deps.extras   cookies collecting before an ascension would add (wrinklers, chocolate egg)
  * @param {() => void} [deps.collect]  pops the wrinklers, a tick before prepare: they pay on later logic frames
- * @param {() => void} deps.prepare    the rest: sells stock, harvests, sells buildings into the chocolate egg
+ * @param {() => void} deps.prepare    the rest: sells stock, harvests (the garden, then a golden lump),
+ *        sells buildings into the chocolate egg
  * @param {{invalidate(): void}} [deps.buyer]
  * @param {{plan: Function, rankSlots: Function}} [deps.heavenly]  plans chips and slots from what it saw of the run
  * @param {(what: string) => void} [deps.log]

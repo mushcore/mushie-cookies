@@ -387,13 +387,19 @@ function fcReset(hard) {
 // - Harvesting pays each plant's harvest effect (cookies through Game.Earn, which count) and
 //   unlocks the seeds of mature plants; the reset clears the plot unharvested. It runs before the
 //   buildings are sold, while the CpS that caps the cookie harvests is intact.
-function prepareForAscension() {
+// - `beforeSelling` is the lump system's collection of a golden sugar lump, which pays
+//   min(CpS x 86400, bank) through Game.Earn (main.js:4492-4496): here the bank holds the stock
+//   sale and the CpS still has its buildings. Once they are sold (or one is sacrificed for Earth
+//   Shatterer) the next frame recalculates CpS without them (main.js:7879, 16274), and the payout
+//   with it. The egg, bought last, then earns 5% of that payout too.
+function prepareForAscension(beforeSelling) {
     var market = Game.Objects["Bank"].minigame;
     if (market && market.goodsById) {
         for (let i = 0; i < market.goodsById.length; i++) market.sellGood(i, 10000);
     }
     var garden = Game.Objects["Farm"].minigame;
     if (garden) garden.harvestAll();
+    if (beforeSelling) beforeSelling();
     if (
         Game.dragonLevel >= 5 + 4 &&
         !Game.hasAura("Earth Shatterer") &&

@@ -70,6 +70,8 @@ export function startSystems({ game, loop, legacy, log, guard }) {
     });
     const clicker = createClicker({ game, settings, loop, log, guard });
     let lumps = null; // created below; the buyer keeps the bank a golden lump is timed to pay on
+    const collectLumpNow = () => lumps && lumps.collectBeforeAscension();
+    const collectLump = guard ? guard('lumpHarvest', collectLumpNow) : collectLumpNow;
     const buyer = createBuyer({
         game,
         settings,
@@ -89,7 +91,9 @@ export function startSystems({ game, loop, legacy, log, guard }) {
         extras: () => wrinklers.held() + legacy.chocolateValue(),
         collect: () => wrinklers.collect(),
         heavenly,
-        prepare: () => legacy.prepareForAscension(),
+        // The lump system collects a golden lump inside the routine, before the buildings are
+        // sold (see fc_main.js prepareForAscension); a failure there must not stop the sales.
+        prepare: () => legacy.prepareForAscension(collectLump),
     });
     lumps = createLumps({
         game,
@@ -100,7 +104,8 @@ export function startSystems({ game, loop, legacy, log, guard }) {
         // The ascension's growth verdict times Sugar frenzy; while its verdict is not yet known the
         // growth reads as unknown, and with it off nothing ends the run.
         run: () => (settings.autoAscendToggle == 1 ? ascension.verdict() || { instantRate: Infinity, averageRate: 0, rated: false } : null),
-        ascending: () => settings.autoAscendToggle == 1 && ascension.phase() === 'settling',
+        // From the wrinkler pop on: the ascension collects a golden lump itself from here.
+        ascending: () => settings.autoAscendToggle == 1 && ascension.phase() !== 'playing',
     });
     const grimoire = createGrimoire({ game, settings, loop, log });
     const garden = createGarden({ game, settings, loop, log, reserve: () => buyer.reserve() });

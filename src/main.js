@@ -130,7 +130,7 @@ const runtime = {
                 harvestBank: () => window.harvestBank(),
                 manualBank: () => window.manualBank(),
                 wrinklerValue: () => window.wrinklerValue(),
-                prepareForAscension: () => window.prepareForAscension(),
+                prepareForAscension: (beforeSelling) => window.prepareForAscension(beforeSelling),
                 chocolateValue: () => window.chocolateValue(),
             },
         });
