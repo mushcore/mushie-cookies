@@ -10,6 +10,7 @@ import { createGods } from '../systems/gods.js';
 import { createDragon } from '../systems/dragon.js';
 import { createShimmers } from '../systems/shimmers.js';
 import { createClicker } from '../systems/clicker.js';
+import { createWrinklers } from '../systems/wrinklers.js';
 
 const CHAIN_REACH = 15;
 
@@ -73,13 +74,15 @@ export function startSystems({ game, loop, legacy, log, guard }) {
         policy: () => policyFrom(game, settings, legacy.blacklistPresets, legacy.prerequisites),
         extraReserve: () => Math.max(extraReserveFrom(settings, legacy), lumps ? lumps.hold() : 0),
     });
+    const wrinklers = createWrinklers({ game, settings, loop, log, buyer });
     const ascension = createAscension({
         game,
         settings,
         loop,
         log,
         buyer,
-        extras: () => legacy.wrinklerValue() + legacy.chocolateValue(),
+        extras: () => wrinklers.held() + legacy.chocolateValue(),
+        collect: () => wrinklers.collect(),
         prepare: () => legacy.prepareForAscension(),
     });
     lumps = createLumps({
@@ -99,5 +102,5 @@ export function startSystems({ game, loop, legacy, log, guard }) {
     // The dragon trains before the gods pick auras; `dragon` tells them when a level is gained.
     const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve() });
     const gods = createGods({ game, settings, loop, log, buyer, dragon });
-    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, shimmers, clicker };
+    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, shimmers, clicker, wrinklers };
 }

@@ -8,7 +8,7 @@ import { planHeavenly, rankPermanentSlots, assignPermanentSlots } from '../game/
 const TICK_EVERY = 30; // frames
 const SAMPLE_SECONDS = 60; // one history sample a minute
 const HISTORY_LIMIT = 60 * 24; // a day of samples
-const SETTLE_TICKS = 2; // popped wrinklers pay out on the next logic frames
+const SETTLE_TICKS = 2; // what prepare() collects settles over the next logic frames
 const BUFF_WAIT_SECONDS = 10 * 60; // an income buff ending sooner than this is let finish
 
 /** The starter set the wiki recommends for a first ascension; its price sets the first target. */
@@ -29,17 +29,18 @@ const FIRST_SHOPPING_LIST = [
  * @param {object} deps.settings       the mod's settings (autoAscendToggle)
  * @param {object} deps.loop
  * @param {() => number} deps.extras   cookies collecting before an ascension would add (wrinklers, chocolate egg)
- * @param {() => void} deps.prepare    collects them: pops wrinklers, sells stock, harvests, the chocolate egg
+ * @param {() => void} [deps.collect]  pops the wrinklers, a tick before prepare: they pay on later logic frames
+ * @param {() => void} deps.prepare    the rest: sells stock, harvests, sells buildings into the chocolate egg
  * @param {{invalidate(): void}} [deps.buyer]
  * @param {(what: string) => void} [deps.log]
  */
-export function createAscension({ game, settings, loop, extras = () => 0, prepare = () => {}, buyer = null, log = () => {} }) {
+export function createAscension({ game, settings, loop, extras = () => 0, collect = () => {}, prepare = () => {}, buyer = null, log = () => {} }) {
     // 'rate' is the rule this system is built on; 'double' (ascend once prestige would double,
     // the inherited rule) is kept so the two can be compared in the harness. `firstTarget`
     // overrides the first ascension's prestige target (null: the starter set's price).
     const options = { rule: 'rate', firstTarget: null };
     const state = {
-        phase: 'playing', // then 'settling' after collecting, then 'ascending'
+        phase: 'playing', // then 'collecting' (wrinklers), 'settling' (the rest), then 'ascending'
         run: null, // { resets, startDate, start: {t, projected} }
         history: [],
         lastSampleAt: -Infinity,
@@ -131,8 +132,14 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
                 (state.plan.saving ? `; saving for ${state.plan.saving.name}` : '')
         );
         // Collect now, so it counts toward this ascension; the game grants chips at the end of
-        // the ascend animation, long before the reset that used to do this.
-        settings.preparedForAscension = true;
+        // the ascend animation, long before the reset.
+        // Wrinklers first: they pay on the next logic frame, and the chocolate egg in prepare()
+        // pays 5% of the bank, which should include them (main.js:10398-10403, 14457-14513).
+        collect();
+        state.phase = 'collecting';
+    }
+
+    function afterCollecting() {
         prepare();
         state.phase = 'settling';
         state.settle = SETTLE_TICKS;
@@ -177,6 +184,7 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
     }
 
     function tick() {
+        if (state.phase === 'collecting') return afterCollecting();
         if (state.phase === 'settling') return ascend();
         if (state.phase === 'ascending') return finish();
         // An ascension the mod did not start is left to the player.

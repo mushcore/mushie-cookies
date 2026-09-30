@@ -238,6 +238,9 @@ function setOverrides(gameSaveData) {
         FrozenCookies.manaMax = preferenceParse("manaMax", 0);
         FrozenCookies.orbMax = preferenceParse("orbMax", 0);
 
+        // "Autopop Wrinklers INSTANTLY" was removed: it kept 1x CpS where popping by value keeps
+        // about 5x, and drop hunting belongs to the season hunt now.
+        if (FrozenCookies.autoWrinkler > 1) FrozenCookies.autoWrinkler = 1;
         // Restore some possibly broken settings
         // Auto Rigidel (autoSL 2) is gone; a player who chose it still wants the harvest.
         if (FrozenCookies.autoSL == 2) FrozenCookies.autoSL = 1;
@@ -342,10 +345,10 @@ function fcDraw(from, text, origin) {
 }
 
 function fcReset(hard) {
-    // Run for an ascension the player started; the mod's own ascension collects beforehand,
-    // while it still counts (the game grants chips before this reset).
-    if (!hard && !FrozenCookies.preparedForAscension) prepareForAscension();
-    FrozenCookies.preparedForAscension = false;
+    // Nothing is collected here. The game calls this from Reincarnate, on the ascension screen,
+    // where a player can neither sell nor buy, after the chips are granted (main.js:4094, 4125);
+    // popped wrinklers could no longer pay (main.js:16165, 3532). The mod's own ascension collects
+    // before Game.Ascend; an ascension the player starts is theirs.
     Game.oldReset(hard);
     FrozenCookies.frenzyTimes = {};
     FrozenCookies.last_gc_state =
@@ -361,15 +364,28 @@ function fcReset(hard) {
     if (MushieCookies.buyer) MushieCookies.buyer.invalidate();
 }
 
-// Everything worth doing in the last moment before an ascension.
+// The last steps of an ascension the mod starts, a tick after the wrinkler system has popped the
+// wrinklers, so their payout is already in the bank (they pay on a later logic frame,
+// main.js:14513). Only the ascension system calls this, before Game.Ascend.
+//
+// What each step gains, by the game's code:
+// - Selling stock or buildings adds to the bank, not to the cookies baked this run
+//   (minigameMarket.js:252-253, main.js:7873-7874), and the reset wipes the bank. The sales count
+//   toward prestige only through the Chocolate egg, bought last, which earns 5% of the bank
+//   (main.js:10398-10403). A stock sale can also earn a stock market achievement
+//   (minigameMarket.js:246-250), which is kept; the market's stock and profit are zeroed at the
+//   reset anyway (minigameMarket.js:774-779). Goods bought in the current market minute cannot be
+//   sold (minigameMarket.js:243) and are lost with the reset.
+// - Harvesting pays each plant's harvest effect (cookies through Game.Earn, which count) and
+//   unlocks the seeds of mature plants; the reset clears the plot unharvested. It runs before the
+//   buildings are sold, while the CpS that caps the cookie harvests is intact.
 function prepareForAscension() {
-    Game.CollectWrinklers();
-    if (B) {
-        for (let i = 0; i < B.goodsById.length; i++) {
-            B.sellGood(i, 10000);
-        } // sell all stock
+    var market = Game.Objects["Bank"].minigame;
+    if (market && market.goodsById) {
+        for (let i = 0; i < market.goodsById.length; i++) market.sellGood(i, 10000);
     }
-    if (G) G.harvestAll(); // harvest all plants
+    var garden = Game.Objects["Farm"].minigame;
+    if (garden) garden.harvestAll();
     if (
         Game.dragonLevel >= 5 + 4 &&
         !Game.hasAura("Earth Shatterer") &&
@@ -769,10 +785,10 @@ function chocolateValue(bankAmount, earthShatter) {
     return value;
 }
 
+// What popping every wrinkler would pay, with every multiplier the game applies. Popping itself
+// belongs to the wrinkler system (src/systems/wrinklers.js).
 function wrinklerValue() {
-    return Game.wrinklers.reduce(function (s, w) {
-        return s + popValue(w);
-    }, 0);
+    return MushieCookies.wrinklerHeld(Game);
 }
 
 function canCastSE() {
@@ -953,73 +969,6 @@ function liveWrinklers() {
     }).sort(function (w1, w2) {
         return w2.sucked - w1.sucked;
     });
-}
-
-function popValue(w) {
-    var toSuck = 1.1;
-    if (Game.Has("Sacrilegious corruption")) toSuck *= 1.05;
-    if (w.type == 1) toSuck *= 3; //shiny wrinklers are an elusive, profitable breed
-    var sucked = w.sucked * toSuck; //cookie dough does weird things inside wrinkler digestive tracts
-    if (Game.Has("Wrinklerspawn")) sucked *= 1.05;
-    return sucked;
-}
-
-function shouldPopWrinklers() {
-    var toPop = [];
-    var living = liveWrinklers();
-    if (living.length > 0) {
-        if (
-            (Game.season == "halloween" || Game.season == "easter") &&
-            !haveAll(Game.season)
-        ) {
-            toPop = living.map(function (w) {
-                return w.id;
-            });
-        } else {
-            var delay = delayAmount();
-            var wrinklerList = Game.wrinklers.slice();
-            var nextRecNeeded = nextPurchase().cost + delay - Game.cookies;
-            var nextRecCps = nextPurchase().delta_cps;
-            var wrinklersNeeded = wrinklerList
-                .sort(function (w1, w2) {
-                    return w2.sucked - w1.sucked;
-                })
-                .reduce(
-                    function (current, w) {
-                        var futureWrinklers =
-                            living.length - (current.ids.length + 1);
-                        if (
-                            (
-                                current.total < nextRecNeeded &&
-                                effectiveCps(
-                                    delay,
-                                    Game.elderWrath,
-                                    futureWrinklers
-                                ) +
-                                    nextRecCps >
-                                    effectiveCps()
-                            ) || (
-                                current.ids.length == 0 && 
-                                living.length == (10 + 2 * (Game.Has("Elder spice") + Game.hasAura("Dragon Guts"))) //always be willing to pop if at max wrinklers
-                            )
-                        ) {
-                            current.ids.push(w.id);
-                            current.total += popValue(w);
-                        }
-                        return current;
-                    },
-                    {
-                        total: 0,
-                        ids: [],
-                    }
-                );
-            toPop =
-                wrinklersNeeded.total > nextRecNeeded
-                    ? wrinklersNeeded.ids
-                    : toPop;
-        }
-    }
-    return toPop;
 }
 
 function autoGSBuy() {
@@ -1203,56 +1152,8 @@ function autoCookieBody() {
         }
         FrozenCookies.hc_gain += changeAmount;
     }
-    // Sugar lumps are harvested by the lump system (src/systems/lumps.js).
-    if (FrozenCookies.autoWrinkler == 1) {
-        var popCount = 0;
-        var popList = shouldPopWrinklers();
-        if (FrozenCookies.shinyPop == 1) {
-            _.filter(Game.wrinklers, function (w) {
-                return _.contains(popList, w.id);
-            }).forEach(function (w) {
-                if (w.type !== 1) {
-                    // do not pop Shiny Wrinkler
-                    w.hp = 0;
-                    popCount += 1;
-                }
-            });
-            if (popCount > 0)
-                logEvent("Wrinkler", "Popped " + popCount + " wrinklers.");
-        } else {
-            _.filter(Game.wrinklers, function (w) {
-                return _.contains(popList, w.id);
-            }).forEach(function (w) {
-                w.hp = 0;
-                popCount += 1;
-            });
-            if (popCount > 0)
-                logEvent("Wrinkler", "Popped " + popCount + " wrinklers.");
-        }
-    }
-    if (FrozenCookies.autoWrinkler == 2) {
-        var popCount = 0;
-        var popList = Game.wrinklers;
-        if (FrozenCookies.shinyPop == 1) {
-            popList.forEach(function (w) {
-                if (w.close == true && w.type !== 1) {
-                    w.hp = 0;
-                    popCount += 1;
-                }
-            });
-            if (popCount > 0)
-                logEvent("Wrinkler", "Popped " + popCount + " wrinklers.");
-        } else {
-            popList.forEach(function (w) {
-                if (w.close == true) {
-                    w.hp = 0;
-                    popCount += 1;
-                }
-            });
-            if (popCount > 0)
-                logEvent("Wrinkler", "Popped " + popCount + " wrinklers.");
-        }
-    }
+    // Sugar lumps are harvested by the lump system (src/systems/lumps.js), wrinklers popped by the
+    // wrinkler system (src/systems/wrinklers.js).
 
     var itemBought = false;
 
