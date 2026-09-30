@@ -25,17 +25,20 @@ test('the reward-cookie patch is gone', { skip }, () =>
 
 test("choosing wrinklers to pop does not reorder the game's own array", { skip }, () =>
     withMod(async (game) => {
-        const out = await game.eval(() => {
+        const before = await game.eval(() => {
             Game.wrinklers.forEach((w, i) => {
                 w.phase = 2;
                 w.sucked = ((i * 7) % 10) + 1;
             });
-            const before = Game.wrinklers.map((w) => w.id);
-            shouldPopWrinklers();
-            return { before, after: Game.wrinklers.map((w) => w.id) };
+            FrozenCookies.autoWrinkler = 1;
+            FrozenCookies.autoBuy = 1;
+            MushieCookies.wrinklers.report();
+            return Game.wrinklers.map((w) => w.id);
         });
-        assert.ok(out.before.length >= 10);
-        assert.deepEqual(out.after, out.before);
+        await game.advance(30); // the wrinkler system decides twice
+        const after = await game.eval(() => Game.wrinklers.map((w) => w.id));
+        assert.ok(before.length >= 10);
+        assert.deepEqual(after, before);
     }));
 
 test('bestBank survives an empty candidate list', { skip }, () =>

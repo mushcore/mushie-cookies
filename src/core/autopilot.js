@@ -25,9 +25,8 @@ export const AUTOPILOT = Object.freeze({
     autoBulk: 0,
     autoAscendToggle: 1,
 
-    // Wrinklers.
+    // Wrinklers: the measured popping policy, collection before every ascension.
     autoWrinkler: 1,
-    shinyPop: 0,
 
     // Sugar lumps: harvest when ripe, spend with the lump system. Rigidel and aura swaps around
     // the harvest would fight the pantheon and aura system, so they stay off.

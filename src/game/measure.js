@@ -1,6 +1,7 @@
 // Reads the live game into the plain state that src/core/income.js estimates from.
 import { outcomeProbabilities } from '../core/goldenPool.js';
 import { simulateEach } from '../core/sim.js';
+import { wrinklerModel } from './wrinklers.js';
 
 /** The game rejects clicks less than 20 ms apart (main.js:4770), so 50 a second is the most that count. */
 export const MAX_CLICKS_PER_SECOND = 50;
@@ -122,29 +123,12 @@ function unbuffedClickPower(game) {
     return game.computedMouseCps / mult;
 }
 
-/** Payout multiplier per wrinkler (main.js:14467-14479). */
-function wrinklerReturnMult(game) {
-    let m = 1.1;
-    if (game.Has('Sacrilegious corruption')) m *= 1.05;
-    if (game.Has('Wrinklerspawn')) m *= 1.05;
-    m *= 1 + game.auraMult('Dragon Guts') * 0.2;
-    const scorn = god(game, 'scorn');
-    if (scorn === 1) m *= 1.15;
-    else if (scorn === 2) m *= 1.1;
-    else if (scorn === 3) m *= 1.05;
-    return m;
-}
-
 /**
- * Wrinklers attach only during the grandmapocalypse. What they give back depends on who pops
- * them: nothing if nobody does, and next to nothing if they are popped as soon as they arrive.
+ * Wrinklers attach only during the grandmapocalypse. How many are counted, and whether what they
+ * store is spendable, follows the wrinkler system's policy (src/game/wrinklers.js).
  */
 function wrinklerState(game, settings) {
-    const count = game.elderWrath > 0 ? game.getWrinklersMax() : 0;
-    const suckRate = 0.05 * game.eff('wrinklerEat') * (1 + 0.2 * game.auraMult('Dragon Guts'));
-    const popping = Number(settings.autoWrinkler) || 0; // 0 off, 1 when worth it, 2 at once
-    if (popping === 2) return { count: 0, returnMult: 0, suckRate };
-    return { count, returnMult: popping === 1 ? wrinklerReturnMult(game) : 0, suckRate };
+    return wrinklerModel(game, settings);
 }
 
 /**
