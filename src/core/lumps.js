@@ -84,16 +84,15 @@ export function nextLevelUp({ buildings, lumps, sugarBaking, guard = false }) {
         return cost <= lumps - hold ? { name: b.name, cost, reason } : null;
     };
 
-    // A minigame costs one lump and opens a whole system, so it is never held back.
-    for (const name of MINIGAMES) {
-        const b = byName.get(name);
-        if (b && b.amount > 0 && b.level === 0) return levelUp(b, 'unlocks its minigame', 0);
-    }
-    // Once Sugar baking is owned every other lump spent below 100 costs 1/(100 + L) of all CpS
-    // until it grows back (main.js:5095), a day per lump, so the targets wait for the excess too.
+    // Once Sugar baking is owned every lump spent below 100 costs 1/(100 + L) of all CpS until it
+    // grows back (main.js:5095), a day per lump, so the targets wait for the excess too (spec 4.8).
     // Before that, the guard keeps a jar ready for the purchase but lets the targets go first:
     // their worth is not CpS, and the jar costs nothing until Sugar baking is bought.
     const targetHold = sugarBaking ? SUGAR_BAKING_HOLD : 0;
+    for (const name of MINIGAMES) {
+        const b = byName.get(name);
+        if (b && b.amount > 0 && b.level === 0) return levelUp(b, 'unlocks its minigame', targetHold);
+    }
     for (const [name, target] of TARGETS) {
         const b = byName.get(name);
         if (b && b.amount > 0 && b.level < target) return levelUp(b, `towards level ${target}`, targetHold);

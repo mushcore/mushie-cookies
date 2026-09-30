@@ -79,9 +79,12 @@ test('once Sugar baking is owned, the Farm and Cursor targets respect the hold t
     assert.equal(nextLevelUp({ buildings: bakery(farmDone), lumps: 101, sugarBaking: true }).name, 'Cursor');
 });
 
-test('the four minigame unlocks are never held: a lump each opens a whole minigame', () => {
-    assert.equal(nextLevelUp({ buildings: bakery(), lumps: 1, sugarBaking: true }).name, 'Wizard tower');
-    assert.equal(nextLevelUp({ buildings: bakery({ 'Wizard tower': { level: 1 } }), lumps: 50, sugarBaking: true, guard: true }).name, 'Temple');
+test('the minigame unlocks go first, and once Sugar baking is owned they too wait for the excess', () => {
+    // Spec 4.8: minigame and Farm/Cursor targets respect the hold. A save that owns Sugar baking
+    // (200 million chips in) without every minigame is all but unreachable, so the wait is moot.
+    assert.equal(nextLevelUp({ buildings: bakery(), lumps: 1, sugarBaking: false, guard: true }).name, 'Wizard tower');
+    assert.equal(nextLevelUp({ buildings: bakery(), lumps: 100, sugarBaking: true }), null);
+    assert.equal(nextLevelUp({ buildings: bakery(), lumps: 101, sugarBaking: true }).name, 'Wizard tower');
 });
 
 test('nothing owned, nothing to level', () => {
