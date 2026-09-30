@@ -21,6 +21,8 @@ function world({ settings = { autoGC: 1, autoReindeer: 1, autoFortune: 1 }, immi
         tickerL: {
             click() {
                 game.tickerClicks++;
+                // The fortune golden cookie appears at once (main.js:7640).
+                if (game.TickerEffect && game.TickerEffect.sub === 'fortuneGC') game.spawn('golden', { fortune: true });
                 game.TickerEffect = 0;
             },
         },
@@ -42,12 +44,16 @@ function world({ settings = { autoGC: 1, autoReindeer: 1, autoFortune: 1 }, immi
     };
     const guards = createGuard();
     const loop = createLoop(guards);
+    // A system registered before the shimmer system, as the legacy infobox is (fc_main.js), that
+    // reads the screen the way the grimoire's forecast does.
+    const seen = [];
+    loop.add('reader', () => seen.push(game.shimmers.filter((s) => s.type === 'golden').length));
     const shimmers = createShimmers({ game, settings, loop, ascensionImminent: () => imminent });
     let frame = 0;
     const run = (frames = 1) => {
         for (let i = 0; i < frames; i++) loop.run(++frame);
     };
-    return { game, settings, shimmers, popped, run, guards };
+    return { game, settings, shimmers, popped, run, guards, seen };
 }
 
 test('pops every golden cookie on screen in one frame, none skipped', () => {
@@ -58,13 +64,13 @@ test('pops every golden cookie on screen in one frame, none skipped', () => {
     assert.equal(w.game.shimmers.length, 0);
 });
 
-test('wrath cookies and storm drops are golden shimmers and are popped too; reindeer after them', () => {
+test('wrath cookies and storm drops are golden shimmers and are popped too; reindeer before them', () => {
     const w = world();
-    w.game.spawn('reindeer');
     w.game.spawn('golden', { wrath: 1 });
+    w.game.spawn('reindeer');
     w.game.spawn('golden', { force: 'cookie storm drop' });
     w.run(1);
-    assert.deepEqual(w.popped.map((s) => s.type), ['golden', 'golden', 'reindeer']);
+    assert.deepEqual(w.popped.map((s) => s.type), ['reindeer', 'golden', 'golden']);
     assert.deepEqual(w.shimmers.report().popped, { golden: 0, wrath: 1, drop: 1, reindeer: 1 });
 });
 
@@ -128,6 +134,25 @@ test('fortunes: upgrades and the golden cookie on sight; the hour of CpS only wh
     w.run(15);
     assert.equal(w.game.tickerClicks, 3);
     assert.deepEqual(w.shimmers.report().fortunes, { taken: 3, left: 1 });
+});
+
+test('the golden cookie a fortune brings is popped in the frame the fortune is taken', () => {
+    const w = world();
+    w.game.TickerEffect = { type: 'fortune', sub: 'fortuneGC' };
+    w.run(15);
+    assert.equal(w.game.tickerClicks, 1);
+    assert.equal(w.game.shimmers.length, 0, 'no golden cookie left on screen for a forecast later in the frame');
+    assert.deepEqual(w.popped.map((s) => !!s.fortune), [true]);
+});
+
+test('the shimmer system runs first on the loop: a system registered earlier never sees a golden cookie', () => {
+    const w = world();
+    w.run(1);
+    w.game.spawn('golden');
+    w.game.spawn('golden', { wrath: 1 });
+    w.run(1);
+    assert.deepEqual(w.seen, [0, 0]);
+    assert.equal(w.popped.length, 2);
 });
 
 test('a news item that is not a fortune is never clicked', () => {

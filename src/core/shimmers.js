@@ -5,14 +5,18 @@
  * the outcome pool a wrath cookie is worth more than a golden one (Lucky always pays at least what
  * Ruin takes, and storms come three times as often), and a cookie left on screen only delays the
  * next one, whose timer restarts when the spawn lead dies (main.js:5234-5242). A reindeer is never
- * a loss (main.js:5787-5793). Golden cookies go first: a reindeer pays on the buffed CpS.
+ * a loss (main.js:5787-5793). Reindeer go first: a reindeer pays a minute of Game.cookiesPs, cut
+ * to 0.75 by a Frenzy and 0.5 by an Elder frenzy the moment it runs (main.js:5787-5789), while the
+ * CpS those buffs raise is recalculated only on the next frame (13748-13793, 16274). A golden
+ * cookie popped first in the same frame can only lower a reindeer, and a Lucky popped after one
+ * pays on a bank the reindeer has added to (5536).
  */
 
 /** The shimmers to pop, in order, as a new array: popping one splices the game's list (main.js:5244). */
 export function toPop(shimmers, { golden = false, reindeer = false } = {}) {
     const out = [];
-    if (golden) for (const s of shimmers) if (s.type === 'golden') out.push(s);
     if (reindeer) for (const s of shimmers) if (s.type === 'reindeer') out.push(s);
+    if (golden) for (const s of shimmers) if (s.type === 'golden') out.push(s);
     return out;
 }
 

@@ -1,9 +1,11 @@
 // Shimmers: clicks golden, wrath and storm-drop cookies and reindeer on sight, and the news
 // ticker's fortunes when they pay.
 //
-// Runs on the loop every frame under a guard of its own, registered before every other system:
-// shimmers spawn in the frame's updateShimmers (main.js:16524), before the mod's logic hook
-// (main.js:16607), so they are gone before a system that reads the screen looks at it. The
+// Runs on the loop every frame under a guard of its own, first on the loop (ahead of the legacy
+// infobox too, which asks the buyer for its next purchase): shimmers spawn in the frame's
+// updateShimmers (main.js:16524), before the mod's logic hook (main.js:16607), so they are gone
+// before a system that reads the screen looks at it. A fortune is taken before the pops, so the
+// golden cookie it brings (main.js:7640) is popped in the same frame. The
 // grimoire's fail chance adds 15% for each golden cookie on screen (minigameGrimoire.js:44-47)
 // and Dragon's Fortune multiplies CpS by each (main.js:5108-5110). The grimoire pops the cookie
 // its own cast makes in the same tick (src/systems/grimoire.js), so the two never hold the same
@@ -73,11 +75,14 @@ export function createShimmers({ game, settings, loop, ascensionImminent = () =>
 
     function tick(frame) {
         if (game.OnAscend || game.AscendTimer) return;
-        pop();
         if (settings.autoFortune == 1 && frame % FORTUNE_EVERY === 0) fortune();
+        pop();
     }
 
-    loop.add('shimmers', tick, { enabled: () => settings.autoGC == 1 || settings.autoReindeer == 1 || settings.autoFortune == 1 });
+    loop.add('shimmers', tick, {
+        first: true,
+        enabled: () => settings.autoGC == 1 || settings.autoReindeer == 1 || settings.autoFortune == 1,
+    });
 
     return {
         report() {

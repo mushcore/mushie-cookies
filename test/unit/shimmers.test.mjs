@@ -4,9 +4,12 @@ import { toPop, fortuneChoice } from '../../src/core/shimmers.js';
 
 const s = (type, id) => ({ type, id });
 
-test('every golden cookie is popped, and every reindeer, golden ones first', () => {
+// A reindeer pays a minute of Game.cookiesPs, cut to 0.75 by a Frenzy and 0.5 by an Elder frenzy
+// the moment it runs (main.js:5787-5789), while the CpS those buffs raise is recalculated only on
+// the next frame (13748-13793, 16274): a golden cookie popped first can only lower a reindeer.
+test('every golden cookie is popped, and every reindeer, reindeer first', () => {
     const list = [s('reindeer', 1), s('golden', 2), s('golden', 3), s('reindeer', 4), s('golden', 5)];
-    assert.deepEqual(toPop(list, { golden: true, reindeer: true }).map((x) => x.id), [2, 3, 5, 1, 4]);
+    assert.deepEqual(toPop(list, { golden: true, reindeer: true }).map((x) => x.id), [1, 4, 2, 3, 5]);
     assert.deepEqual(toPop(list, { golden: true, reindeer: false }).map((x) => x.id), [2, 3, 5]);
     assert.deepEqual(toPop(list, { golden: false, reindeer: true }).map((x) => x.id), [1, 4]);
     assert.deepEqual(toPop(list, { golden: false, reindeer: false }), []);
