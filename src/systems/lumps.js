@@ -12,7 +12,7 @@ const SUGAR_FRENZY = 'Sugar frenzy';
  * @param {object} deps.settings  autoSL (harvest), sugarFrenzy, autoLumps (spend), sugarBakingGuard
  * @param {object} deps.loop
  * @param {{invalidate(): void, ranking(): Array}} [deps.buyer]  holds the bank a golden lump pays on
- * @param {() => ({instantRate: number, averageRate: number} | null)} [deps.run]
+ * @param {() => ({instantRate: number, averageRate: number, rated: boolean} | null)} [deps.run]
  *        the ascension's growth verdict; null when nothing ends runs
  * @param {() => boolean} [deps.ascending]  the ascension has collected and is about to ascend
  * @param {() => number} [deps.goldenWait]  expected seconds to the next golden cookie

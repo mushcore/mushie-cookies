@@ -214,12 +214,12 @@ test('with the ascension on, Sugar frenzy waits until the run\'s growth nears it
         await game.eval(() => {
             FrozenCookies.autoAscendToggle = 1;
             // Test seam: the ascension's growth verdict, as its rate rule would compute it.
-            MushieCookies.ascension.verdict = () => ({ ascend: false, instantRate: 3e-6, averageRate: 1e-6 });
+            MushieCookies.ascension.verdict = () => ({ ascend: false, instantRate: 3e-6, averageRate: 1e-6, rated: true });
         });
         await game.advanceSeconds(5);
         assert.equal((await frenzyState(game)).bought, 0, 'the run is still growing at three times its average');
         await game.eval(() => {
-            MushieCookies.ascension.verdict = () => ({ ascend: false, instantRate: 1.05e-6, averageRate: 1e-6 });
+            MushieCookies.ascension.verdict = () => ({ ascend: false, instantRate: 1.05e-6, averageRate: 1e-6, rated: true });
         });
         await game.advanceSeconds(2);
         const out = await frenzyState(game);

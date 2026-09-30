@@ -177,7 +177,7 @@ test('Sugar frenzy is worth two hours of CpS, more when it lands on a running Cp
     assert.equal(frenzyValue([{ multClick: 777, secondsLeft: 13 }]), 7200, 'click buffs are not CpS');
 });
 
-const run = (ratio) => ({ instantRate: ratio * 1e-6, averageRate: 1e-6 });
+const run = (ratio, rated = true) => ({ instantRate: ratio * 1e-6, averageRate: 1e-6, rated });
 const frenzyAt = (over) => decideFrenzy({ available: true, buffs: [], worth: 1000, run: run(1.05), ascending: false, ...over });
 
 test('Sugar frenzy waits for the end of the run, when two hours of CpS are worth the most', () => {
@@ -187,6 +187,13 @@ test('Sugar frenzy waits for the end of the run, when two hours of CpS are worth
     assert.equal(frenzyAt({ run: { instantRate: Infinity, averageRate: 1e-6 } }).activate, false, 'growth not known yet');
     assert.equal(frenzyAt({ ascending: true }).activate, false, 'the ascension has begun: the hour would be lost');
     assert.equal(frenzyAt({ available: false }).activate, false);
+});
+
+test('Sugar frenzy ignores the rates until the ascension\'s rule is live', () => {
+    // Early in a run the rates swing (measured: 1.3x the average at 15 minutes, 3.4x at 90), and a
+    // frenzy there would triple a CpS that is still tiny.
+    assert.equal(frenzyAt({ run: run(1.05, false) }).activate, false);
+    assert.equal(frenzyAt({ run: run(1.05, false), buffs: [{ multCpS: 7, secondsLeft: 77 }] }).activate, false);
 });
 
 test('Sugar frenzy starts a little earlier to land on a Frenzy', () => {

@@ -72,7 +72,7 @@ export function startSystems({ game, loop, legacy, log }) {
         buyer,
         // The ascension's growth verdict times Sugar frenzy; while its verdict is not yet known the
         // growth reads as unknown, and with it off nothing ends the run.
-        run: () => (settings.autoAscendToggle == 1 ? ascension.verdict() || { instantRate: Infinity, averageRate: 0 } : null),
+        run: () => (settings.autoAscendToggle == 1 ? ascension.verdict() || { instantRate: Infinity, averageRate: 0, rated: false } : null),
         ascending: () => settings.autoAscendToggle == 1 && ascension.phase() === 'settling',
     });
     const grimoire = createGrimoire({ game, settings, loop, log });

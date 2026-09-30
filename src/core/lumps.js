@@ -231,7 +231,8 @@ export function frenzyValue(buffs) {
  * @param {boolean} a.available   unlocked, unused this ascension, and a lump to pay with
  * @param {Array<{multCpS?: number, secondsLeft: number}>} a.buffs
  * @param {number} a.worth        seconds of CpS the lump is worth elsewhere
- * @param {{instantRate: number, averageRate: number} | null} a.run  the ascension's growth verdict; null when nothing ends runs
+ * @param {{instantRate: number, averageRate: number, rated: boolean} | null} a.run
+ *        the ascension's growth verdict (rated: its rate rule is live); null when nothing ends runs
  * @param {boolean} a.ascending   the ascension has begun
  * @returns {{activate: boolean, reason: string, value: number}}
  */
@@ -243,8 +244,9 @@ export function decideFrenzy(a) {
     if (!(value > a.worth)) return out(false, 'the lump is worth more on a building level');
     const stacked = value >= (1 + STACK_GAIN) * (FRENZY_MULT_CPS - 1) * FRENZY_SECONDS;
     if (!a.run) return stacked ? out(true, 'stacked on a CpS buff') : out(false, 'waiting for a CpS buff to stack on');
+    // Before the rule is live (a short run, a thin history) the rates swing and judge nothing.
     const ratio = a.run.instantRate / a.run.averageRate;
-    if (!(a.run.averageRate > 0) || !Number.isFinite(ratio)) return out(false, 'the run\'s growth is not known yet');
+    if (!a.run.rated || !(a.run.averageRate > 0) || !Number.isFinite(ratio)) return out(false, 'the run\'s growth is not known yet');
     if (ratio <= 1 + FRENZY_MARGIN) return out(true, 'the run is near its end');
     if (stacked && ratio <= 1 + STACK_MARGIN) return out(true, 'the run is near its end, stacked on a CpS buff');
     return out(false, 'the run is still growing');
