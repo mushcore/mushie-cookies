@@ -529,25 +529,4 @@ FrozenCookies.preferenceValues = {
     slowOptions: {
         hint: "Warning: These options may slow the game.",
     },
-    fpsModifier: {
-        hint: "Set game frame rate (default 30).",
-        display: [
-            "Frame Rate 15 fps",
-            "Frame Rate 24 fps",
-            "Frame Rate 30 fps",
-            "Frame Rate 48 fps",
-            "Frame Rate 60 fps",
-            "Frame Rate 72 fps",
-            "Frame Rate 88 fps",
-            "Frame Rate 100 fps",
-            "Frame Rate 120 fps",
-            "Frame Rate 144 fps",
-            "Frame Rate 200 fps",
-            "Frame Rate 240 fps",
-            "Frame Rate 300 fps",
-            "Frame Rate 5 fps",
-            "Frame Rate 10 fps",
-        ],
-        default: 2,
-    },
 };

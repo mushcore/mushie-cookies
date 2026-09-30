@@ -85,7 +85,9 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
     function trackRun() {
         const current = { resets: game.resets, startDate: game.startDate };
         if (state.run && state.run.resets === current.resets && state.run.startDate === current.startDate) return;
-        state.run = { ...current, start: { t: runSeconds(), projected: withExtras() } };
+        // The run began at the prestige its reset left: measured from there even when the mod
+        // starts mid-run, the average is not understated and the ascension not put off.
+        state.run = { ...current, start: { t: 0, projected: game.HowMuchPrestige(game.cookiesReset) } };
         state.history = [];
         state.lastSampleAt = -Infinity;
     }

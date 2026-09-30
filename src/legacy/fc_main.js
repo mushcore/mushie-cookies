@@ -228,7 +228,7 @@ function setOverrides(gameSaveData) {
         FrozenCookies.frenzyClickSpeed = preferenceParse("frenzyClickSpeed", 0);
         FrozenCookies.minCpSMult = preferenceParse("minCpSMult", 1);
         FrozenCookies.maxSpecials = preferenceParse("maxSpecials", 1);
-        FrozenCookies.minLoanMult = preferenceParse("minLoanMult", 1);
+        FrozenCookies.minLoanMult = preferenceParse("minLoanMult", 777);
         FrozenCookies.minASFMult = preferenceParse("minASFMult", 1);
         FrozenCookies.manBankMins = preferenceParse("manBankMins", 0);
 
@@ -369,7 +369,7 @@ function prepareForAscension() {
     }
     if (G) G.harvestAll(); // harvest all plants
     if (
-        Game.dragonLevel > 5 &&
+        Game.dragonLevel >= 5 + 4 &&
         !Game.hasAura("Earth Shatterer") &&
         Game.HasUnlocked("Chocolate egg") &&
         !Game.Has("Chocolate egg")
@@ -658,7 +658,8 @@ function autoEasterAction() {
         Game.hasBuff("Cookie storm") &&
         Game.season != "easter" &&
         !haveAll("easter") &&
-        Game.UpgradesById[181].unlocked
+        Game.Has("Season switcher") &&
+        Game.UpgradesById[209].unlocked
     ) {
         Game.UpgradesById[209].buy();
     }
@@ -682,6 +683,7 @@ function autoHalloweenAction() {
         Game.season != "halloween" &&
         !haveAll("halloween")
     ) {
+        if (!Game.Has("Season switcher") || !Game.UpgradesById[183].unlocked) return;
         Game.UpgradesById[183].buy();
         logEvent(
             "autoHalloween",
@@ -1304,25 +1306,6 @@ function autoCookieBody() {
 
     var itemBought = false;
 
-    var fps_amounts = [
-        "15",
-        "24",
-        "30",
-        "48",
-        "60",
-        "72",
-        "88",
-        "100",
-        "120",
-        "144",
-        "200",
-        "240",
-        "300",
-        "5",
-        "10",
-    ];
-    if (parseInt(fps_amounts[FrozenCookies["fpsModifier"]]) != Game.fps)
-        Game.fps = parseInt(fps_amounts[FrozenCookies["fpsModifier"]]);
 
     // This apparently *has* to stay here, or else fast purchases will multi-click it.
     if (goldenCookieLife() && FrozenCookies.autoGC) {

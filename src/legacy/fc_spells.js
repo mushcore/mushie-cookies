@@ -36,7 +36,31 @@
     }
 })();
 
+var FATE_LABELS = {
+    frenzy: '<b style="color:#FFDE5F">Frenzy',
+    'multiply cookies': '<b style="color:#FFDE5F">Lucky',
+    'click frenzy': '<b style="color:#00C4FF">Click Frenzy',
+    'cookie storm': '<b style="color:#00C4FF">Cookie Storm',
+    'cookie storm drop': "Cookie Storm (Drop)",
+    'building special': '<b style="color:#DAA520">Building Special',
+    'free sugar lump': '<b style="color:#5FFFFC">Sugar Lump',
+    blab: "Blab",
+    clot: '<b style="color:#FF3605">Clot',
+    'ruin cookies': '<b style="color:#FF3605">Ruin Cookies',
+    'cursed finger': '<b style="color:#174F01">Cursed Finger',
+    'blood frenzy': '<b style="color:#4F0007">Elder Frenzy',
+};
+
 nextSpell = function (i) {
+    var grimoire = Game.ObjectsById[7].minigame;
+    if (Game.ObjectsById[7].minigameLoaded && grimoire) {
+        var next = MushieCookies.forecastFate(Game, grimoire, i);
+        return "<small>" + (FATE_LABELS[next.outcome] || next.outcome) + "</b></small>";
+    }
+};
+
+// The inherited forecast, kept for reference only: it reseeds the game's generator.
+var nextSpellInherited = function (i) {
     if (Game.ObjectsById[7].minigameLoaded) {
         season = Game.season;
         var obj = obj || {};

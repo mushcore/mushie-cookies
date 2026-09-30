@@ -64,16 +64,18 @@ export const AUTOPILOT = Object.freeze({
     autoBank: 0,
     autoBroker: 0,
 
-    // Dragon.
+    // Dragon. The inherited petting reseeds the game's generator every second, so it stays off
+    // until the dragon system pets with a private forecast.
     autoDragon: 1,
-    petDragon: 1,
+    petDragon: 0,
 
-    // Seasons.
+    // Seasons. The inherited Easter and Halloween switches fight each other at rising prices,
+    // ignore the buyer's reserve and pop every wrinkler all season; off until the season planner.
     defaultSeasonToggle: 0,
     defaultSeason: 0,
     freeSeason: 1,
-    autoEaster: 1,
-    autoHalloween: 1,
+    autoEaster: 0,
+    autoHalloween: 0,
 
     // Banks the inherited code held back for manual combos.
     holdManBank: 0,
