@@ -170,7 +170,7 @@ function registerMod(mod_id = "frozen_cookies") {
     if (!FrozenCookies.loadedData) setOverrides();
     logEvent(
         "Load",
-        "Initial Load of Frozen Cookies v " +
+        "Initial load of Mushie Cookies v " +
             FrozenCookies.branch +
             "." +
             FrozenCookies.version +
@@ -218,7 +218,6 @@ function setOverrides(gameSaveData) {
         efficiency: 0,
     };
     FrozenCookies.disabledPopups = true;
-    FrozenCookies.trackedStats = [];
     FrozenCookies.lastGraphDraw = 0;
     FrozenCookies.calculatedCpsByType = {};
 
@@ -232,9 +231,6 @@ function setOverrides(gameSaveData) {
     FrozenCookies.frenzyClickBot = 0;
 
     // Smart tracking details
-    FrozenCookies.smartTrackingBot = 0;
-    FrozenCookies.minDelay = 1000 * 10; // 10s minimum reporting between purchases with "smart tracking" on
-    FrozenCookies.delayPurchaseCount = 0;
 
     // Caching
     emptyCaches();
@@ -280,8 +276,6 @@ function setOverrides(gameSaveData) {
             )
     );
 
-    // Give free achievements!
-    if (!Game.HasAchiev("Third-party")) Game.Win("Third-party");
 
     function loadFCData() {
         // Set all cycleable preferences
@@ -465,7 +459,6 @@ function fcReset() {
     FrozenCookies.prevLastHCTime = Date.now();
     FrozenCookies.lastCps = 0;
     FrozenCookies.lastBaseCps = 0;
-    FrozenCookies.trackedStats = [];
     recommendationList(true);
 }
 
@@ -960,7 +953,6 @@ function recommendedSettingsAction() {
         FrozenCookies.logging = 1;
         FrozenCookies.purchaseLog = 0;
         FrozenCookies.fpsModifier = 2;
-        FrozenCookies.trackStats = 0;
         logEvent(
             "recommendedSettings",
             "Set all options to recommended values"
@@ -2458,134 +2450,6 @@ function buySanta() {
         Game.ToggleSpecialMenu();
 }
 
-function statSpeed() {
-    var speed = 0;
-    switch (FrozenCookies.trackStats) {
-        case 1: // 60s
-            speed = 1000 * 60;
-            break;
-        case 2: // 30m
-            speed = 1000 * 60 * 30;
-            break;
-        case 3: // 1h
-            speed = 1000 * 60 * 60;
-            break;
-        case 4: // 24h
-            speed = 1000 * 60 * 60 * 24;
-            break;
-    }
-    return speed;
-}
-
-function saveStats(fromGraph) {
-    FrozenCookies.trackedStats.push({
-        time: Date.now() - Game.startDate,
-        baseCps: baseCps(),
-        effectiveCps: effectiveCps(),
-        hc: Game.HowMuchPrestige(
-            Game.cookiesEarned + Game.cookiesReset + wrinklerValue()
-        ),
-        actualClicks: Game.cookieClicks,
-    });
-    if (
-        $("#statGraphContainer").length > 0 &&
-        !$("#statGraphContainer").is(":hidden") &&
-        !fromGraph
-    ) {
-        viewStatGraphs();
-    }
-}
-
-function viewStatGraphs() {
-    saveStats(true);
-    var containerDiv = $("#statGraphContainer").length
-        ? $("#statGraphContainer")
-        : $("<div>")
-              .attr("id", "statGraphContainer")
-              .html($("<div>").attr("id", "statGraphs"))
-              .appendTo("body")
-              .dialog({
-                  modal: true,
-                  title: "Frozen Cookies Tracked Stats",
-                  width: $(window).width() * 0.8,
-                  height: $(window).height() * 0.8,
-              });
-    if (containerDiv.is(":hidden")) containerDiv.dialog();
-    if (
-        FrozenCookies.trackedStats.length > 0 &&
-        Date.now() - FrozenCookies.lastGraphDraw > 1000
-    ) {
-        FrozenCookies.lastGraphDraw = Date.now();
-        $("#statGraphs").empty();
-        var graphs = $.jqplot(
-            "statGraphs",
-            transpose(
-                FrozenCookies.trackedStats.map(function (s) {
-                    return [
-                        [s.time / 1000, s.baseCps],
-                        [s.time / 1000, s.effectiveCps],
-                        [s.time / 1000, s.hc],
-                    ];
-                })
-            ), //
-            {
-                legend: {
-                    show: true,
-                },
-                height: containerDiv.height() - 50,
-                axes: {
-                    xaxis: {
-                        tickRenderer: $.jqplot.CanvasAxisTickRenderer,
-                        tickOptions: {
-                            angle: -30,
-                            fontSize: "10pt",
-                            showGridline: false,
-                            formatter: function (ah, ai) {
-                                return timeDisplay(ai);
-                            },
-                        },
-                    },
-                    yaxis: {
-                        padMin: 0,
-                        renderer: $.jqplot.LogAxisRenderer,
-                        tickDistribution: "even",
-                        tickOptions: {
-                            formatter: function (ah, ai) {
-                                return Beautify(ai);
-                            },
-                        },
-                    },
-                    y2axis: {
-                        padMin: 0,
-                        tickOptions: {
-                            showGridline: false,
-                            formatter: function (ah, ai) {
-                                return Beautify(ai);
-                            },
-                        },
-                    },
-                },
-                highlighter: {
-                    show: true,
-                    sizeAdjust: 15,
-                },
-                series: [
-                    {
-                        label: "Base CPS",
-                    },
-                    {
-                        label: "Effective CPS",
-                    },
-                    {
-                        label: "Earned HC",
-                        yaxis: "y2axis",
-                    },
-                ],
-            }
-        );
-    }
-}
-
 function updateCaches() {
     var recommendation,
         currentBank,
@@ -2710,22 +2574,6 @@ function transpose(a) {
             return r[c];
         });
     });
-}
-
-function smartTrackingStats(delay) {
-    saveStats();
-    if (FrozenCookies.trackStats == 6) {
-        delay /=
-            FrozenCookies.delayPurchaseCount == 0
-                ? 1 / 1.5
-                : delay > FrozenCookies.minDelay
-                ? 2
-                : 1;
-        FrozenCookies.smartTrackingBot = setTimeout(function () {
-            smartTrackingStats(delay);
-        }, delay);
-        FrozenCookies.delayPurchaseCount = 0;
-    }
 }
 
 // Unused
@@ -3155,14 +3003,6 @@ function autoCookie() {
                 recommendation.purchase.buy();
             }
             FrozenCookies.autobuyCount += 1;
-            if (
-                FrozenCookies.trackStats == 5 &&
-                recommendation.type == "upgrade"
-            ) {
-                saveStats();
-            } else if (FrozenCookies.trackStats == 6) {
-                FrozenCookies.delayPurchaseCount += 1;
-            }
             if (FrozenCookies.purchaseLog == 1) {
                 logEvent(
                     "Store",
@@ -3357,10 +3197,6 @@ function FCStart() {
     if (FrozenCookies.autoclickBot) {
         clearInterval(FrozenCookies.autoclickBot);
         FrozenCookies.autoclickBot = 0;
-    }
-    if (FrozenCookies.statBot) {
-        clearInterval(FrozenCookies.statBot);
-        FrozenCookies.statBot = 0;
     }
 
     if (FrozenCookies.autoGSBot) {
@@ -3678,20 +3514,6 @@ function FCStart() {
             minigameCheckAction,
             FrozenCookies.frequency * 600 // 1 minute
         );
-    }
-
-    if (statSpeed(FrozenCookies.trackStats) > 0) {
-        FrozenCookies.statBot = setInterval(
-            saveStats,
-            statSpeed(FrozenCookies.trackStats)
-        );
-    } else if (
-        FrozenCookies.trackStats == 6 &&
-        !FrozenCookies.smartTrackingBot
-    ) {
-        FrozenCookies.smartTrackingBot = setTimeout(function () {
-            smartTrackingStats(FrozenCookies.minDelay * 8);
-        }, FrozenCookies.minDelay);
     }
 
     FCMenu();

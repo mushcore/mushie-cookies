@@ -556,20 +556,6 @@ FrozenCookies.preferenceValues = {
         ],
         default: 2,
     },
-    trackStats: {
-        hint: "Track CpS/HC for graphs (may slow game).",
-        display: [
-            "Tracking OFF",
-            "Tracking EVERY 60s",
-            "Tracking EVERY 30m",
-            "Tracking EVERY 1h",
-            "Tracking EVERY 24h",
-            "Tracking ON UPGRADES",
-            "Tracking SMART TIMING",
-        ],
-        default: 0,
-        extras: '<a class="option" id="viewStats" onclick="viewStatGraphs();">View Stat Graphs</a>',
-    },
     recommendedSettings: {
         hint: "Set all recommended options (⚠️ reloads game instantly).",
         display: ["Recommended OFF", "Recommended ON"],

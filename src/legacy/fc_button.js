@@ -5,7 +5,7 @@ $("#logButton").before(
     $("<div>")
         .attr("id", "fcButton")
         .addClass("button panelButton")
-        .html("Frozen<br />Cookies")
+        .html("Mushie<br />Cookies")
         .click(function () {
             Game.ShowMenu("fc_menu");
         })
@@ -22,8 +22,7 @@ $("<style>")
             ".bad {border-width:1px; border-style:solid; border-color:#660033;}" +
             ".average {border-width:1px; border-style:solid; border-color:#663399;}" +
             ".good {border-width:1px; border-style:solid; border-color:#3399FF;}" +
-            ".best {border-width:1px; border-style:solid; border-color:#00FFFF;}" +
-            ".ui-dialog {z-index:1000000;}"
+            ".best {border-width:1px; border-style:solid; border-color:#00FFFF;}"
     )
     .appendTo("head");
 
@@ -392,7 +391,7 @@ function FCMenu() {
                     $("<div>")
                         .addClass("section")
                         .text(
-                            "Frozen Cookies v " +
+                            "Mushie Cookies v " +
                                 FrozenCookies.branch +
                                 "." +
                                 FrozenCookies.version
@@ -422,9 +421,9 @@ function FCMenu() {
                                 .attr("id", "fcOpenDocPage")
                                 .attr(
                                     "title",
-                                    "Open the Frozen Cookies readme/documentation page"
+                                    "Open the Mushie Cookies readme"
                                 )
-                                .text("Frozen Cookies Readme")
+                                .text("Mushie Cookies Readme")
                                 .click(openDocumentationPage)
                         )
                 );
@@ -549,7 +548,7 @@ function FCMenu() {
         if (FrozenCookies.preferenceValues) {
             subsection = $("<div>").addClass("subsection");
             subsection.append(
-                $("<div>").addClass("title").text("Frozen Cookie Controls"),
+                $("<div>").addClass("title").text("Mushie Cookies Controls"),
                 // Add warning below the title
                 $("<div>")
                     .addClass("fc-warning")
@@ -1158,7 +1157,7 @@ function openGameLogPanel() {
 // The following will open a new window (which may be a tab, depending on browser settings).
 function openDocumentationPage() {
     window.open(
-        "https://github.com/erbkaiser/FrozenCookies?tab=readme-ov-file#frozencookies",
+        "https://github.com/mushcore/mushie-cookies#readme",
         "_blank",
         "noopener,noreferrer,width=800,height=600"
     );
