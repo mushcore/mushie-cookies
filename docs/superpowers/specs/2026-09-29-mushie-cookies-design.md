@@ -1,6 +1,15 @@
 # Mushie Cookies — design
 
-Status: **proposed, awaiting approval**. Date: 2026-09-29.
+Status: **approved** 2026-09-29.
+
+Decisions confirmed by the owner:
+
+| Question | Decision |
+|---|---|
+| Fair-play boundary | As in section 2: no save-scumming, no editing timers or cookies |
+| Steam achievements | On |
+| Steam Workshop release | No |
+| Review gates | None. Milestones run back to back, with a report at each boundary |
 Target: Cookie Clicker v2.053, Steam build.
 Base: fork of `erbkaiser/FrozenCookies` at upstream commit `797f174`.
 
@@ -191,7 +200,14 @@ Verified by: income per day in the harness against static slotting.
 | Time-lapse harness | Whole strategies over days of game time | The game's own code in a headless browser with a controllable clock |
 | Live smoke test | Loading and behaviour in the real Steam game | A separate test save; the player's save is backed up first |
 
-The time-lapse harness is the piece no other mod has, and it is what makes criterion 4 checkable. Its feasibility is unproven, so M1 begins with a short spike. If the spike fails, the fallback is recorded snapshots plus per-subsystem simulators for the market and the garden, which are known to be feasible.
+The time-lapse harness is the piece no other mod has, and it is what makes criterion 4 checkable.
+
+Feasibility was confirmed by a spike on 2026-09-29. The installed v2.053 game booted in headless Chrome in about 0.3 seconds with no errors, and ran at roughly 30,000 logic frames per second: about 1,000 times real time, or one game day in under two minutes. Cookies earned over a simulated hour matched CpS × 3,600 exactly.
+
+Two rules follow from how the harness works:
+
+- New code is driven by the game's `logic` hook and counts frames. It never uses wall-clock timers, so it behaves identically at any playback speed.
+- The harness replaces timers, the clock and the random seed with virtual ones, so legacy code that still uses timers runs in virtual time and every run is reproducible.
 
 Game files are read from the local install at test time. They are never copied into the repository.
 
@@ -202,13 +218,12 @@ Game files are read from the local install at test time. They are never copied i
 | Upstream has no license | Fork relationship kept; no Workshop release; section 4 |
 | Game updates change mechanics | Read pools, recipes and formulas from the live game wherever possible; generated tables are rebuilt by a tool |
 | The seam between legacy and new code leaks | One bridge file owns every global the legacy code still needs |
-| Harness not feasible | Spike first; fallback in section 7 |
 | Conflict with other mods | Upstream has a known conflict with Cookie Monster; the README will say so |
 | Bot damages a save | Test save for all live runs; backup before first use |
 
 ## 9. Out of scope
 
 - Steam Workshop release
-- Web, bookmarklet and userscript loaders (left as they are, not maintained)
+- Web, bookmarklet and userscript loaders. The upstream ones are removed, because they load upstream's code, not this fork's
 - Translations
 - Anything outside the boundary in section 2
