@@ -61,6 +61,31 @@ test('trains a whole chain to Radiant Appetite once it repays, one level after a
     }
 });
 
+test('a chain that becomes trainable is trained at once, not at the next scheduled look', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        // One Prism short of the hundred that Radiant Appetite takes. The auras within reach
+        // (levels 13 to 18) pay through golden cookies, which are off: nothing is worth training.
+        await game.eval(bakery, { prestige: 1e11, level: 12 });
+        await game.eval(() => {
+            Game.Objects['Prism'].sacrifice(11);
+        });
+        await game.eval(dragonOn, { autoDragon: 1 });
+        await game.advanceSeconds(5);
+        const before = await game.eval(() => ({ level: Game.dragonLevel, decision: MushieCookies.dragon.report().decision }));
+        assert.equal(before.level, 12);
+        assert.equal(before.decision.train, false);
+        await game.eval(() => {
+            Game.cookies = 1e30;
+            Game.Objects['Prism'].buy(1);
+        });
+        await game.advanceSeconds(20);
+        assert.equal(await game.eval(() => Game.dragonLevel), 19);
+    } finally {
+        await game.close();
+    }
+});
+
 test('a chain that would not repay within the run is not trained; the inherited rule would train it', { skip }, async () => {
     const game = await launchWithMod();
     try {

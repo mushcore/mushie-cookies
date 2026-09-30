@@ -33,7 +33,7 @@ export function createDragon({ game, settings, loop, reserve = () => 0, buyer = 
     // check allows, the inherited rule, fc_gods.js:562-589 before this system) is kept so the two
     // can be compared in the harness.
     const options = { rule: 'measured' };
-    const state = { levelsGained: 0, decision: null, nextDecisionAt: 0, pets: 0, last: null, order: null, orderSeed: null };
+    const state = { levelsGained: 0, decision: null, nextDecisionAt: 0, decidedSteps: 0, pets: 0, last: null, order: null, orderSeed: null };
     const listeners = [];
 
     const income = () => estimateIncome(readState(game, settings)).total;
@@ -258,11 +258,15 @@ export function createDragon({ game, settings, loop, reserve = () => 0, buyer = 
             if (!clickBuffRunning()) train('affordable');
             return;
         }
-        if (incomeBuffRunning() || frame < state.nextDecisionAt) return;
+        if (incomeBuffRunning()) return;
         const steps = chain();
         if (!steps.length) return; // the egg's price is held by the buyer, or the grimoire's mana is
+        // A "not yet" is looked at again after DECIDE_EVERY, or at once when the chain that can be
+        // trained changes: a building reaching the count a level takes, or a cast spending mana.
+        if (frame < state.nextDecisionAt && steps.length === state.decidedSteps) return;
         const decision = decide(steps);
         state.decision = decision;
+        state.decidedSteps = steps.length;
         if (!decision.train) {
             state.nextDecisionAt = frame + DECIDE_EVERY;
             return;
