@@ -93,7 +93,10 @@ async function play(mod, start, seed) {
     }
 }
 
-/** A loaded machine can make a browser miss its launch timeout; that is retried, nothing else. */
+/**
+ * A loaded machine can make a browser miss its launch timeout, which the harness cleans up after;
+ * that is retried, nothing else (a page that fails to load leaves its browser to the process exit).
+ */
 async function playWithRetry(mod, start, seed) {
     for (let attempt = 1; ; attempt++) {
         try {
