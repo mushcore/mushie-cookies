@@ -144,6 +144,15 @@ test('brokers are hired only when they repay before the run is expected to end',
         assert.ok(out.report.buys > 0, 'the market traded, so a broker had something to save');
         assert.ok(!(out.report.brokerPayback <= out.report.runLeft), `a broker would repay in time, so the claim is not tested: ${JSON.stringify(out.report)}`);
         assert.equal(out.brokers, 0, `hired ${out.brokers} brokers that cannot repay: ${JSON.stringify(out.report)}`);
+
+        // The run is timed by play, on the ascension's clock: the game makes nothing while the
+        // machine sleeps (it catches up at most 5 s, main.js:16788), so eight hours asleep must
+        // not make the run look ten hours old and a broker look as if it had ten more to repay in.
+        await game.machineSleep(8 * 3600);
+        await game.advanceSeconds(60);
+        const woken = await game.eval(() => ({ report: MushieCookies.market.report(), played: MushieCookies.ascension.report().runSeconds }));
+        assert.ok(woken.played < 3 * 3600, `the premise: the ascension's clock counts play, ${woken.played} s`);
+        assert.ok(Math.abs(woken.report.runLeft - woken.played) < 60, `brokers are judged over ${woken.report.runLeft} s left, the run has been played ${woken.played} s`);
         assert.deepEqual(failures(out.status), []);
         assert.deepEqual(game.errors, []);
     }));
@@ -179,33 +188,61 @@ test('a loan is taken only on a combo it pays for, and its downpayment never tou
         const quiet = await game.eval(() => window.__loans.length);
         assert.equal(quiet, 0, 'no loan on ordinary income');
 
-        // A combo, with a bank whose free part is smaller than any downpayment: no loan.
+        // A long boost is no combo (the shared classifier, src/core/buffs.js): Sugar frenzy's hour
+        // at x3 is not looked at as one, where reading the buff raw valued every loan on it once
+        // a second for the hour.
+        await game.eval(() => Game.gainBuff('sugar frenzy', 3600, 3));
+        await game.advanceSeconds(5);
+        const long = await game.eval(() => ({ loans: window.__loans.length, loan: MushieCookies.market.report().loan }));
+        assert.equal(long.loans, 0, 'no loan on a long boost');
+        assert.match(String(long.loan && long.loan.reason), /no combo/, `a long boost read as a combo: ${JSON.stringify(long.loan)}`);
+        await game.eval(() => Game.killBuff('Sugar frenzy')); // test fixture: its hour is up
+        await game.advanceSeconds(1);
+
+        // A combo worth the pawnshop loan, with a bank whose free part is smaller than either
+        // downpayment: no loan. The combo pays by CpS alone, clicking off: with clicks in a Click
+        // frenzy the bank rises past any downpayment within a second while the buyer stands aside
+        // (src/systems/buyer.js), and the reserve then rightly stops nothing. Test fixture: an
+        // Elder frenzy of 40 s on a Frenzy (x4662), and a Click frenzy of 40 s only so the buyer
+        // stands aside. The reserve is 1,400 minutes of CpS (84,000 s), the bank 1.1 of it, and
+        // one second is played: one market tick. The free part is then at most 8,400 + 4,662 s of
+        // CpS, under loan 1's downpayment (0.2 of the bank, 19,400) and loan 2's (38,800), while
+        // 39 s of the combo doubled are worth 182,000.
+        await game.eval(() => {
+            FrozenCookies.autoClick = 0;
+            FrozenCookies.manBankMins = 1400;
+            MushieCookies.buyer.invalidate();
+        });
+        await game.advanceSeconds(2); // the buyer ranks, holding the new reserve
         await game.eval(() => {
             Game.gainBuff('frenzy', 77, 7);
-            Game.gainBuff('blood frenzy', 6, 666);
-            Game.gainBuff('click frenzy', 13, 777);
+            Game.gainBuff('blood frenzy', 40, 666);
+            Game.gainBuff('click frenzy', 40, 777);
             Game.cookies = MushieCookies.buyer.reserve() * 1.1;
         });
-        await game.advanceSeconds(3);
-        const tight = await game.eval(() => window.__loans.slice());
+        await game.advanceSeconds(1);
+        const tight = await game.eval(() => ({ loans: window.__loans.slice(), loan: MushieCookies.market.report().loan }));
 
-        // The same combo with room above the reserve: the pawnshop loan's 40 s double it.
+        // The same combo, fresh, with room above the reserve: the pawnshop loan's 40 s double it.
+        // Gaining a buff that is running can prolong it (main.js:13765-13771), so the first combo is ended.
+        await game.eval(() => ['Frenzy', 'Elder frenzy', 'Click frenzy'].forEach((name) => Game.killBuff(name)));
+        await game.advanceSeconds(1);
         await game.eval(() => {
             Game.gainBuff('frenzy', 77, 7);
-            Game.gainBuff('blood frenzy', 6, 666);
-            Game.gainBuff('click frenzy', 13, 777);
-            Game.cookies = MushieCookies.buyer.reserve() * 5;
+            Game.gainBuff('blood frenzy', 40, 666);
+            Game.gainBuff('click frenzy', 40, 777);
+            Game.cookies = MushieCookies.buyer.reserve() * 1.8; // loan 2's downpayment fits: 0.72 of 0.8 free
         });
-        await game.advanceSeconds(3);
+        await game.advanceSeconds(1);
         const out = await game.eval(() => ({ loans: window.__loans, report: MushieCookies.market.report(), status: MushieCookies.status() }));
         const share = { 1: 0.2, 2: 0.4, 3: 0.5 };
         const intoReserve = out.loans.filter((l) => share[l.id] * l.before > l.before - l.reserve + 1e-9 * l.before);
         assert.deepEqual(intoReserve, [], 'a downpayment took part of the reserve');
-        assert.deepEqual(tight, [], 'no downpayment fits above the reserve');
+        assert.deepEqual(tight.loans, [], `no downpayment fits above the reserve: ${JSON.stringify(tight.loan)}`);
         // Each loan is judged on the bank the last one left: never two downpayments in one go.
         const ticks = out.loans.map((l) => l.T);
         assert.equal(new Set(ticks).size, ticks.length, `two loans were taken in the same frame: ${JSON.stringify(out.loans)}`);
-        assert.ok(out.loans.some((l) => l.id === 2), `the pawnshop loan should pay on this combo: ${JSON.stringify(out.report.loan)}`);
+        assert.ok(out.loans.some((l) => l.id === 2), `the pawnshop loan should pay on this combo, so only the reserve stopped it before: ${JSON.stringify(out.report.loan)}`);
         assert.deepEqual(failures(out.status), []);
         assert.deepEqual(game.errors, []);
     }));

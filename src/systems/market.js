@@ -5,7 +5,8 @@
 // purchase, unless the trade returns more per cookie than that purchase (src/core/bank.js).
 import { restingValue, tradeDecision } from '../core/market.js';
 import { OFFICES, officeIncome, overhead as overheadWith, brokerIncome, brokerWorthHiring, expectedRunLeft, tradeReturn, marketBudget } from '../core/bank.js';
-import { LOANS, chooseLoan, secondsToAscension, comboProfile, castTimes } from '../core/loans.js';
+import { LOANS, chooseLoan, secondsToAscension, comboProfile, castTimes, loanOccasion } from '../core/loans.js';
+import { classifyBuffs, unbuffedFactors } from '../core/buffs.js';
 import { estimateIncome } from '../core/income.js';
 import { simulate } from '../core/sim.js';
 import { readState } from '../game/measure.js';
@@ -50,7 +51,8 @@ export function thresholdsFor(id, bankLevel, overhead) {
  * @param {object} deps.loop
  * @param {() => number} [deps.reserve]  cookies the buyer is holding back
  * @param {{committed(): number, ranking(): Array<object>}} [deps.buyer]  what it is saving for, and its ranking
- * @param {{report(): object}} [deps.ascension]  its verdict, for forecasting when the run ends
+ * @param {{verdict(): object, runSeconds(): number}} [deps.ascension]  its verdict, for forecasting
+ *   when the run ends, and its run clock
  * @param {(what: string) => void} [deps.log]
  */
 export function createMarket({ game, settings, loop, reserve = () => 0, buyer = null, ascension = null, log = () => {} }) {
@@ -76,14 +78,20 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
         allocation: null, // the inputs of the last buy decision
         loan: null, // the last loan decision
         office: null, // the last office offer: its price and the income it adds
+        frame: 0, // the loop's frame at the last tick
     };
 
     const market = () => {
         const M = game.Objects['Bank'].minigame;
         return M && M.goodsById ? M : null;
     };
-    const now = () => Date.now() / 1000;
-    const runSeconds = () => Math.max(0, (Date.now() - game.startDate) / 1000);
+    // Everything here is timed by play, not the wall clock: the game makes nothing while the
+    // machine sleeps or the loop stalls (it catches up at most 5 s, main.js:16788), and a rate or
+    // a run length measured across that gap is wrong. `now` counts the loop's frames; the run's
+    // length is the ascension system's run clock, which counts them the same way.
+    const now = () => state.frame / game.fps;
+    const runSeconds = () =>
+        ascension && typeof ascension.runSeconds === 'function' ? ascension.runSeconds() : Math.max(0, (Date.now() - game.startDate) / 1000);
 
     /** A new run starts with no brokers, no offices, and a raw CpS record of 0 (main.js:3504, 3619). */
     function trackRun() {
@@ -103,8 +111,8 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
         state.samples.push({ t, raw: game.cookiesPsRawHighest, earned: game.cookiesEarned });
         while (state.samples.length > 2 && state.samples[1].t <= t - GROWTH_SECONDS) state.samples.shift();
         // A first ascension waits for a prestige target, not for growth to slow (src/core/ascension.js).
-        const verdict = ascension && settings.autoAscendToggle == 1 && game.prestige > 0 ? ascension.report().verdict : null;
-        if (verdict && Number.isFinite(verdict.instantRate) && Number.isFinite(verdict.averageRate)) {
+        const verdict = ascension && settings.autoAscendToggle == 1 && game.prestige > 0 ? ascension.verdict() : null;
+        if (verdict && verdict.startDate === game.startDate && Number.isFinite(verdict.instantRate) && Number.isFinite(verdict.averageRate)) {
             state.gaps.push({ t, gap: verdict.instantRate - verdict.averageRate });
             while (state.gaps.length > 2 && state.gaps[1].t <= t - GROWTH_SECONDS) state.gaps.shift();
         }
@@ -320,11 +328,11 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
         });
     }
 
-    /** The buffs running now, as seconds left and multipliers. */
+    /** The buffs running now, as seconds left and multipliers, read by the shared classifier. */
     const runningBuffs = () =>
-        Object.values(game.buffs)
-            .filter((b) => b.time > 0)
-            .map((b) => ({ seconds: b.time / game.fps, multCpS: b.multCpS, multClick: b.multClick }));
+        classifyBuffs(game.buffs, { fps: game.fps })
+            .filter((c) => c.secondsLeft > 0)
+            .map((c) => ({ seconds: c.secondsLeft, multCpS: c.cpsMult, multClick: c.clickMult }));
 
     /**
      * Click frenzies forecast from Force the Hand of Fate inside `window` seconds, each timed at
@@ -332,10 +340,11 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
      * alone, though the grimoire lands them on a buff when it can: waiting for one is never
      * overstated.
      */
-    function forecastCombos(window, { buffs, durationMult, clicksPerSecond, share }) {
+    function forecastCombos(window, { durationMult, clicksPerSecond, share }) {
         const grimoire = game.Objects['Wizard tower'].minigame;
         if (!grimoire || !grimoire.spells || settings.autoFate != 1) return [];
-        const buffed = buffs.reduce((m, b) => m * (b.multCpS === undefined ? 1 : b.multCpS) * (b.multClick === undefined ? 1 : b.multClick), 1);
+        const factors = unbuffedFactors(game.buffs);
+        const buffed = factors.cps * factors.click;
         // A click frenzy lasts 13 s times the golden cookie duration bonus, at ×777 (main.js:5561).
         const profile = comboProfile({
             buffs: [{ seconds: Math.ceil(13 * durationMult), multClick: 777 }],
@@ -358,9 +367,8 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
         );
         if (!loans.length) return;
         const secondsLeft = settings.autoAscendToggle == 1 ? secondsToAscension(state.gaps) : Infinity;
-        const combo = runningBuffs().some((b) => (b.multCpS || 1) > 1 || (b.multClick || 1) > 1);
         // Nothing but a combo or the run's end in sight can make a loan pay (src/core/loans.js).
-        if (!combo && !(secondsLeft <= Math.max(...loans.map((l) => l.seconds)))) {
+        if (!loanOccasion({ buffs: game.buffs, secondsLeft, loans, fps: game.fps })) {
             state.loan = { taken: null, reason: 'no combo running and no ascension in sight' };
             return;
         }
@@ -377,7 +385,7 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
             spendable: game.cookies - reserve(),
             committed: committed(),
             buyerReturn: next && Number.isFinite(next.purePayback) && next.purePayback > 0 ? 1 / next.purePayback : 0,
-            ahead: forecastCombos(window, { buffs, durationMult: live.golden.durationMult, clicksPerSecond: live.clicksPerSecond, share }),
+            ahead: forecastCombos(window, { durationMult: live.golden.durationMult, clicksPerSecond: live.clicksPerSecond, share }),
         });
         if (!choice) {
             state.loan = { taken: null, reason: 'no loan is worth its cost', secondsLeft };
@@ -391,7 +399,8 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
         log(`market: took loan ${choice.loan.id}, worth ${Math.round(choice.net).toLocaleString()} cookies over its cost`);
     }
 
-    function tick() {
+    function tick(frame) {
+        state.frame = frame;
         const M = market();
         if (!M || game.OnAscend) return;
         if (state.profitAtStart === null) state.profitAtStart = M.profit;

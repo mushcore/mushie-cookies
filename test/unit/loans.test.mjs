@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LOANS, incomeOver, loanValue, chooseLoan, secondsToAscension, comboProfile, castTimes } from '../../src/core/loans.js';
+import { LOANS, incomeOver, loanValue, chooseLoan, secondsToAscension, comboProfile, castTimes, loanOccasion } from '../../src/core/loans.js';
+import { BUFF_FIXTURES, buffFromFixture } from '../fixtures/buffs.mjs';
 
 const close = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
 const [loan1, loan2, loan3] = LOANS;
@@ -138,4 +139,23 @@ test('casts are timed at the soonest the mana covers them, with the game\'s rege
     // From 40 left, 20 more at about √0.4..√0.6 × 0.06 a second: some 400 s.
     assert.ok(times[1] > 300 && times[1] < 600, `second cast at ${times[1]}`);
     assert.deepEqual(castTimes({ mana: 0, maxMana: 100, cost: 60, count: 3, window: 60 }), [], 'nothing inside the window');
+});
+
+test("only an income spike or the run's end makes a loan worth looking at, as the shared classifier reads the buffs", () => {
+    const buff = (type) => buffFromFixture(BUFF_FIXTURES.find((row) => row.type === type));
+    const loans = [loan1, loan2];
+    // A long boost multiplies CpS for hours or days (Sugar frenzy, a loan the player took, a
+    // golden lump's blessing); reading it raw as a combo ran the whole valuation every second
+    // for as long as it lasted (autopilot spec, section 2 rule 3).
+    for (const type of ['sugar frenzy', 'loan 1', 'loan 3', 'sugar blessing']) {
+        assert.equal(loanOccasion({ buffs: { x: buff(type) }, loans }), null, `${type} alone is no combo`);
+    }
+    assert.equal(loanOccasion({ buffs: { x: buff('clot') }, loans }), null, 'a debuff is no combo');
+    assert.equal(loanOccasion({ buffs: {}, loans }), null);
+    assert.equal(loanOccasion({ buffs: { a: buff('sugar frenzy'), b: buff('frenzy') }, loans }), 'combo');
+    assert.equal(loanOccasion({ buffs: { x: buff('click frenzy') }, loans }), 'combo');
+    // With no spike, only a run forecast to end inside the longest boost it could take.
+    assert.equal(loanOccasion({ buffs: {}, loans, secondsLeft: 7000 }), 'run end');
+    assert.equal(loanOccasion({ buffs: {}, loans, secondsLeft: 7300 }), null);
+    assert.equal(loanOccasion({ buffs: {}, loans: [loan2], secondsLeft: 7000 }), null);
 });

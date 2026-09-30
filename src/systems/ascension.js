@@ -249,6 +249,8 @@ export function createAscension({ game, settings, loop, extras = () => 0, collec
         history: () => state.history.slice(),
         /** The last growth verdict (shouldAscend), or null before the first; cheap, for other systems. */
         verdict: () => state.verdict,
+        /** Seconds of play in the current run (the run clock above); cheap, for other systems. */
+        runSeconds,
         /** 'playing', 'settling' (collected, about to ascend) or 'ascending'. */
         phase: () => state.phase,
     };

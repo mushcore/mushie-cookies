@@ -8,6 +8,7 @@
  * click, main.js:4692-4708), or a run that ends before its interest does (the reset clears every
  * buff without running a loan's onDie, main.js:3492 and 13827, so no interest is charged).
  */
+import { incomeSpikeRunning } from './buffs.js';
 
 /**
  * The three loans. The game stores durations in minutes and passes minutes × 60 as seconds
@@ -56,6 +57,24 @@ export function loanValue({ loan, profile = [], expected, bank, secondsLeft = In
     // The downpayment is a share of the whole bank (minigameMarket.js:375), gone for good.
     const cost = loan.downpayment * bank + interest;
     return { gain, cost, net: gain - cost };
+}
+
+/**
+ * What could make a loan pay now, before any valuation: 'combo' while an income spike runs (the
+ * shared classifier, src/core/buffs.js), 'run end' when the run is forecast to end inside the
+ * longest boost of `loans` (its interest is then never charged), else null. A long boost (Sugar
+ * frenzy, a loan, a golden lump's blessing) is no combo: it lasts hours or days, and on it every
+ * loan loses as on ordinary income.
+ * @param {object} args
+ * @param {object|Array<object>} args.buffs  Game.buffs
+ * @param {number} [args.secondsLeft=Infinity]  until the run is forecast to end
+ * @param {Array<object>} args.loans  the loans that could be taken
+ * @param {number} [args.fps=30]
+ */
+export function loanOccasion({ buffs, secondsLeft = Infinity, loans, fps = 30 }) {
+    if (incomeSpikeRunning(buffs, { fps })) return 'combo';
+    if (loans.length && secondsLeft <= Math.max(...loans.map((l) => l.seconds))) return 'run end';
+    return null;
 }
 
 /**
