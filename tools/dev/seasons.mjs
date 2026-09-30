@@ -75,7 +75,21 @@ async function run(seed, variant) {
             );
         }
         const report = variant === 'on' ? await game.eval(() => MushieCookies.seasons.report()) : null;
-        return { seed, variant, wallSeconds: Math.round((Date.now() - started) / 1000), errors: game.errors.slice(0, 5), points, last: report && report.last };
+        // How much of the end-of-run CpS the seasonal upgrades and Santa give directly, at the same
+        // buildings: a what-if that takes them away (the rest of the gap is compounding).
+        const direct = await game.eval(() => {
+            const names = Game.seasonDrops.concat(["Santa's dominion", 'A festive hat']);
+            const without = MushieCookies.simulate(Game, {
+                apply() {
+                    for (const n of names) if (Game.Upgrades[n].bought) { Game.Upgrades[n].bought = 0; Game.UpgradesOwned--; }
+                    Game.santaLevel = 0;
+                },
+                measure: () => Game.unbuffedCps,
+            });
+            const reindeer = MushieCookies.estimateIncome(MushieCookies.readState(Game, FrozenCookies));
+            return { cpsFactor: Game.unbuffedCps / without, reindeerShare: reindeer.reindeer / reindeer.total };
+        });
+        return { seed, variant, wallSeconds: Math.round((Date.now() - started) / 1000), errors: game.errors.slice(0, 5), points, direct, last: report && report.last };
     } finally {
         await game.close();
     }
@@ -99,6 +113,8 @@ for (const seed of seeds) {
         seasonalOff: end(off).seasonal,
         switches: end(on).uses,
         santaLevel: end(on).santaLevel,
+        directCpsFactor: on.direct.cpsFactor,
+        reindeerShare: on.direct.reindeerShare,
     });
 }
 const spread = (key) => {
@@ -107,7 +123,8 @@ const spread = (key) => {
 };
 for (const s of summary) {
     process.stderr.write(
-        `${s.seed}: CpS x${s.cpsRatio.toFixed(2)}, cookies x${s.earnedRatio.toFixed(2)}, seasonal upgrades ${s.seasonalOn} vs ${s.seasonalOff}, ${s.switches} switches, Santa ${s.santaLevel}\n`
+        `${s.seed}: CpS x${s.cpsRatio.toFixed(2)}, cookies x${s.earnedRatio.toFixed(2)}, seasonal upgrades ${s.seasonalOn} vs ${s.seasonalOff}, ${s.switches} switches, Santa ${s.santaLevel}; ` +
+            `at the end they give x${s.directCpsFactor.toFixed(2)} CpS directly, reindeer ${(100 * s.reindeerShare).toFixed(0)}% of income\n`
     );
 }
 console.log(JSON.stringify({ hours, startPrestige, goldenCookies: false, summary, cps: spread('cpsRatio'), earned: spread('earnedRatio'), runs }, null, 1));

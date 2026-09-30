@@ -21,6 +21,7 @@ Each part is also a separate switch in the **Mushie Cookies** menu, and each is 
 | Garden | Breeds every seed by asking the game which neighbours produce which plant, then sacrifices the garden for 10 sugar lumps and starts again. | Auto Garden |
 | Stock market | Trades with buy and sell prices derived by simulating the game's exact price model (the port matches the game bit for bit); spends only what the buyer is not holding. | Auto Trading |
 | Pantheon and dragon | Slots gods and picks auras by what they add to income, the way a player drags a god or confirms an aura. | Auto Gods & Auras |
+| Seasons and Santa | With Season switcher, values each season for the rest of the run (reindeer in Christmas, the drops still missing in each) and switches when that repays the switch: a Valentine's visit for the hearts that pay, then Christmas to rest in. Levels Santa by what each level adds. Switches and Santa levels are ranked with every other purchase and paid from above the buyer's reserve; the calendar's season is kept while it has drops to give. | Auto Seasons |
 
 ## What it will and will not do
 
@@ -42,6 +43,7 @@ From the harness, against the inherited Frozen Cookies logic or against doing no
 | Stock market | 1.95× the profit of the published "buy at 50%, sell at 125% of resting value" rule on a price history the search never saw (bank levels 1 and 5, 5% broker overhead; 1.92× over every bank level and overhead). Simulated profit per share of storage, not profit measured in the game |
 | Buying | On par with the inherited logic for pure purchase order (0.96× to 1.03×, luck removed); the gains are correctness and a four times faster simulation |
 | Garden | 8 of 34 seeds in the first six game hours from a fresh seed log, 27 by 48 hours; one seed, with a bank so large that seed prices never held it back |
+| Seasons and Santa | Three game hours from just after an ascension at prestige 3000, Season switcher owned, golden cookies off, three seeds, against no season play: CpS at the end ×10,600 to ×11,800, cookies ×29,600 to ×31,000; 28 seasonal upgrades collected against none (Santa to level 14, all 7 Christmas cookies, 5 hearts) with 4 switches. At the end the seasonal upgrades give ×3.3 CpS directly and reindeer 14% of income; the rest is compounding within the run. Easter and Halloween were not visited: they wait for the wrinkler system |
 
 A single run is dominated by golden cookie luck, so strategies are compared with golden cookies switched off (which makes runs deterministic) or across several seeds.
 

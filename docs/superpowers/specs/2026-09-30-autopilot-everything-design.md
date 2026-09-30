@@ -26,7 +26,7 @@ Every option starts off. One switch, **Autopilot**, automates every part of the 
 | Clicking the big cookie | clicker | inherited interval clicker; to rebuild (section 4.1) |
 | Golden, wrath and storm cookies, reindeer, news fortunes | shimmers | inherited, shares a guard with wrinkler code; to rebuild (4.2) |
 | Wrinklers | wrinklers | inherited popping with verified defects; to rebuild (4.3) |
-| Seasons, Santa, seasonal drops | seasons | nothing buys seasons or levels Santa; to build (4.4) |
+| Seasons, Santa, seasonal drops | seasons | built in wave one (branch w1/seasons): Christmas with Santa and reindeer, Valentine's visits for hearts; Easter and Halloween only once the wrinkler system hunts (4.3). Measured (`tools/dev/seasons.mjs`, 3 game hours from prestige 3000 with Season switcher, luck-free, 3 seeds) against no season play: end-of-run CpS ×10,600 to ×11,800, cookies ×29,600 to ×31,000, 28 seasonal upgrades against 0 (Santa 14, 7 Christmas cookies, 5 hearts, the hat, Santa's dominion), 4 switches. At the end those upgrades give ×3.3 CpS directly and reindeer 14% of income; the rest is compounding within the run |
 | Dragon training and petting | dragon | inherited trainer ignores reserve and horizon; petting reseeds the RNG; to rebuild (4.5) |
 | Dragon auras, pantheon | gods | done (M8), thrash fixed in review |
 | Heavenly upgrades, permanent slots | ascension | done (M3); planner misses unlock-only upgrades; to fix (4.6) |
@@ -65,6 +65,8 @@ Measure: cookies over a day of grandmapocalypse against the inherited "efficient
 One owner of `Game.season`, gated on owning Season switcher and on the reserve. Each run it plans which seasons to visit and in what order to collect seasonal upgrades cheapest (switch prices grow with `seasonUses`, drops reset each ascension), levels Santa to 14 while Christmas is on (`Game.UpgradeSanta`, about 2.35× CpS in total), buys A festive hat, and settles on the season whose standing value is highest. Reindeer and Santa enter the income model so Christmas can be valued. The real calendar season is respected: it costs nothing and switching away forfeits it.
 
 Measure: CpS at the end of a run with and without the planner; seasonal upgrades collected per run.
+
+As built: switches and Santa levels are sold through the buyer (`buyer.offer`), so they are ranked with every other purchase and paid from above the reserve. Popping stays with the wrinkler system: while Halloween or Easter runs with drops missing, the season system calls its `hunt({season, chance, perDrop})` every five seconds (`hunt(null)` otherwise), where `chance` is the drop chance per pop and `perDrop` the cookies a drop is worth over the rest of the run; the wrinkler system pops for drops when `chance × perDrop` beats what popping forfeits. Until that function is wired in, the season system never enters Easter or Halloween while wrinklers feed, because the inherited popper pops them all in those seasons.
 
 ### 4.5 Dragon
 
