@@ -18,7 +18,7 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { launchWithMod, BUILT_MOD } from '../../test/harness/game.mjs';
 import { startServer } from '../../test/harness/server.mjs';
-import { prepareRuntime } from '../../test/harness/runtime.mjs';
+import { prepareRuntime, stopTree } from '../../test/harness/runtime.mjs';
 import { takeSlot } from '../../test/harness/slots.mjs';
 import { gameAppDir } from '../localConfig.mjs';
 
@@ -356,7 +356,7 @@ async function runtime(reps, seconds) {
         } catch (e) {
             // already closed
         }
-        child.kill();
+        stopTree(child); // child.kill() would leave the renderer running the game
         await server.close();
         releaseSlot();
     }
