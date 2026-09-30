@@ -13,7 +13,7 @@ import {
     lindyHorizon,
     auraHorizon,
     RETURN_BLOCK_SECONDS,
-    SKIP_GODS,
+    skippedGods,
     HOLOBORE,
     pinnedSlots,
     goldenCookiesClicked,
@@ -107,10 +107,11 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
 
     function godMoves(M) {
         const now = incomeNow();
-        const pinned = pinnedSlots(M.slot.map((id) => keyOf(M, id)), goldenClicked());
+        const skipped = skippedGods(settings);
+        const pinned = pinnedSlots(M.slot.map((id) => keyOf(M, id)), goldenClicked(), skipped);
         const moves = [];
         for (const key of Object.keys(M.gods)) {
-            if (SKIP_GODS.has(key)) continue;
+            if (skipped.has(key)) continue;
             const god = M.gods[key];
             for (let slot = 0; slot < 3; slot++) {
                 if (god.slot === slot || pinned[slot]) continue;
