@@ -57,9 +57,10 @@ export const AUTOPILOT = Object.freeze({
     autoDragonOrbs: 0,
     orbLimit: 0,
 
-    // The market's parts, by what each measured (tools/dev/bank.mjs, 12 luck-free hours): office
-    // upgrades earned x0.72 to x1.42 (geometric mean x1.09 on four seeds); brokers x1.00, their
-    // payback test hiring none that would not repay in the run.
+    // The market's parts, by what each measured (tools/dev/bank.mjs, 12 luck-free hours, every
+    // variant of a seed on the same market prices): office upgrades earned x0.986 to x1.107
+    // (geometric mean x1.044 on four seeds, three up); brokers x1.00, their payback test hiring
+    // none that would not repay in the run.
     autoBank: 1,
     autoBroker: 1,
 

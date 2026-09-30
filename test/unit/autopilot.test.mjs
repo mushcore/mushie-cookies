@@ -57,11 +57,12 @@ test('the Autopilot never runs two systems that act on the same thing', () => {
     }
 });
 
-// The market's parts are set by what they measured (tools/dev/bank.mjs): the office on, as it
-// earned more on three seeds of four (x0.72 to x1.42 cookies earned over 12 hours, geometric mean
-// x1.09); brokers on, as their payback test kept them from any hire that would not repay in the
-// run (x1.00 on three seeds); loans off, as under golden cookies they did not measure positive
-// (x0.40 to x1.01 over 4 hours, geometric mean x0.76), though a forced combo every hour gave x2.16.
+// The market's parts are set by what they measured (tools/dev/bank.mjs, every variant of a seed on
+// the same market prices): the office on, as it earned more on three seeds of four (x0.986 to
+// x1.107 cookies earned over 12 hours, geometric mean x1.044); brokers on, as their payback test
+// kept them from any hire that would not repay in the run (x1.00 on three seeds); loans off, as
+// under golden cookies they did not measure positive (x0.40 to x1.01 over 4 hours, geometric mean
+// x0.76), though a forced combo every hour gave x2.10.
 test('the Autopilot runs the bank office and brokers, and leaves loans off', () => {
     assert.equal(AUTOPILOT.autoBank, 1);
     assert.equal(AUTOPILOT.autoBroker, 1);
