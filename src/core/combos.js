@@ -321,6 +321,32 @@ export function switchPlan(args) {
     };
 }
 
+/**
+ * The buffs as the switch will see them while the combo keeps selling for Godzamok. Devastation
+ * lasts 10 s from a window's first sale and is not renewed by later ones (main.js:7889-7897),
+ * but the combo starts a new window as soon as one ends, for as long as the click buff runs: the
+ * switch's share of clicks stays multiplied through the gaps. Without this the switch plan saw a
+ * window's end as the end of the gain, turned the switch off there and on again a tick later,
+ * paying both toggles each window. A new window starts at about the level its first sale gives
+ * (later sales in a window add to it, and the next starts over), so the running window keeps its
+ * own level until it ends and `freshMult` is assumed after, until `spikeEnd`.
+ * @param {Array<{type?: string, multClick?: number, secondsLeft: number}>} buffs  the running buffs
+ * @param {number} freshMult  Devastation's multiplier after a window's first sale in this click
+ *   buff; 1 (or less) while no sale has been made, when the buffs are returned as they are
+ * @param {number} spikeEnd   seconds until the last running click buff ends
+ */
+export function renewedDevastation(buffs, freshMult, spikeEnd) {
+    if (!(freshMult > 1) || !(spikeEnd > 0)) return buffs;
+    const dev = buffs.find((b) => b.type === 'devastation');
+    if (dev && dev.secondsLeft >= spikeEnd) return buffs;
+    // Never above the running window's level: a lower one means the budget has run short.
+    const level = dev ? Math.min(freshMult, dev.multClick) : freshMult;
+    const renewed = { name: 'Devastation (renewed)', type: 'devastation renewed', multCpS: 1, multClick: level, secondsLeft: spikeEnd };
+    if (!dev) return [...buffs, renewed];
+    // The running window's own level until it ends: its multiplier over the renewed one's.
+    return [...buffs.map((b) => (b === dev ? { ...dev, multClick: dev.multClick / level } : b)), renewed];
+}
+
 /** A switch left on stays on while it out-earns the golden cookies it stops. */
 export function keepStanding({ incomeOn, incomeOff }) {
     return incomeOn > incomeOff;

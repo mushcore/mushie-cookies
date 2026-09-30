@@ -24,6 +24,7 @@ import {
     goldenSwitchOn,
     switchPlan,
     offPlan,
+    renewedDevastation,
     keepStanding,
     turnOnStanding,
     DEVASTATION_SECONDS,
@@ -65,6 +66,7 @@ export function createCombos({ game, settings, loop, buyer = null, runSeconds = 
         switchedOn: 0,
         switchedOff: 0,
         spentOnSwitch: 0,
+        freshMult: 1, // Devastation after a window's first sale in the running click buff
         mode: null, // 'combo' | 'standing' while the switch is on
         heldBefore: 0,
         hold: 0,
@@ -155,6 +157,7 @@ export function createCombos({ game, settings, loop, buyer = null, runSeconds = 
         state.last = `sold and bought back ${plan.units} buildings: Devastation x${devastation ? devastation.multClick.toFixed(2) : '?'}`;
         if (plan.fresh) {
             state.windows++;
+            if (devastation) state.freshMult = devastation.multClick;
             log(`combos: ${state.last}`);
         }
     }
@@ -240,7 +243,10 @@ export function createCombos({ game, settings, loop, buyer = null, runSeconds = 
 
     function planArgs(frame, buffs) {
         const m = switchEffect(frame);
-        return { m, args: { deltaCps: m.deltaCps, deltaClick: m.deltaClick, clicksPerSecond: clicksPerSecond(settings), priceOffBase: m.priceOffBase, goldenRate: m.goldenRate, buffs } };
+        // While Godzamok is played, the switch sees the Devastation the combo keeps renewing.
+        const spikeEnd = clickBuffsOf(buffs).reduce((most, b) => Math.max(most, b.secondsLeft), 0);
+        const seen = godzamokOn(settings) && godzamokLevel(game) ? renewedDevastation(buffs, state.freshMult, spikeEnd) : buffs;
+        return { m, args: { deltaCps: m.deltaCps, deltaClick: m.deltaClick, clicksPerSecond: clicksPerSecond(settings), priceOffBase: m.priceOffBase, goldenRate: m.goldenRate, buffs: seen } };
     }
 
     function considerOn(frame, buffs, turnOn) {
@@ -320,6 +326,8 @@ export function createCombos({ game, settings, loop, buyer = null, runSeconds = 
     function tick(frame) {
         if (game.OnAscend || game.AscendTimer) return;
         const buffs = runningBuffs();
+        // A new click buff's first window sets its own level.
+        if (!clickBuffsOf(buffs).length) state.freshMult = 1;
         // The switch first: what it adds to clicks is what Devastation multiplies.
         if (goldenSwitchOn(settings)) goldenSwitch(frame, buffs);
         else state.hold = 0;

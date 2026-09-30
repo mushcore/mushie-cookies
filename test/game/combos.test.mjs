@@ -396,6 +396,42 @@ test('judges leaving the Golden switch on for good over the run as the play cloc
     }
 });
 
+// A late bakery the buyer has had ten minutes to fill with upgrades, Godzamok in the diamond slot
+// and golden cookies valued but held back (their spawn timer kept at zero: a test fixture, not
+// something the mod does), so what the switch stops is the golden cookies' Click frenzies that
+// Godzamok plays: worth more a second than the switch adds to a Click frenzy alone, less than it
+// adds under Devastation.
+test('plays the Golden switch through a whole Click frenzy that Godzamok plays: on once, off once', { skip }, async () => {
+    const game = await launchWithMod({ seed: 'c1' });
+    try {
+        await game.eval(() => {
+            Game.Earn(1e21);
+            for (const b of Game.ObjectsById.slice(0, 12)) b.buy(100);
+            Game.Objects['Temple'].level = 1;
+            Game.LoadMinigames();
+            for (const name of ['Golden switch', 'Get lucky']) Game.Upgrades[name].earn();
+            Game.Unlock('Golden switch [off]');
+        });
+        await game.waitFor(() => !!(Game.Objects['Temple'].minigame && Game.Objects['Temple'].minigame.godsById && document.getElementById('templeSlot0')));
+        await game.eval(slotGodzamok, 0);
+        await game.eval(() => {
+            Game.registerHook('logic', () => (Game.shimmerTypes.golden.time = 0));
+            Object.assign(FrozenCookies, { autoBuy: 1, autoClick: 1, cookieClickSpeed: 50, autoGC: 1, autoGods: 0, autoFate: 0, autoWrinkler: 0, autoLumps: 0, autoAscendToggle: 0, autoGodzamok: 1, autoGS: 1 });
+        });
+        await game.advanceSeconds(600);
+        await game.eval(() => Game.gainBuff('click frenzy', 26, 777));
+        await game.advanceSeconds(40);
+        const out = await game.eval(switchNow);
+        assert.ok(out.report.windows >= 2, `Godzamok played the buff: ${JSON.stringify(out.report)}`);
+        assert.equal(out.report.switchedOn, 1, `toggled mid-buff: ${JSON.stringify(out.report)}`);
+        assert.equal(out.report.switchedOff, 1);
+        assert.equal(out.on, false);
+        assert.deepEqual(game.errors, []);
+    } finally {
+        await game.close();
+    }
+});
+
 test('leaves the Golden switch off when the click buff does not pay for it, and turns it off at once beside a long buff', { skip }, async () => {
     const game = await launchWithMod();
     try {

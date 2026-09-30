@@ -14,6 +14,7 @@ import {
     devastationGainPerUnit,
     switchPlan,
     offPlan,
+    renewedDevastation,
     keepStanding,
     turnOnStanding,
 } from '../../src/core/combos.js';
@@ -238,6 +239,26 @@ test('the switch is turned off at the moment that costs least: after a short CpS
     assert.equal(offPlan({ ...base, buffs: [] }).offAt, 0);
     // A Cursed finger stops CpS, so the price is nothing while it runs (main.js:10694, 13932).
     assert.equal(offPlan({ ...base, buffs: [{ multCpS: 0, multClick: 1, secondsLeft: 10 }, frenzy(60)] }).offAt, 0);
+});
+
+test('while the combo keeps selling, the switch sees Devastation renewed until the click buff ends', () => {
+    const dev = (multClick, secondsLeft) => ({ type: 'devastation', multCpS: 1, multClick, secondsLeft });
+    // Golden cookies earn more a second than the switch adds to a Click frenzy alone (1,554.5),
+    // less than it adds under Devastation x22.
+    const args = { ...base, goldenRate: 2000 };
+    // Between two windows no Devastation runs this instant; the next sale is about to renew it.
+    assert.equal(offPlan({ ...args, buffs: [clickFrenzy(16)] }).offAt, 0);
+    assert.equal(offPlan({ ...args, buffs: renewedDevastation([clickFrenzy(16)], 22, 16) }).offAt, 16);
+    // Inside a window: its own level until it ends, then the level a window's first sale gives.
+    const inside = renewedDevastation([clickFrenzy(16), dev(300, 4)], 22, 16);
+    assert.ok(close(buffProduct(inside, 0, 'multClick'), 777 * 300));
+    assert.ok(close(buffProduct(inside, 5, 'multClick'), 777 * 22));
+    assert.equal(buffProduct(inside, 16, 'multClick'), 1);
+    assert.equal(offPlan({ ...args, buffs: inside }).offAt, 16);
+    // No sale yet in this buff (level unknown), or a window that outlasts the buff: as they are.
+    assert.deepEqual(renewedDevastation([clickFrenzy(16)], 1, 16), [clickFrenzy(16)]);
+    const outlasts = [clickFrenzy(5), dev(22, 9)];
+    assert.deepEqual(renewedDevastation(outlasts, 22, 5), outlasts);
 });
 
 test('the switch stays on for good only while that out-earns golden cookies, and is turned on for good only when it repays both toggles', () => {
