@@ -123,6 +123,41 @@ test('a first ascension: plans, ascends, buys and reincarnates by itself', { ski
     }
 });
 
+test('a day-long buff or a debuff does not hold an ascension; a short income buff does', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await game.eval(() => {
+            Game.Earn(1e14);
+            for (const name of ['Cursor', 'Grandma', 'Farm', 'Mine', 'Factory', 'Bank']) Game.Objects[name].buy(60);
+            Game.cookiesEarned = Game.HowManyCookiesReset(400);
+            Game.CalculateGains();
+            // A golden sugar lump grants this for 24 hours (main.js harvestLumps); a backfired
+            // spell leaves an hour of Haggler's misery.
+            Game.gainBuff('sugar blessing', 24 * 60 * 60, 1);
+            Game.gainBuff('haggler misery', 60 * 60, 2);
+            FrozenCookies.autoAscendToggle = 1;
+            FCStart();
+        });
+        await game.advanceSeconds(60);
+        assert.equal(await game.eval(() => Game.resets), 1, 'ascended despite the long buffs');
+
+        // A frenzy is income worth finishing first. The doubling rule has no minimum run time,
+        // so the frenzy is the only thing that can hold this ascension.
+        await game.eval(() => {
+            MushieCookies.ascension.options.rule = 'double';
+            Game.cookiesEarned = Game.HowManyCookiesReset(4000);
+            Game.gainBuff('frenzy', 77, 7);
+        });
+        await game.advanceSeconds(30);
+        const during = await game.eval(() => ({ resets: Game.resets, phase: MushieCookies.ascension.report().phase, frenzy: !!Game.buffs.Frenzy }));
+        assert.deepEqual(during, { resets: 1, phase: 'playing', frenzy: true }, 'waits while the frenzy runs');
+        await game.advanceSeconds(90);
+        assert.equal(await game.eval(() => Game.resets), 2, 'ascends once the frenzy is over');
+    } finally {
+        await game.close();
+    }
+});
+
 test('with auto-ascend off nothing ascends, however much prestige is waiting', { skip }, async () => {
     const game = await launchWithMod();
     try {

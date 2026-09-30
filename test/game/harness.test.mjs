@@ -87,6 +87,27 @@ test('timers created after takeover run on virtual time', { skip }, async () => 
     }
 });
 
+test('a timer sees the time it was due, so the game counts 50 clicks a second as in a browser', { skip }, async () => {
+    const game = await launchGame();
+    try {
+        await game.eval(() => {
+            window.__seen = [];
+            setInterval(() => window.__seen.push(Date.now()), 4);
+            window.__clicks = Game.cookieClicks;
+            setInterval(() => Game.ClickCookie(), 4);
+        });
+        await game.advanceSeconds(10);
+        const out = await game.eval(() => {
+            const gaps = window.__seen.slice(1).map((t, i) => t - window.__seen[i]);
+            return { clicks: Game.cookieClicks - window.__clicks, gaps: [...new Set(gaps)] };
+        });
+        assert.deepEqual(out.gaps, [4], 'each firing is 4 ms after the last');
+        assert.ok(out.clicks >= 495 && out.clicks <= 500, `${out.clicks} clicks in 10 s`);
+    } finally {
+        await game.close();
+    }
+});
+
 test('after reset the game reaches for nothing outside the local server', { skip }, async () => {
     const game = await launchGame();
     try {

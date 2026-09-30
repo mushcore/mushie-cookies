@@ -540,6 +540,11 @@ function FCMenu() {
 function setPreferenceDirect(preferenceName, value) {
     var preference = FrozenCookies.preferenceValues[preferenceName];
     if (preference) {
+        if (preferenceName === "autopilot") {
+            if (value) MushieCookies.applyAutopilot(FrozenCookies);
+        } else if (FrozenCookies[preferenceName] !== value) {
+            takeOverFromAutopilot(preferenceName);
+        }
         FrozenCookies[preferenceName] = value;
         FrozenCookies.recalculateCaches = true;
         Game.RefreshStore();

@@ -170,6 +170,7 @@ function setOverrides(gameSaveData) {
         FrozenCookies.loadedData = {};
     }
     loadFCData();
+    if (FrozenCookies.autopilot) MushieCookies.applyAutopilot(FrozenCookies);
     FrozenCookies.frequency = 100;
 
 
@@ -521,6 +522,7 @@ function validateNumber(value, minValue = null, maxValue = null) {
 function storeNumberCallback(base, min, max) {
     return (result) => {
         if (!validateNumber(result, min, max)) result = FrozenCookies[base];
+        if (Number(result) !== FrozenCookies[base]) takeOverFromAutopilot(base);
         FrozenCookies[base] = Number(result);
         FCStart();
     };
@@ -529,7 +531,7 @@ function storeNumberCallback(base, min, max) {
 function updateSpeed(base) {
     userInputPrompt(
         "Autoclicking!",
-        "How many times per second do you want to click? (250 recommended, 1000 max)",
+        "How many times per second do you want to click? (the game counts at most 50)",
         FrozenCookies[base],
         storeNumberCallback(base, 0, 1000)
     );
@@ -619,7 +621,16 @@ function updateManBank(base) {
 
 
 
+// A player who changes a playing option by hand is taking over: the Autopilot steps aside.
+function takeOverFromAutopilot(setting) {
+    if (FrozenCookies.autopilot && MushieCookies.isAutopilotSetting(setting)) {
+        FrozenCookies.autopilot = 0;
+        logEvent("Autopilot", "Switched off: " + setting + " was changed by hand");
+    }
+}
+
 function toggleFrozen(setting) {
+    takeOverFromAutopilot(setting);
     if (!FrozenCookies[setting]) {
         FrozenCookies[setting] = 1;
     } else {
@@ -703,96 +714,6 @@ function autoBlacklistOff() {
             FrozenCookies.blacklist =
                 haveAll("halloween") && haveAll("easter") ? 0 : 3;
             break;
-    }
-}
-
-function recommendedSettingsAction() {
-    if (FrozenCookies.recommendedSettings == 1) {
-        // clicking options
-        FrozenCookies.autoClick = 1;
-        FrozenCookies.cookieClickSpeed = 250;
-        FrozenCookies.autoFrenzy = 1;
-        FrozenCookies.frenzyClickSpeed = 1000;
-        FrozenCookies.autoGC = 1;
-        // FrozenCookies.autoWC = 1;
-        FrozenCookies.autoReindeer = 1;
-        FrozenCookies.autoFortune = 1;
-        // autobuy options
-        FrozenCookies.autoBuy = 1;
-        FrozenCookies.autoBlacklistOff = 0;
-        FrozenCookies.blacklist = 0;
-        FrozenCookies.mineLimit = 1;
-        FrozenCookies.mineMax = 500;
-        FrozenCookies.factoryLimit = 1;
-        FrozenCookies.factoryMax = 500;
-        // other auto options
-        FrozenCookies.autoAscendToggle = 1;
-        FrozenCookies.autoBulk = 2;
-        FrozenCookies.autoWrinkler = 1;
-        FrozenCookies.shinyPop = 0;
-        FrozenCookies.autoSL = 2;
-        FrozenCookies.dragonsCurve = 2;
-        FrozenCookies.sugarBakingGuard = 1;
-        FrozenCookies.autoGS = 1;
-        FrozenCookies.autoGodzamok = 1;
-        FrozenCookies.autoBank = 1;
-        FrozenCookies.autoBroker = 1;
-        FrozenCookies.autoLoan = 1;
-        FrozenCookies.minLoanMult = 777;
-        // Pantheon options
-        FrozenCookies.autoWorshipToggle = 1;
-        FrozenCookies.autoWorship0 = 2; // Godzamok
-        FrozenCookies.autoWorship1 = 8; // Mokalsium
-        FrozenCookies.autoWorship2 = 6; // Muridal
-        FrozenCookies.autoCyclius = 0;
-        // Spell options
-        FrozenCookies.towerLimit = 1;
-        FrozenCookies.manaMax = 37;
-        FrozenCookies.autoCasting = 3;
-        FrozenCookies.minCpSMult = 7;
-        FrozenCookies.autoFTHOFCombo = 0;
-        FrozenCookies.auto100ConsistencyCombo = 0;
-        FrozenCookies.autoSugarFrenzy = 0;
-        FrozenCookies.minASFMult = 7777;
-        //Dragon options
-        FrozenCookies.autoDragon = 1;
-        FrozenCookies.petDragon = 1;
-        FrozenCookies.autoDragonToggle = 1;
-        FrozenCookies.autoDragonAura0 = 3; // Elder Batallion
-        FrozenCookies.autoDragonAura1 = 15; // Radiant Appetite
-        FrozenCookies.autoDragonOrbs = 0;
-        FrozenCookies.orbLimit = 0;
-        FrozenCookies.orbMax = 200;
-        // Season options
-        FrozenCookies.defaultSeasonToggle = 1;
-        FrozenCookies.defaultSeason = 1;
-        FrozenCookies.freeSeason = 1;
-        FrozenCookies.autoEaster = 1;
-        FrozenCookies.autoHalloween = 1;
-        //Bank options
-        FrozenCookies.holdManBank = 0;
-        FrozenCookies.manBankMins = 0;
-        FrozenCookies.holdSEBank = 0;
-        FrozenCookies.setHarvestBankPlant = 0;
-        FrozenCookies.setHarvestBankType = 3;
-        FrozenCookies.maxSpecials = 1;
-        // Other options
-        FrozenCookies.FCshortcuts = 1;
-        FrozenCookies.simulatedGCPercent = 1;
-        //Display options
-        FrozenCookies.showMissedCookies = 0;
-        FrozenCookies.numberDisplay = 1;
-        FrozenCookies.fancyui = 1;
-        FrozenCookies.logging = 1;
-        FrozenCookies.purchaseLog = 0;
-        FrozenCookies.fpsModifier = 2;
-        logEvent(
-            "recommendedSettings",
-            "Set all options to recommended values"
-        );
-        FrozenCookies.recommendedSettings = 0;
-        Game.toSave = true;
-        Game.toReload = true;
     }
 }
 
@@ -1626,11 +1547,6 @@ function FCStart() {
         FrozenCookies.autoCycliusBot = 0;
     }
 
-    if (FrozenCookies.recommendedSettingsBot) {
-        clearInterval(FrozenCookies.recommendedSettingsBot);
-        FrozenCookies.recommendedSettingsBot = 0;
-    }
-
     if (FrozenCookies.autoMinigameCheckBot) {
         clearInterval(FrozenCookies.autoMinigameCheckBot);
         FrozenCookies.autoMinigameCheckBot = 0;
@@ -1805,13 +1721,6 @@ function FCStart() {
         FrozenCookies.autoCycliusBot = setInterval(
             MushieCookies.guard("legacy:autoCycliusAction", autoCycliusAction),
             FrozenCookies.frequency * 600 // 1 minute
-        );
-    }
-
-    if (FrozenCookies.recommendedSettings) {
-        FrozenCookies.recommendedSettingsBot = setInterval(
-            MushieCookies.guard("legacy:recommendedSettingsAction", recommendedSettingsAction),
-            FrozenCookies.frequency
         );
     }
 

@@ -76,25 +76,36 @@ export function installVirtualTime({ epoch, modUrls }) {
 
     const runDue = () => {
         if (vt.now < vt.soonest) return; // nothing is due; the common case on most frames
-        // A timer that re-arms itself with a zero delay could spin forever.
-        // 1000 firings in one frame is far above anything real code does.
-        for (let fired = 0; fired < 1000; fired++) {
-            let next = null;
-            let nextId = 0;
-            for (const [id, t] of vt.timers) {
-                if (t.at <= vt.now && (next === null || t.at < next.at || (t.at === next.at && id < nextId))) {
-                    next = t;
-                    nextId = id;
+        // Each timer runs at the time it was due, as in a browser, not at the frame's time:
+        // otherwise every timer inside one frame sees the same Date.now(), and code that spaces
+        // its actions by the clock (the game counts one click per 20 ms) is held to one per frame.
+        const frameTime = vt.now;
+        let last = -Infinity; // the clock never runs backwards, even for a timer left overdue
+        try {
+            // A timer that re-arms itself with a zero delay could spin forever.
+            // 1000 firings in one frame is far above anything real code does.
+            for (let fired = 0; fired < 1000; fired++) {
+                let next = null;
+                let nextId = 0;
+                for (const [id, t] of vt.timers) {
+                    if (t.at <= frameTime && (next === null || t.at < next.at || (t.at === next.at && id < nextId))) {
+                        next = t;
+                        nextId = id;
+                    }
                 }
+                if (next === null) {
+                    vt.soonest = Infinity;
+                    for (const t of vt.timers.values()) if (t.at < vt.soonest) vt.soonest = t.at;
+                    return;
+                }
+                last = Math.max(last, next.at);
+                vt.now = last;
+                if (next.every) next.at += next.every;
+                else vt.timers.delete(nextId);
+                next.run(...next.args);
             }
-            if (next === null) {
-                vt.soonest = Infinity;
-                for (const t of vt.timers.values()) if (t.at < vt.soonest) vt.soonest = t.at;
-                return;
-            }
-            if (next.every) next.at += next.every;
-            else vt.timers.delete(nextId);
-            next.run(...next.args);
+        } finally {
+            vt.now = frameTime;
         }
     };
 

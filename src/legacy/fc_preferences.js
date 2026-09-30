@@ -1,4 +1,9 @@
 FrozenCookies.preferenceValues = {
+    autopilot: {
+        hint: "Autopilot automates everything: it plays the whole game by itself with the best measured settings. Changing a playing option below hands control back to you.",
+        display: ["Autopilot OFF", "Autopilot ON"],
+        default: 0,
+    },
     // clicking options
     clickingOptions: {
         hint: "Auto clicking:",
@@ -544,10 +549,5 @@ FrozenCookies.preferenceValues = {
             "Frame Rate 10 fps",
         ],
         default: 2,
-    },
-    recommendedSettings: {
-        hint: "Set all recommended options (⚠️ reloads game instantly).",
-        display: ["Recommended OFF", "Recommended ON"],
-        default: 0,
     },
 };

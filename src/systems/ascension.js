@@ -9,6 +9,7 @@ const TICK_EVERY = 30; // frames
 const SAMPLE_SECONDS = 60; // one history sample a minute
 const HISTORY_LIMIT = 60 * 24; // a day of samples
 const SETTLE_TICKS = 2; // popped wrinklers pay out on the next logic frames
+const BUFF_WAIT_SECONDS = 10 * 60; // an income buff ending sooner than this is let finish
 
 /** The starter set the wiki recommends for a first ascension; its price sets the first target. */
 const FIRST_SHOPPING_LIST = [
@@ -62,6 +63,16 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
         return total || 365;
     }
 
+    /**
+     * A buff worth finishing before ascending: it raises income and ends within minutes. Waiting
+     * on every buff would stall a day for a golden lump's Sugar blessing (24 h) and an hour for a
+     * backfired spell's misery, and a debuff costs nothing to leave behind.
+     */
+    function worthFinishing(buff) {
+        const raises = (buff.multCpS || 1) > 1 || (buff.multClick || 1) > 1 || (buff.type && buff.type.name === 'cookie storm');
+        return raises && buff.time <= BUFF_WAIT_SECONDS * game.fps;
+    }
+
     function dragonEggWindow() {
         // "A crumbly egg" needs a million cookies earned in the current run; ascending inside that
         // window with the heavenly upgrade owned could keep the dragon locked forever.
@@ -101,7 +112,7 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
         }
         if (!state.verdict.ascend) return;
         if (dragonEggWindow()) return;
-        if (Object.keys(game.buffs).length) return; // a buff is running: let it finish first
+        if (Object.values(game.buffs).some(worthFinishing)) return;
 
         // Plan while the bakery still stands: the chocolate egg routine sells every building.
         const prestigeAfter = Math.floor(projected);

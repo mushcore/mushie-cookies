@@ -23,9 +23,10 @@ export function skipReason() {
 /**
  * Boots the installed game in a headless browser on virtual time, from a freshly reset save.
  * `mods` are built mod files, loaded at the point where Steam loads them.
+ * With `autopilot`, the Autopilot is on from the start, as for a player who switched it on earlier.
  * Returns null when the game location is not configured.
  */
-export async function launchGame({ seed = 'mushie', headless = true, mods = [] } = {}) {
+export async function launchGame({ seed = 'mushie', headless = true, mods = [], autopilot = false } = {}) {
     const appDir = gameAppDir(root);
     if (!appDir) return null;
     const server = await startServer(appDir, mods);
@@ -46,11 +47,13 @@ export async function launchGame({ seed = 'mushie', headless = true, mods = [] }
         if (m.type() === 'error') errors.push('console: ' + m.text());
     });
     await page.addInitScript(installVirtualTime, { epoch: EPOCH, modUrls: server.modUrls });
-    await page.addInitScript(() => {
+    await page.addInitScript((autopilotOn) => {
         try {
             localStorage.setItem('CookieClickerLang', 'EN');
+            // As if the player had switched the Autopilot on before this session.
+            if (autopilotOn) localStorage.setItem('autopilot', '1');
         } catch (e) {}
-    });
+    }, autopilot);
     await page.goto(server.origin + '/src/index.html');
     // The game sets its ready flag as it begins to initialise and initialises in one go,
     // so by the time this poll sees the flag the game is fully built.

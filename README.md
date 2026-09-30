@@ -8,7 +8,9 @@ It is built for Cookie Clicker v2.053, the Steam build. It loads nothing from th
 
 ## What it does
 
-Each part is a separate switch in the **Mushie Cookies** menu, and each is measured in a time-lapse harness that runs the game's own code.
+Everything starts off. Switch on **Autopilot**, the first option in the menu, and it automates everything: it plays the whole game, from a fresh save through ascension after ascension, with no further input. It switches on every part below and keeps off every inherited option that would fight one of them. Changing a playing option by hand hands control back to you; switching Autopilot on again restores its settings. Display options (number format, infobox, frame rate) are always yours.
+
+Each part is also a separate switch in the **Mushie Cookies** menu, and each is measured in a time-lapse harness that runs the game's own code.
 
 | Part | What it does | Setting |
 |---|---|---|
@@ -67,11 +69,11 @@ You need [Node.js](https://nodejs.org) 22 or later.
    npm run deploy
    ```
 
-4. Start Cookie Clicker. The mod is on by default, with every automation switched off. Open the **Mushie Cookies** button at the top right and switch on the parts you want. For fully unattended play, turn on Autobuy, Autoclick, Autoclick GC, Forecast Casting, Auto Ascend, Spend Lumps, Auto Garden, Auto Trading and Auto Gods & Auras.
+4. Start Cookie Clicker. The mod loads with everything off. Open the **Mushie Cookies** button at the top right and switch on **Autopilot** to have it play everything, or switch on only the parts you want.
 
 To switch the mod off, open **Options**, then **Manage mods**.
 
-Some inherited options do the same job as a new part and would fight it (the old casting modes, worship slots, dragon auras). The new part stands aside while its inherited counterpart is on.
+Some inherited options do the same job as a new part and would fight it (the old casting modes, worship slots, dragon auras). Autopilot never turns them on; if you do, the new part stands aside while its inherited counterpart is on.
 
 ## Known conflict
 
