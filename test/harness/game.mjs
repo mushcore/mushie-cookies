@@ -10,6 +10,9 @@ const EPOCH = Date.UTC(2026, 5, 15, 12, 0, 0);
 // Five game minutes per round trip keeps the page responsive to script loads.
 const CHUNK = 9000;
 
+/** The mod as built by `npm run build`. */
+export const BUILT_MOD = path.join(root, 'dist', 'MushieCookies', 'main.js');
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Use as a test's `skip` option. */
@@ -19,12 +22,13 @@ export function skipReason() {
 
 /**
  * Boots the installed game in a headless browser on virtual time, from a freshly reset save.
+ * `mods` are built mod files, loaded at the point where Steam loads them.
  * Returns null when the game location is not configured.
  */
-export async function launchGame({ seed = 'mushie', headless = true } = {}) {
+export async function launchGame({ seed = 'mushie', headless = true, mods = [] } = {}) {
     const appDir = gameAppDir(root);
     if (!appDir) return null;
-    const server = await startServer(appDir);
+    const server = await startServer(appDir, mods);
     const browser = await chromium.launch({ channel: process.env.MUSHIE_BROWSER || 'chrome', headless });
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const blocked = [];
@@ -41,14 +45,20 @@ export async function launchGame({ seed = 'mushie', headless = true } = {}) {
     page.on('console', (m) => {
         if (m.type() === 'error') errors.push('console: ' + m.text());
     });
-    await page.addInitScript(installVirtualTime, { epoch: EPOCH });
+    await page.addInitScript(installVirtualTime, { epoch: EPOCH, modUrls: server.modUrls });
     await page.addInitScript(() => {
         try {
             localStorage.setItem('CookieClickerLang', 'EN');
         } catch (e) {}
     });
     await page.goto(server.origin + '/src/index.html');
-    await page.waitForFunction(() => window.Game && window.Game.ready, null, { timeout: 60000 });
+    await page.waitForFunction(() => window.Game && window.Game.ready && window.Game.T > 0, null, { timeout: 60000 });
+    // The game's own web-mode boot asks for things that do not exist locally. Uncaught exceptions
+    // and anything the mod or the harness reports are what matter.
+    const bootErrors = errors.filter(
+        (e) => e.startsWith('pageerror') || e.includes('Mushie Cookies') || e.includes('harness:')
+    );
+    const bootBlocked = blocked.slice();
     await page.evaluate((s) => window.__vt.takeover(s), seed);
     // Every run starts from the same state and the same timestamps.
     await page.evaluate(() => window.Game.HardReset(2));
@@ -57,6 +67,10 @@ export async function launchGame({ seed = 'mushie', headless = true } = {}) {
         page,
         errors,
         blocked,
+        /** Errors raised while the game and its mods were loading, before virtual time began. */
+        bootErrors,
+        /** Requests that tried to leave the machine while the game and its mods were loading. */
+        bootBlocked,
         clearLogs() {
             errors.length = 0;
             blocked.length = 0;
@@ -68,14 +82,13 @@ export async function launchGame({ seed = 'mushie', headless = true } = {}) {
             }
         },
         advanceSeconds: (seconds) => handle.advance(Math.round(seconds * 30)),
-        async loadMod(file, id) {
-            await page.addScriptTag({ path: file });
-            for (let tries = 0; tries < 100; tries++) {
+        /** Advances until Mushie Cookies reports that it has started. */
+        async modStarted() {
+            for (let tries = 0; tries < 20; tries++) {
                 await handle.advance(15);
-                if (await page.evaluate((modId) => !!window.Game.mods[modId], id)) return;
-                await sleep(20);
+                if (await page.evaluate(() => !!(window.MushieCookies && window.MushieCookies.started()))) return;
             }
-            throw new Error(`mod "${id}" did not register. Page errors: ${errors.join(' | ') || 'none'}`);
+            throw new Error(`Mushie Cookies did not start. Errors: ${bootErrors.concat(errors).join(' | ') || 'none'}`);
         },
         /** Polls in real time; for things the browser loads asynchronously, such as minigame scripts. */
         async waitFor(fn, arg, timeoutMs = 15000) {
@@ -91,6 +104,19 @@ export async function launchGame({ seed = 'mushie', headless = true } = {}) {
             await server.close();
         },
     };
-    handle.clearLogs();
+    blocked.length = 0;
+    errors.length = 0;
     return handle;
+}
+
+/** Boots the game with the built mod loaded and started. */
+export async function launchWithMod(options = {}) {
+    const game = await launchGame({ ...options, mods: [BUILT_MOD] });
+    if (!game) return null;
+    if (game.bootErrors.length) {
+        await game.close();
+        throw new Error('errors while loading: ' + game.bootErrors.join(' | '));
+    }
+    await game.modStarted();
+    return game;
 }

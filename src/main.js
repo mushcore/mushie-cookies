@@ -1,2 +1,47 @@
-/* global __MUSHIE_VERSION__ */
+/* global __MUSHIE_VERSION__, __MUSHIE_LEGACY__ */
+import { createGuard } from './core/guard.js';
+import { createLoop } from './core/loop.js';
+import { register } from './game/boot.js';
+
 export const version = __MUSHIE_VERSION__;
+
+const report = (message) => console.error(`[Mushie Cookies] ${message}`);
+
+const guards = createGuard({
+    maxFailures: 5,
+    onError(name, error, disabled) {
+        report(`${name} failed: ${error.message}` + (disabled ? ' (switched off after repeated failures)' : ''));
+    },
+});
+
+export const guard = guards.guard;
+export const status = guards.status;
+export const revive = guards.revive;
+export const loop = createLoop(guards);
+
+// The legacy files are plain global scripts. They are carried as text and evaluated as one
+// script element, which gives their declarations the global scope they were written for.
+const runtime = {
+    evaluate() {
+        const script = document.createElement('script');
+        script.text = __MUSHIE_LEGACY__ + '\n//# sourceURL=mushie-cookies-legacy.js';
+        document.head.appendChild(script);
+        script.remove();
+        if (typeof window.legacyStart !== 'function') throw new Error('legacy code did not evaluate');
+    },
+    start: (data) => window.legacyStart(data),
+    save: () => window.saveFCData(),
+    load: (data) => window.setOverrides(data),
+};
+
+const booted =
+    typeof window !== 'undefined' && window.Game && typeof window.Game.registerMod === 'function'
+        ? register(window.Game, {
+              id: 'mushie_cookies',
+              runtime,
+              loop,
+              onError: (error) => report(`failed to start: ${error.message}`),
+          })
+        : null;
+
+export const started = () => !!booted && booted.started();
