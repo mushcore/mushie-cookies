@@ -145,17 +145,20 @@ const NATURAL_BOOSTS = {
 
 /**
  * What an outcome is worth cast on its own later, the way the forecast casting casts it
- * (decideCast): on the first CpS boost it would be cast on that lands in the `window` seconds
- * between mana paying for it and mana being full, or on nothing at the full bar.
+ * (decideCast), once mana pays for it `start` seconds from now: on a boost still running then (a
+ * Sugar frenzy's hour, a loan's), at once; otherwise on the first CpS boost it would be cast on
+ * that lands in the `window` seconds until mana is full, or at the full bar on what runs then.
  *
  * Boosts come from natural golden cookies clicked as they spawn, ctx.natural = { interval, odds }:
  * one spawns every `interval` seconds on average, each outcome with its chance in `odds`
- * (src/game/measure.js). Spawns are counted as a Poisson stream. Without them, or with a buff
- * already running, it is worth what it is on nothing: those buffs end long before.
+ * (src/game/measure.js). Spawns are counted as a Poisson stream.
  */
-export function heldWorth(outcome, ctx, window) {
-    const quiet = { ...ctx, buffs: [] };
-    const alone = outcomeValue(outcome, quiet);
+export function heldWorth(outcome, ctx, start, window) {
+    // Only the buffs still running when it can be cast: a golden cookie's are over long before
+    // mana pays for a cast again, a long boost or a loan's interest is not.
+    const then = contextAt(ctx, start);
+    if (boostLandedOn(outcome, then)) return outcomeValue(outcome, then);
+    const alone = outcomeValue(outcome, contextAt(ctx, start + Math.max(0, window)));
     const natural = ctx.natural;
     if (!natural || !(natural.interval > 0) || !Number.isFinite(natural.interval) || !(window > 0)) return alone;
     let rate = 0;
@@ -165,7 +168,8 @@ export function heldWorth(outcome, ctx, window) {
         const picks = NATURAL_BOOSTS[golden](ctx);
         for (const boost of picks) {
             // A natural cookie's buff lasts as long as the spell's (main.js:5459-5477).
-            const on = { ...quiet, buffs: [{ name: boost.name, multCpS: boost.mult, multClick: 1, secondsLeft: Math.ceil(boost.seconds * ctx.durationMult) }] };
+            const buff = { name: boost.name, multCpS: boost.mult, multClick: 1, secondsLeft: Math.ceil(boost.seconds * ctx.durationMult) };
+            const on = { ...then, buffs: (then.buffs || []).concat([buff]) };
             if (!boostLandedOn(outcome, on)) continue;
             const r = p / picks.length / natural.interval;
             rate += r;
@@ -178,14 +182,14 @@ export function heldWorth(outcome, ctx, window) {
 }
 
 /**
- * What a cast is worth on average, held as the forecast casting holds it (heldWorth) for the
- * `window` a cast cycle leaves: bad outcomes are skipped, so a cast is always a good one.
+ * What a cast is worth on average, held as the forecast casting holds it (heldWorth) from `start`
+ * for the `window` a cast cycle leaves: bad outcomes are skipped, so a cast is always a good one.
  */
-function castWorth(odds, ctx, window) {
+function castWorth(odds, ctx, start, window) {
     let weight = 0;
     let sum = 0;
     for (const [outcome, p] of Object.entries(odds)) {
-        const value = heldWorth(outcome, ctx, window);
+        const value = heldWorth(outcome, ctx, start, window);
         if (!(value > 0) || !Number.isFinite(value)) continue;
         weight += p;
         sum += p * value;
@@ -237,13 +241,14 @@ export function decideDouble({ first, second, ctx, ctxSecond = ctx, odds, mana, 
     const after = Math.min(alone, sale.maxMagic) - sale.cost;
     const refill = (from) => regenSeconds(from, mana.max, mana.max);
     // A cast left with `from` magic can be cast once mana pays for it again, until the bar is full.
-    const heldFor = (from) => refill(from) - regenSeconds(from, mana.costFirst, mana.max);
-    const later = Math.max(0, heldWorth(second.outcome, ctx, heldFor(alone)));
+    const payable = (from) => regenSeconds(from, mana.costFirst, mana.max);
+    const heldFor = (from) => refill(from) - payable(from);
+    const later = Math.max(0, heldWorth(second.outcome, ctx, payable(alone), heldFor(alone)));
     if (!Number.isFinite(stacked) || !Number.isFinite(later) || !Number.isFinite(outcomeValue(first.outcome, ctx))) {
         return out('single', 'a sugar lump is cast on its own');
     }
     const delay = refill(after) - refill(alone) - refill(cycle);
-    const penalty = refill(cycle) > 0 ? (castWorth(odds, ctx, heldFor(cycle)) * Math.max(0, delay)) / refill(cycle) : 0;
+    const penalty = refill(cycle) > 0 ? (castWorth(odds, ctx, payable(cycle), heldFor(cycle)) * Math.max(0, delay)) / refill(cycle) : 0;
 
     const gain = stacked - later - rebuyLoss - penalty;
     const numbers = { gain, stacked, later, penalty };

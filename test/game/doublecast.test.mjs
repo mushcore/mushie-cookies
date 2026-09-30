@@ -324,12 +324,20 @@ test('nothing is kept for a pair whose worth rests on a buff that ends before ma
         const short = await report();
         assert.equal(short.casts, 0);
         assert.equal(short.kept, 0, `kept ${short.kept} for a pair castable only after the Frenzy: ${JSON.stringify(short.decision)}`);
-        // The same pair while a Frenzy will still run once mana is full: its buy-back is kept.
-        await game.eval(() => Game.gainBuff('frenzy', 3000, 7)); // adds to the running one (main.js:13765-13771)
+        // The same pair while the Frenzy will still run once mana is full (about 1,340 s from 30
+        // magic) and be over before mana pays for the click frenzy cast alone after it (967 s
+        // more, regenSeconds): its buy-back is kept.
+        await game.eval(() => Game.gainBuff('frenzy', 1740, 7)); // adds to the running one (main.js:13765-13771)
         await game.advance(16);
         const long = await report();
         assert.equal(long.casts, 0);
         assert.ok(long.kept > 0, JSON.stringify(long.decision));
+        // A Frenzy still running then would carry the click frenzy cast alone just as well: nothing is kept.
+        await game.eval(() => Game.gainBuff('frenzy', 1300, 7));
+        await game.advance(16);
+        const longer = await report();
+        assert.equal(longer.casts, 0);
+        assert.equal(longer.kept, 0, JSON.stringify(longer.decision));
         assert.deepEqual(game.errors, []);
     }));
 
@@ -374,6 +382,30 @@ test('with golden cookies clicked as they spawn, a click frenzy natural boosts w
         assert.deepEqual(fate.map((c) => c.made), ['frenzy'], JSON.stringify(out.report));
         assert.equal(out.log.filter((e) => e.kind === 'sell').length, 0);
         assert.equal(out.report.double.action, 'single', out.report.double.reason);
+        assert.deepEqual(out.status, []);
+        assert.deepEqual(game.errors, []);
+    }));
+
+test('with Sugar frenzy running, a click frenzy that gains nothing from the cast before it is not double-cast', { skip }, () =>
+    withLateBakery(async (game) => {
+        // A Lucky, then a click frenzy: held alone, the click frenzy is cast on the Sugar frenzy as
+        // soon as mana pays for it, so stacking it on the Lucky adds nothing.
+        const pair = await game.eval(burnTo, ['multiply cookies', 'click frenzy']);
+        assert.deepEqual(pair, ['multiply cookies', 'click frenzy']);
+        await game.eval(instrument);
+        await game.eval(() => {
+            // Test fixture: the buff the lump system's Sugar frenzy grants (main.js:11043).
+            Game.gainBuff('sugar frenzy', 3600, 3);
+        });
+        // Golden cookies clicked, as the Autopilot has it.
+        await game.eval(settings, { autoGC: 1 });
+        await game.advance(45);
+        const out = await read(game);
+        const fate = out.log.filter((e) => e.kind === 'cast' && e.spell === 'fate');
+        assert.deepEqual(fate.map((c) => c.made), ['multiply cookies'], JSON.stringify(out.report));
+        assert.equal(out.log.filter((e) => e.kind === 'sell').length, 0, JSON.stringify(out.report.double));
+        assert.equal(out.report.double.action, 'single', out.report.double.reason);
+        assert.equal(out.report.doubles, 0);
         assert.deepEqual(out.status, []);
         assert.deepEqual(game.errors, []);
     }));

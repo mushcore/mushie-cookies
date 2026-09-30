@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { magicMax, spellCost, regenSeconds, planSale, fateOdds, decideDouble, contextAt } from '../../src/core/doublecast.js';
-import { outcomeValue, afterOutcome } from '../../src/core/grimoire.js';
+import { outcomeValue, afterOutcome, decideCast } from '../../src/core/grimoire.js';
 
 // Force the Hand of Fate's price: 10 magic plus 60% of max magic (minigameGrimoire.js:42-43).
 const FATE = { costMin: 10, costPercent: 0.6 };
@@ -200,6 +200,36 @@ test('later casts held for natural boosts make the mana a double cast takes wort
     const quiet = double('frenzy', 'cookie storm drop');
     const golden = double('frenzy', 'cookie storm drop', { ctx: { ...ctx, natural } });
     assert.ok(golden.penalty > quiet.penalty, `${golden.penalty} is not above ${quiet.penalty}`);
+});
+
+// Sugar frenzy: CpS x3 for an hour (main.js:11043, 14089-14100), which the lump system switches
+// on late in every Autopilot run. A long boost like it is still running when mana pays again.
+const sugar = { ...ctx, buffs: [buff('Sugar frenzy', 3, 3600)] };
+// Held alone, the second cast can be made once the 26 magic left grows to the 64 a cast costs.
+const payable = regenSeconds(26, 64, 90);
+
+test('a long boost still running when the held outcome can be cast is no gain for the double', () => {
+    // Held alone, the click frenzy lands on the Sugar frenzy as soon as mana pays for it: forecast
+    // casting casts on any running CpS boost that covers half of it.
+    const then = contextAt(sugar, payable);
+    assert.equal(decideCast({ next: good('click frenzy'), mana: 64, maxMana: 90, fateCost: 64, skipCost: 19, ctx: then }).action, 'cast');
+    const rebuyLoss = 0.1 * outcomeValue('click frenzy', ctx);
+    const out = double('multiply cookies', 'click frenzy', { ctx: sugar, rebuyLoss });
+    near(out.later, outcomeValue('click frenzy', then));
+    // A Lucky gives it nothing more, so the towers' round trip and the mana are pure loss.
+    assert.equal(out.action, 'single', out.reason);
+    // Natural golden cookies do not come into it: it is cast at once, on the boost.
+    near(double('multiply cookies', 'click frenzy', { ctx: { ...sugar, natural: { interval: 60, odds: { frenzy: 1 } } }, rebuyLoss }).later, out.later);
+    // A frenzy first still adds its x7 on top of the x3.
+    const frenzy = double('frenzy', 'click frenzy', { ctx: sugar, rebuyLoss });
+    assert.equal(frenzy.action, 'double', frenzy.reason);
+    near(frenzy.stacked - frenzy.later, 6 * outcomeValue('click frenzy', then));
+});
+
+test('the casts a double delays are worth what they are on a long boost still running', () => {
+    const out = double('frenzy', 'cookie storm drop', { ctx: sugar });
+    const plain = double('frenzy', 'cookie storm drop');
+    assert.ok(out.penalty > plain.penalty, `${out.penalty} is not above ${plain.penalty}`);
 });
 
 test('a sugar lump is cast on its own', () => {
