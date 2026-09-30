@@ -86,6 +86,8 @@ export function startSystems({ game, loop, legacy, log }) {
     // The dragon trains before the gods pick auras; `dragon` tells them when a level is gained.
     const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve() });
     const gods = createGods({ game, settings, loop, log, buyer, dragon });
-    const seasons = createSeasons({ game, settings, loop, log, buyer });
+    // Halloween cookies and eggs drop from popped wrinklers: the season system asks the wrinkler
+    // system to hunt them, and the wrinkler system weighs each hunt against what it forfeits.
+    const seasons = createSeasons({ game, settings, loop, log, buyer, wrinklers });
     return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, wrinklers, seasons };
 }

@@ -208,6 +208,138 @@ test('the last Santa level is taken for Santa\'s dominion once every drop is out
         assert.equal(out.dominion, 1, 'the buyer buys the dominion the last level unlocks');
     }));
 
+test('with Autobuy off, switches and Santa levels spend only what the buyer is not holding', { skip }, () =>
+    withMod(async (game) => {
+        await bakery(game);
+        await game.eval(() => {
+            FrozenCookies.autoBuy = 0;
+            // The player asks the buyer to hold a bank far larger than this one.
+            FrozenCookies.holdManBank = 1;
+            FrozenCookies.manBankMins = 1e12;
+            Game.Upgrades['A festive hat'].earn(); // fixture: Santa's Evolve is open, level 1 costs 1 cookie
+        });
+        await game.advanceSeconds(60);
+        const held = await game.eval(() => ({
+            season: Game.season,
+            uses: Game.seasonUses,
+            santa: Game.santaLevel,
+            reserve: MushieCookies.buyer.reserve(),
+            bank: Game.cookies,
+            last: MushieCookies.seasons.report().last,
+        }));
+        assert.equal(held.season, '', `switched out of the held bank: ${held.last}`);
+        assert.equal(held.uses, 0);
+        assert.equal(held.santa, 0, `Santa levelled out of the held bank: ${held.last}`);
+        assert.ok(held.reserve > held.bank, `the buyer holds ${held.reserve} of a ${held.bank} bank`);
+        // Released, the same bank pays for both.
+        await game.eval(() => {
+            FrozenCookies.holdManBank = 0;
+            MushieCookies.buyer.invalidate(); // fixture: re-rank now rather than on the next store change
+        });
+        await game.advanceSeconds(60);
+        const free = await game.eval(() => ({ season: Game.season, santa: Game.santaLevel }));
+        assert.equal(free.season, 'christmas');
+        assert.ok(free.santa > 0);
+    }));
+
+test('a switch is ranked and paid at its live price, never out of the reserve', { skip }, () =>
+    withMod(async (game) => {
+        await bakery(game);
+        // The plan to go to Christmas is made while the bank cannot cover it, so the offer waits.
+        const bank = await game.eval(() => {
+            const before = Game.cookies;
+            Game.cookies = 1e8;
+            return before;
+        });
+        await game.advanceSeconds(12);
+        const out = await game.eval((bank) => {
+            const offered = MushieCookies.seasons.report().offers.find((o) => / season$/.test(o.name));
+            // Fixture: income grows after the plan was priced, and with it the switch price.
+            for (let i = 0; i < 12; i++) Game.ObjectsById[i].getFree(100);
+            Game.CalculateGains();
+            Game.cookies = bank;
+            MushieCookies.buyer.invalidate();
+            MushieCookies.buyer.next();
+            const row = MushieCookies.buyer.ranking().find((c) => c.kind === 'offer' && / season$/.test(c.name));
+            const reserve = MushieCookies.buyer.reserve();
+            const live = Game.Upgrades['Festive biscuit'].getPrice();
+            // The bank covers the reserve and the planned price, but not the live price.
+            Game.cookies = reserve + live - 1;
+            const bought = row ? row.buy() : null;
+            return { planned: offered && offered.price, ranked: row && row.price, live, reserve, bought, season: Game.season, cookies: Game.cookies };
+        }, bank);
+        assert.ok(out.planned > 0 && out.live > out.planned, `fixture: planned ${out.planned}, live ${out.live}`);
+        assert.equal(out.ranked, out.live, 'the buyer ranks the switch at its live price');
+        assert.equal(out.season, '', 'the switch was paid out of the reserve');
+        assert.ok(out.cookies >= out.reserve);
+    }));
+
+test('a Halloween hunt pops wrinklers for drops, and stops once all seven are in; Easter hunts by egg', { skip }, () =>
+    withMod(async (game) => {
+        // No Season switcher: the calendar's season is kept, so what ends the hunt is not a switch.
+        await bakery(game, { switcher: false, hoursIn: 24 });
+        await game.eval(() => {
+            // Fixture: the calendar says Halloween; a grandmapocalypse with the Wrinkler doormat, so
+            // an emptied slot refills at once; Spooky cookies (a drop one pop in five).
+            Game.baseSeason = 'halloween';
+            Game.season = 'halloween';
+            Game.elderWrath = 3;
+            Game.Upgrades['Wrinkler doormat'].earn();
+            Game.Win('Spooky cookies');
+            FrozenCookies.autoWrinkler = 1;
+            Game.CalculateGains();
+        });
+        const read = () =>
+            game.eval(() => ({
+                season: Game.season,
+                found: Game.halloweenDrops.filter((n) => Game.HasUnlocked(n) || Game.Has(n)).length,
+                huntPops: MushieCookies.wrinklers.report().huntPops,
+                hunting: MushieCookies.wrinklers.report().hunting,
+                request: MushieCookies.seasons.report().hunting,
+                // Seconds to the next Halloween cookie, as the season planner values the season.
+                nextDrop: (MushieCookies.seasons.report().values || { halloween: {} }).halloween.nextDrop,
+            }));
+        await game.advanceSeconds(30);
+        const first = await read();
+        assert.equal(first.request && first.request.season, 'halloween', JSON.stringify(first));
+        assert.equal(first.hunting, true, 'the wrinkler system hunts what the season system asked for');
+        assert.ok(first.huntPops > 0);
+        // No wrinkler had been popped before the hunt: the planner values it at the hunt's pop rate.
+        assert.ok(first.nextDrop < 60, `next Halloween cookie valued ${first.nextDrop} s away`);
+        let out = first;
+        for (let i = 0; i < 15 && out.found < 7; i++) {
+            await game.advanceSeconds(60);
+            out = await read();
+        }
+        assert.equal(out.found, 7, `${out.found} of 7 after ${out.huntPops} hunting pops`);
+        await game.advanceSeconds(10);
+        const done = await read();
+        await game.advanceSeconds(60);
+        const after = await read();
+        assert.equal(after.season, 'halloween');
+        assert.equal(after.request, null, 'the season system still asks for a hunt');
+        assert.equal(after.hunting, false);
+        assert.equal(after.huntPops, done.huntPops, 'wrinklers were popped for drops that are all in');
+
+        // Easter: the request values each egg, and the wrinkler system weighs the eggs by it.
+        await game.eval(() => {
+            Game.baseSeason = 'easter'; // fixture: the calendar turns to Easter
+            Game.season = 'easter';
+        });
+        await game.advanceSeconds(30);
+        const easter = await game.eval(() => ({
+            request: MushieCookies.seasons.report().hunting,
+            verdict: MushieCookies.wrinklers.report().hunt,
+            huntPops: MushieCookies.wrinklers.report().huntPops,
+            status: MushieCookies.status(),
+        }));
+        assert.equal(easter.request && easter.request.season, 'easter', JSON.stringify(easter.request));
+        assert.ok(easter.verdict && easter.verdict.perPop > 0, `the wrinkler system values a pop at ${easter.verdict && easter.verdict.perPop}`);
+        assert.ok(easter.huntPops > after.huntPops, 'no wrinkler was popped for eggs');
+        assert.deepEqual(failures(easter.status), []);
+        assert.deepEqual(game.errors, []);
+    }));
+
 test('drop values are measured against a recalculated baseline, even right after a purchase', { skip }, () =>
     withMod(async (game) => {
         await bakery(game);

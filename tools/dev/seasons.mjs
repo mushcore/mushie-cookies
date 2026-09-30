@@ -2,7 +2,11 @@
 // inherited Easter and Halloween switches were off). Each run starts just after an ascension at
 // the given prestige with Season switcher owned, buys with the buyer, clicks, and runs luck-free
 // (golden cookies off), so a seed changes only Santa's and the reindeer's draws. One game at a time.
-// Usage: node tools/dev/seasons.mjs <gameHours> <seed[,seed...]> [--start-prestige=N] [--only=on|off] > out.json
+// Usage: node tools/dev/seasons.mjs <gameHours> <seed[,seed...]> [--start-prestige=N] [--only=on|off] [--variants=A,B] [--wrath] > out.json
+//   --variants  two of off (no season play), on (the planner), nohunt (the planner without wrinkler hunts);
+//               the summary divides the second by the first. Default off,on.
+//   --wrath     a grandmapocalypse from the start (One mind, Communal brainsweep, Elder Pact, Unholy bait) with
+//               the wrinkler system on, so Halloween and Easter drops can be hunted.
 import { launchWithMod } from '../../test/harness/game.mjs';
 
 const hours = Number(process.argv[2] || 3);
@@ -10,7 +14,9 @@ const seeds = (process.argv[3] || 'seasons1,seasons2,seasons3').split(',');
 const startArg = process.argv.find((a) => a.startsWith('--start-prestige='));
 const startPrestige = startArg ? Number(startArg.split('=')[1]) : 3000;
 const onlyArg = process.argv.find((a) => a.startsWith('--only='));
-const variants = onlyArg ? [onlyArg.split('=')[1]] : ['off', 'on'];
+const variantsArg = process.argv.find((a) => a.startsWith('--variants='));
+const variants = onlyArg ? [onlyArg.split('=')[1]] : variantsArg ? variantsArg.split('=')[1].split(',') : ['off', 'on'];
+const wrath = process.argv.includes('--wrath');
 
 function sample() {
     const owned = (names) => names.filter((n) => Game.Has(n)).length;
@@ -31,6 +37,9 @@ function sample() {
         santaLevel: Game.santaLevel,
         drops,
         seasonal: Object.values(drops).reduce((s, n) => s + Number(n), 0),
+        wrath: Game.elderWrath,
+        wrinklersPopped: Game.wrinklersPopped,
+        huntPops: MushieCookies.wrinklers ? MushieCookies.wrinklers.report().huntPops : 0,
         failures: Object.entries(MushieCookies.status())
             .filter(([, s]) => s.failures > 0)
             .map(([n, s]) => `${n}: ${s.lastError}`),
@@ -42,7 +51,7 @@ async function run(seed, variant) {
     if (!game) throw new Error('game location not configured');
     try {
         await game.eval(
-            ({ p, on }) => {
+            ({ p, on, hunt, wrath }) => {
                 Game.shimmerTypes.golden.spawnConditions = () => false;
                 // Test fixture only: the state an ascension at this prestige leaves behind, with the
                 // heavenly upgrades a planner buys first and Season switcher.
@@ -59,9 +68,15 @@ async function run(seed, variant) {
                 FrozenCookies.cookieClickSpeed = 50;
                 FrozenCookies.autoReindeer = 1;
                 FrozenCookies.autoSeasons = on ? 1 : 0;
+                if (wrath) {
+                    for (const name of ['One mind', 'Communal brainsweep', 'Elder Pact', 'Unholy bait']) Game.Upgrades[name].earn();
+                    Game.elderWrath = 3;
+                    FrozenCookies.autoWrinkler = 1;
+                }
                 FCStart();
+                MushieCookies.seasons.options.hunt = hunt;
             },
-            { p: startPrestige, on: variant === 'on' }
+            { p: startPrestige, on: variant !== 'off', hunt: variant !== 'nohunt', wrath }
         );
         const points = [];
         const started = Date.now();
@@ -74,7 +89,7 @@ async function run(seed, variant) {
                     `santa=${p.santaLevel} seasonal=${p.seasonal} ${JSON.stringify(p.drops)}${p.failures.length ? ' FAIL ' + p.failures.join('; ') : ''}\n`
             );
         }
-        const report = variant === 'on' ? await game.eval(() => MushieCookies.seasons.report()) : null;
+        const report = variant !== 'off' ? await game.eval(() => MushieCookies.seasons.report()) : null;
         // How much of the end-of-run CpS the seasonal upgrades and Santa give directly, at the same
         // buildings: a what-if that takes them away (the rest of the gap is compounding).
         const direct = await game.eval(() => {
@@ -102,8 +117,8 @@ for (const seed of seeds) for (const variant of variants) runs.push(await run(se
 const end = (r) => r.points[r.points.length - 1];
 const summary = [];
 for (const seed of seeds) {
-    const off = runs.find((r) => r.seed === seed && r.variant === 'off');
-    const on = runs.find((r) => r.seed === seed && r.variant === 'on');
+    const off = runs.find((r) => r.seed === seed && r.variant === variants[0]);
+    const on = runs.find((r) => r.seed === seed && r.variant === variants[1]);
     if (!off || !on) continue;
     summary.push({
         seed,
@@ -127,4 +142,4 @@ for (const s of summary) {
             `at the end they give x${s.directCpsFactor.toFixed(2)} CpS directly, reindeer ${(100 * s.reindeerShare).toFixed(0)}% of income\n`
     );
 }
-console.log(JSON.stringify({ hours, startPrestige, goldenCookies: false, summary, cps: spread('cpsRatio'), earned: spread('earnedRatio'), runs }, null, 1));
+console.log(JSON.stringify({ hours, startPrestige, goldenCookies: false, wrath, variants, summary, cps: spread('cpsRatio'), earned: spread('earnedRatio'), runs }, null, 1));

@@ -203,7 +203,12 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         income() {
             return state.income;
         },
+        /**
+         * What the buyer holds back, which every other system leaves alone. With Autobuy off
+         * nothing ranks on the buyer's own tick, so the reserve is brought up to date here.
+         */
         reserve() {
+            if (!settings.autoBuy) refreshIfStale(state.frame);
             return state.reserve;
         },
         /** What the next purchase is, or null; ranks first if the ranking is stale. */

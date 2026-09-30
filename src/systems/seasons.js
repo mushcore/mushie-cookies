@@ -27,11 +27,16 @@ const SELEBRAK_DROP = { 1: 0.9, 2: 0.95, 3: 0.97 };
  * @param {object} deps.settings  the mod's settings (autoSeasons, autoBuy, autoReindeer, autoGC, autoWrinkler)
  * @param {object} deps.loop
  * @param {object} [deps.buyer]   sells the switches and Santa levels; without it (or with Autobuy
- *        off) they are bought directly when the bank covers them
- * @param {(request: object|null) => void} [deps.hunt]  the wrinkler system's hunt request (see report)
+ *        off) they are bought directly when the bank covers them above the buyer's reserve
+ * @param {{hunt(request: object|null): void, valueHunt(request: object): object}} [deps.wrinklers]
+ *        the wrinkler system: told to hunt Halloween cookies or eggs by popping, at
+ *        `{season, value}` with `value` the cookies a new drop is worth, and asked what such a
+ *        hunt would bring and cost a second
  * @param {(what: string) => void} [deps.log]
  */
-export function createSeasons({ game, settings, loop, buyer = null, hunt = null, log = () => {} }) {
+export function createSeasons({ game, settings, loop, buyer = null, wrinklers = null, log = () => {} }) {
+    // hunt: false plans as if no wrinkler were ever popped for drops (for comparison only).
+    const options = { hunt: true };
     const state = {
         plan: null,
         values: null,
@@ -56,7 +61,9 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
     const god = () => (game.hasGod ? game.hasGod('seasons') : 0);
     const missing = (names) => names.filter((n) => !game.HasUnlocked(n) && !game.Has(n));
     const income = () => estimateIncome(readState(game, settings)).total;
-    const reserve = () => (buyer && settings.autoBuy ? buyer.reserve() : 0);
+    // One bank: with Autobuy on or off, only what the buyer is not holding is spent.
+    const reserve = () => (buyer ? buyer.reserve() : 0);
+    const spendable = () => game.cookies - reserve();
 
     function horizon() {
         const run = (Date.now() - game.startDate) / 1000;
@@ -123,14 +130,17 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
         const heart = game.heartDrops.find((n) => !game.Has(n));
         if (heart) trials.push({ group: 'heart', apply: buy([heart]) });
         // The Chocolate egg is the ascension routine's (candidates.js NEVER_BUY): worth nothing here.
-        for (const n of missing(game.easterEggs)) if (n !== 'Chocolate egg') trials.push({ group: 'egg', apply: buy([n]) });
+        for (const n of missing(game.easterEggs)) if (n !== 'Chocolate egg') trials.push({ group: 'egg', name: n, apply: buy([n]) });
         const measured = simulateEach(game, trials, income);
         const base = measured[0];
         const sums = {};
         const counts = {};
+        const eggs = {}; // name -> what that egg adds, for a hunt that values each egg
         trials.forEach((t, i) => {
-            sums[t.group] = (sums[t.group] || 0) + Math.max(0, measured[i] - base);
+            const gain = Math.max(0, measured[i] - base);
+            sums[t.group] = (sums[t.group] || 0) + gain;
             counts[t.group] = (counts[t.group] || 0) + 1;
+            if (t.name) eggs[t.name] = gain;
         });
         const mean = (g) => (counts[g] ? sums[g] / counts[g] : 0);
         const eggsLeft = missing(game.easterEggs).length;
@@ -138,13 +148,47 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
             income: base,
             santaLevel: game.santaLevel,
             santa: mean('santa'),
-            santaPriceExtra: dominion.length ? game.Upgrades["Santa's dominion"].getPrice() : 0,
             christmas: mean('christmas'),
             halloween: mean('halloween'),
             heart: mean('heart'),
             // Averaged over every missing egg, the Chocolate egg counting as nothing.
             egg: eggsLeft ? (sums.egg || 0) / eggsLeft : 0,
+            eggs,
         };
+    }
+
+    // What a new drop is worth over the rest of the run, net of buying it: the wrinkler system
+    // applies its own chance of each drop per pop (core/wrinklers.js huntDecision).
+    function dropValue(name, gain, H) {
+        return Math.max(0, gain * H - game.Upgrades[name].getPrice());
+    }
+
+    function huntRequest(season, gains, H) {
+        if (season === 'halloween') {
+            // The seven Halloween cookies are alike (+2% each, main.js:10218-10224).
+            const values = {};
+            for (const n of missing(game.halloweenDrops)) values[n] = dropValue(n, gains.halloween, H);
+            return worthHunting(season, values);
+        }
+        if (season === 'easter') {
+            const values = {};
+            for (const n of missing(game.easterEggs)) values[n] = n in gains.eggs ? dropValue(n, gains.eggs[n], H) : 0;
+            return worthHunting(season, values);
+        }
+        return null;
+    }
+
+    function worthHunting(season, values) {
+        if (!Object.keys(values).some((n) => values[n] > 0)) return null;
+        return { season, value: (name) => values[name] || 0, values };
+    }
+
+    // What the wrinkler system would bring and cost a second hunting `season`, when it would hunt.
+    function huntVerdict(season, gains, H) {
+        if (!wrinklers || !options.hunt || !(Number(settings.autoWrinkler) > 0)) return null;
+        const request = huntRequest(season, gains, H);
+        const verdict = request ? wrinklers.valueHunt(request) : null;
+        return verdict && verdict.hunt ? verdict : null;
     }
 
     function seasonValues(gains, H) {
@@ -169,21 +213,34 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
             }
             christmasNext = 5;
         }
-        const spookyWaits = uniformWaits({ missing: missing(game.halloweenDrops).length, total: 7, rate: pops, chance: c.halloween });
+        // In Halloween and Easter the wrinkler system hunts when that pays: pops then come at its
+        // rate, and the wrinkler income it forfeits is paid until the drops are expected in.
+        const spookyHunt = huntVerdict('halloween', gains, H);
+        const eggHunt = huntVerdict('easter', gains, H);
+        const spookyWaits = uniformWaits({ missing: missing(game.halloweenDrops).length, total: 7, rate: spookyHunt ? spookyHunt.popsPerSecond : pops, chance: c.halloween });
         const eggs = missing(game.easterEggs);
         const eggWait = eggWaits({
             rareMissing: eggs.filter((n) => game.rareEggDrops.indexOf(n) !== -1).length,
             commonMissing: eggs.filter((n) => game.eggDrops.indexOf(n) !== -1).length,
-            rate: golden * c.eggGolden + pops * c.eggPop,
+            rate: golden * c.eggGolden + (eggHunt ? eggHunt.popsPerSecond : pops) * c.eggPop,
         });
+        const huntCost = (verdict, waits) => (verdict ? verdict.cost * Math.min(H, waits.reduce((a, b) => a + b, 0)) : 0);
         const zero = { standing: 0, collection: 0, nextDrop: Infinity };
         return {
             chances: c,
             pops,
             values: {
                 christmas: { standing, collection: christmas, nextDrop: christmasNext },
-                halloween: { standing: 0, collection: collectionValue({ waits: spookyWaits, gain: gains.halloween, horizon: H }), nextDrop: spookyWaits.length ? spookyWaits[0] : Infinity },
-                easter: { standing: 0, collection: collectionValue({ waits: eggWait, gain: gains.egg, horizon: H }), nextDrop: eggWait.length ? eggWait[0] : Infinity },
+                halloween: {
+                    standing: 0,
+                    collection: collectionValue({ waits: spookyWaits, gain: gains.halloween, horizon: H }) - huntCost(spookyHunt, spookyWaits),
+                    nextDrop: spookyWaits.length ? spookyWaits[0] : Infinity,
+                },
+                easter: {
+                    standing: 0,
+                    collection: collectionValue({ waits: eggWait, gain: gains.egg, horizon: H }) - huntCost(eggHunt, eggWait),
+                    nextDrop: eggWait.length ? eggWait[0] : Infinity,
+                },
                 valentines: { ...zero },
                 fools: zero,
                 '': zero,
@@ -206,18 +263,14 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
         return [p0, (p0 * at(game.seasonUses + 1)) / at(game.seasonUses)];
     }
 
-    // Until the wrinkler system takes over popping, the inherited popper pops every wrinkler in
-    // Easter and Halloween (fc_main.js shouldPopWrinklers), which throws away most of their
-    // return: the planner never goes there while wrinklers are feeding.
-    function blocked() {
-        return !hunt && Number(settings.autoWrinkler) === 1 && game.elderWrath > 0 ? ['easter', 'halloween'] : [];
-    }
-
     // --- Acting, as a player clicks -------------------------------------------------------------
+    // Paid at the price the store shows now, and only from above the reserve: the plan was priced
+    // up to a tick ago, and CpS (which the price follows) may have grown since.
     function switchTo(season) {
         const it = trigger(season);
         if (!canSwitch() || !it || it.bought || !inStore(it) || game.season === season) return false;
         const price = it.getPrice();
+        if (spendable() < price) return false;
         it.buy(); // the store click: the biscuit's own click check runs (main.js:12476-12493)
         if (game.season !== season) return false;
         state.switches++;
@@ -241,7 +294,7 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
 
     // The Evolve button in Santa's tab, shown once A festive hat is owned (main.js:14698, 14994).
     function evolve(level) {
-        if (!game.Has('A festive hat') || game.santaLevel !== level) return false;
+        if (!game.Has('A festive hat') || game.santaLevel !== level || spendable() < santaPrice(level)) return false;
         game.UpgradeSanta();
         if (game.santaLevel !== level + 1) return false;
         state.levels++;
@@ -258,7 +311,7 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
             offers.push({
                 key: `santa:${level}`,
                 name: `Santa level ${level + 1}`,
-                price: santaPrice(level) + gains.santaPriceExtra,
+                priceNow: () => santaPrice(level) + (level === 13 ? game.Upgrades["Santa's dominion"].getPrice() : 0),
                 deltaIncome: gains.santa,
                 valid: () => game.santaLevel === level && game.Has('A festive hat'),
                 buy: () => evolve(level),
@@ -270,7 +323,7 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
             offers.push({
                 key: `season:${from}>${to}`,
                 name: `${game.seasons[to].name} season`,
-                price: plan.price,
+                priceNow: () => trigger(to).getPrice(),
                 // Payback against the other purchases: the plan's gross worth, spread over the run.
                 deltaIncome: (plan.gain + plan.price) / H,
                 valid: () => game.season === from && canSwitch() && !trigger(to).bought,
@@ -280,14 +333,16 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
         return offers;
     }
 
-    const liveOffers = () => (settings.autoSeasons == 1 ? state.offers.filter((o) => o.valid()) : []);
+    // Priced when the buyer ranks them, not when the plan was made.
+    const liveOffers = () => (settings.autoSeasons == 1 ? state.offers.filter((o) => o.valid()).map((o) => ({ ...o, price: o.priceNow() })) : []);
     if (buyer) buyer.offer('seasons', liveOffers);
 
-    // With the buyer off, nothing else spends: buy what the plan asks for when the bank covers it.
+    // With the buyer off, nothing else spends: buy what the plan asks for when the bank covers it
+    // above the buyer's reserve.
     function buyDirectly() {
         const hat = game.Upgrades['A festive hat'];
-        if (inStore(hat) && !hat.bought && game.cookies >= hat.getPrice()) hat.buy(1);
-        for (const offer of liveOffers()) if (game.cookies >= offer.price) offer.buy();
+        if (inStore(hat) && !hat.bought && spendable() >= hat.getPrice()) hat.buy(1);
+        for (const offer of liveOffers()) if (spendable() >= offer.price) offer.buy();
     }
 
     function tick(frame) {
@@ -304,7 +359,7 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
             state.stamp = stamp;
         }
         const gains = state.gains;
-        const { values, chances: c } = seasonValues(gains, H);
+        const { values } = seasonValues(gains, H);
         const visit = heartsVisit(gains, H);
         values.valentines.nextDrop = visit.locked > 0 ? 0 : Infinity;
         const plan = planSeason({
@@ -315,7 +370,6 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
             horizon: H,
             values,
             visit,
-            blocked: blocked(),
             secondsInSeason: now() - state.enteredAt,
         });
         state.plan = plan;
@@ -328,22 +382,18 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
 
         // Popping belongs to the wrinkler system: it is told what a drop is worth while a season
         // with drops from pops runs, and weighs that against what popping forfeits.
-        if (hunt) {
-            let request = null;
-            const spookyLeft = missing(game.halloweenDrops).length;
-            if (game.season === 'halloween' && spookyLeft > 0) {
-                request = { season: 'halloween', chance: c.halloween, perDrop: gains.halloween * H * (spookyLeft / 7) };
-            } else if (game.season === 'easter' && missing(game.easterEggs).length > 0) {
-                request = { season: 'easter', chance: c.eggPop, perDrop: gains.egg * H };
-            }
-            state.hunting = request;
-            hunt(request);
+        // Nothing is asked once every drop worth having is in.
+        if (wrinklers) {
+            const request = options.hunt ? huntRequest(game.season, gains, H) : null;
+            state.hunting = request ? { season: request.season, values: request.values } : null;
+            wrinklers.hunt(request);
         }
     }
 
     loop.add('seasons', tick, { everyFrames: TICK_EVERY, enabled: () => settings.autoSeasons == 1 && !game.OnAscend && !game.AscendTimer });
 
     return {
+        options,
         /** What each missing drop and the next Santa level would add to income, measured now. */
         gains: () => measureGains(),
         /** A plain summary for the console and the tests. */
@@ -353,7 +403,7 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
                 season: game.season,
                 plan: state.plan,
                 values: state.values,
-                offers: state.offers.map((o) => ({ name: o.name, price: o.price, deltaIncome: o.deltaIncome })),
+                offers: state.offers.map((o) => ({ name: o.name, price: o.priceNow(), deltaIncome: o.deltaIncome })),
                 switches: state.switches,
                 santaLevel: game.santaLevel,
                 levels: state.levels,
