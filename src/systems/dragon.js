@@ -9,6 +9,7 @@ import { simulateEach } from '../core/sim.js';
 import { estimateIncome } from '../core/income.js';
 import { readState } from '../game/measure.js';
 import { privateGenerator } from '../game/fate.js';
+import { AURA_GAIN } from '../core/gods.js';
 import { FULLY_TRAINED, SECOND_SLOT, DROPS, trainableChain, chooseTarget, horizonSeconds, magicCap, shuffleWith, dropFor, shouldPet } from '../core/dragon.js';
 
 const TICK_EVERY = 30; // frames: a second, as often as a player could reasonably click
@@ -175,11 +176,12 @@ export function createDragon({ game, settings, loop, reserve = () => 0, buyer = 
         const level = game.dragonLevel;
         const best = bestByLevel(level, level + steps.length);
         // Every aura slot whose best aura changes costs the gods system a switch: one of the
-        // highest building (main.js:14900-14909).
+        // highest building (main.js:14900-14909), and is made only for more than AURA_GAIN.
         const switchPrice = highestPrice();
-        const switchCost = best.map((b) => switchPrice * [0, 1].filter((s) => b.auras[s] !== best[0].auras[s]).length);
+        const switches = best.map((b) => [0, 1].filter((s) => b.auras[s] !== best[0].auras[s]).length);
+        const switchCost = switches.map((n) => n * switchPrice);
         const horizon = horizonSeconds(runSeconds());
-        const choice = chooseTarget({ level, steps, income: best.map((b) => b.income), horizon, switchCost });
+        const choice = chooseTarget({ level, steps, income: best.map((b) => b.income), horizon, switchCost, switches, minSwitchGain: AURA_GAIN });
         return { ...choice, level, horizon, auras: choice.target ? best[choice.target - level].auras.map((a) => game.dragonAuras[a].name) : null };
     }
 

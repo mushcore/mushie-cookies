@@ -102,15 +102,19 @@ export function trainableChain({ level, buildings, spendable, allowed = () => tr
  * @param {number[]} a.income  best income with the dragon at level + i, for i = 0 to steps.length
  * @param {number} a.horizon  seconds the run is expected to last
  * @param {number[]} [a.switchCost]  per i: the buildings the aura switches at level + i sacrifice
+ * @param {number[]} [a.switches]  per i: how many aura slots change at level + i
+ * @param {number} [a.minSwitchGain]  the share of income below which the gods system makes no
+ *   switch (AURA_GAIN in src/core/gods.js): a gain that needs a switch it would not make is none
  * @returns {{train: boolean, target?: number, gain?: number, cost?: number, net?: number, payback?: number}}
  */
-export function chooseTarget({ level, steps, income, horizon, switchCost = [] }) {
+export function chooseTarget({ level, steps, income, horizon, switchCost = [], switches = [], minSwitchGain = 0 }) {
     let best = null;
     let cost = 0;
     for (let i = 1; i <= steps.length; i++) {
         cost += steps[i - 1].cost;
         const gain = income[i] - income[0];
         if (!(gain > 0)) continue;
+        if (switches[i] > 0 && !(gain > minSwitchGain * income[0])) continue;
         const total = cost + (switchCost[i] || 0);
         const net = gain * horizon - total;
         if (!best || net > best.net) best = { target: level + i, gain, cost: total, net, payback: total / gain };

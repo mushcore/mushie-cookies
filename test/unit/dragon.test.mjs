@@ -123,6 +123,21 @@ test('picks the best net target, counting the aura switch the gods will pay for'
     assert.equal(chooseTarget({ level: 18, steps, income, horizon: 3600, switchCost: [0, 1e9, 1e9] }).train, false);
 });
 
+test('a gain that needs an aura switch counts only if the gods system would make the switch', () => {
+    // The gods switch an aura only for more than AURA_GAIN (2%) of income (src/core/gods.js); a
+    // chain toward a 1.5% better aura would sacrifice buildings for a switch never made.
+    const steps = [{ level: 8, cost: 10 }, { level: 9, cost: 10 }, { level: 10, cost: 10 }, { level: 11, cost: 10 }];
+    const income = [1000, 1000, 1000, 1000, 1015];
+    const out = chooseTarget({ level: 8, steps, income, horizon: 3600, switchCost: [0, 0, 0, 0, 5], switches: [0, 0, 0, 0, 1], minSwitchGain: 0.02 });
+    assert.equal(out.train, false);
+    // The same gain with no switch (the Dragon cookie, bought by the buyer) counts.
+    const cookie = chooseTarget({ level: 8, steps, income, horizon: 3600, switches: [0, 0, 0, 0, 0], minSwitchGain: 0.02 });
+    assert.equal(cookie.train, true);
+    // And a switch worth more than the band counts.
+    const big = chooseTarget({ level: 8, steps, income: [1000, 1000, 1000, 1000, 1030], horizon: 3600, switchCost: [0, 0, 0, 0, 5], switches: [0, 0, 0, 0, 1], minSwitchGain: 0.02 });
+    assert.equal(big.train, true);
+});
+
 test('the horizon is the time the run has lasted, and at least an hour', () => {
     assert.equal(horizonSeconds(0), 3600);
     assert.equal(horizonSeconds(600), 3600);
