@@ -21,31 +21,40 @@ export function createGrimoire({ game, settings, loop, log = () => {} }) {
     // The inherited casting modes cast on their own; running both would double-cast.
     const inheritedCasting = () => settings.autoCasting != 0 || settings.autoFTHOFCombo == 1 || settings.auto100ConsistencyCombo == 1;
 
-    function buffContext() {
-        let cpsMult = 1;
-        let secondsLeft = Infinity;
-        for (const buff of Object.values(game.buffs)) {
-            if (buff.multCpS && buff.multCpS !== 1) {
-                cpsMult *= buff.multCpS;
-                if (buff.multCpS > 1) secondsLeft = Math.min(secondsLeft, buff.time / game.fps);
-            }
-        }
-        return { cpsMult, buffSecondsLeft: Number.isFinite(secondsLeft) ? secondsLeft : 0 };
+    /** Every running buff, by name, since an outcome only lengthens a buff of its own name. */
+    function runningBuffs() {
+        return Object.values(game.buffs).map((buff) => ({
+            name: buff.name,
+            multCpS: buff.multCpS === undefined ? 1 : buff.multCpS,
+            multClick: buff.multClick === undefined ? 1 : buff.multClick,
+            secondsLeft: buff.time / game.fps,
+            power: buff.power,
+        }));
     }
 
-    function tick() {
-        const grimoire = game.Objects['Wizard tower'].minigame;
-        if (!grimoire || !grimoire.spells || game.OnAscend) return;
+    // The spell's cookie is never wrath, so a building special is always a buff: one building with
+    // 10 or more, picked at random, for 1 + amount/10 (main.js:5496-5512).
+    const buildingSpecials = () =>
+        game.ObjectsById.filter((b) => b.amount >= 10).map((b) => ({ name: game.goldenCookieBuildingBuffs[b.name][0], mult: b.amount / 10 + 1 }));
+
+    /** What an outcome landing now is valued against (see outcomeValue). */
+    function context() {
         const now = readState(game, settings);
-        const ctx = {
+        return {
             passive: now.cps,
             click: now.clicksPerSecond * now.clickPower,
             clicksPerSecond: now.clicksPerSecond,
             bank: game.cookies,
             durationMult: now.golden.durationMult,
-            buildingSpecialMean: now.golden.buildingSpecialMean,
-            ...buffContext(),
+            buildingSpecials: buildingSpecials(),
+            buffs: runningBuffs(),
         };
+    }
+
+    function tick() {
+        const grimoire = game.Objects['Wizard tower'].minigame;
+        if (!grimoire || !grimoire.spells || game.OnAscend) return;
+        const ctx = context();
         const next = forecastFate(game, grimoire, 0);
         const decision = decideCast({
             next,
@@ -81,5 +90,6 @@ export function createGrimoire({ game, settings, loop, log = () => {} }) {
         report() {
             return { casts: state.casts, skips: state.skips, last: state.last, decision: state.decision };
         },
+        context,
     };
 }
