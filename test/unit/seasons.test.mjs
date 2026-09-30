@@ -218,3 +218,13 @@ test('in a calendar season with drops to give, a visit that comes back to it for
     const stay = planSeason(base({ season: 'christmas', baseSeason: 'christmas', values: { ...base().values, christmas, easter } }));
     assert.equal(stay.action, 'stay');
 });
+
+test('after a visit away from a calendar season with drops to give, it goes back to it, for free', () => {
+    const easter = { standing: 0, collection: 1e8, nextDrop: 600 };
+    const out = planSeason(base({ season: 'valentines', baseSeason: 'easter', values: { ...base().values, easter } }));
+    assert.equal(out.action, 'cancel', JSON.stringify(out));
+    assert.equal(out.to, 'easter');
+    // Once the calendar season has nothing more to give, Christmas is free to win.
+    const done = planSeason(base({ season: 'valentines', baseSeason: 'easter' }));
+    assert.equal(done.to, 'christmas');
+});

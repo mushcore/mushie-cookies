@@ -130,9 +130,9 @@ export function planSeason(s) {
 
     const visit = s.visit && s.visit.locked > 0 ? s.visit : null;
     if (s.season === 'valentines' && visit && s.secondsInSeason < MAX_VISIT_SECONDS) return stay('hearts are still unlocking');
-    // The calendar's season is not left while it has drops to give; a visit that comes back to it
-    // (for free, by cancelling) forfeits nothing.
-    const keep = !!s.season && s.season === s.baseSeason && value(s.season).nextDrop < H;
+    // While the calendar's season has drops to give, no other season is rested in: a visit comes
+    // back to it, and from anywhere else it is returned to (both for free, by cancelling).
+    const keep = !!s.baseSeason && value(s.baseSeason).nextDrop < H;
 
     const blocked = new Set(s.blocked || []);
     const free = (to) => !!s.baseSeason && to === s.baseSeason && s.season !== s.baseSeason;
@@ -141,14 +141,14 @@ export function planSeason(s) {
     const plans = [];
     const targets = new Set(REST.concat(s.baseSeason ? [s.baseSeason] : []));
     for (const to of targets) {
-        if (keep || to === s.season || blocked.has(to)) continue;
+        if (to === s.season || blocked.has(to) || (keep && to !== s.baseSeason)) continue;
         const price = free(to) ? 0 : p0;
         plans.push({ to, price, net: worth(to) - price, reason: `rest in ${to}` });
     }
     if (visit && s.season !== 'valentines' && !blocked.has('valentines')) {
         // Valentine's first, then the season to rest in: going there first saves a switch.
         for (const rest of new Set([...targets, s.season])) {
-            if (rest === 'valentines' || blocked.has(rest) || (keep && rest !== s.season)) continue;
+            if (rest === 'valentines' || blocked.has(rest) || (keep && rest !== s.baseSeason)) continue;
             const back = rest === s.baseSeason && s.baseSeason ? 0 : p1;
             const net = visit.value + worth(rest, H - visit.seconds) - p0 - back;
             plans.push({ to: 'valentines', rest, price: p0, net, reason: `visit Valentine's for ${visit.locked} heart(s), then ${rest}` });

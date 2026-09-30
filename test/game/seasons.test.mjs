@@ -176,10 +176,20 @@ test('stays in the calendar season while it still has drops to give', { skip }, 
             Game.shimmerTypes.golden.spawnConditions = () => true;
             FrozenCookies.autoGC = 1;
         });
-        await game.advanceSeconds(60);
-        const out = await game.eval(() => ({ season: Game.season, uses: Game.seasonUses, plan: MushieCookies.seasons.report().plan }));
+        await game.advanceSeconds(120);
+        const out = await game.eval(() => ({
+            season: Game.season,
+            uses: Game.seasonUses,
+            hat: Game.Upgrades['A festive hat'].unlocked,
+            hearts: Game.heartDrops.filter((n) => Game.Has(n)).length,
+            plan: MushieCookies.seasons.report().plan,
+        }));
         assert.equal(out.season, 'easter', JSON.stringify(out.plan));
-        assert.equal(out.uses, 0);
+        // A Valentine's visit that comes back to Easter for free is allowed; resting anywhere else is
+        // not: Christmas, even for five seconds, would have unlocked the hat.
+        assert.ok(out.uses <= 1, `${out.uses} switches`);
+        assert.equal(out.hat, 0, 'Christmas was entered');
+        if (out.uses === 1) assert.ok(out.hearts > 0, 'a switch was paid for without the hearts it was for');
     }));
 
 test('the last Santa level is taken for Santa\'s dominion once every drop is out', { skip }, () =>
