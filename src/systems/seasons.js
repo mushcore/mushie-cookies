@@ -105,10 +105,13 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
                 }
             }
         };
+        // A level with no drop left to bring still adds Santa's legacy (main.js:5015), and the
+        // last one opens Santa's dominion (main.js:14748-14752).
         const santaLeft = game.santaLevel < 14 ? game.santaDrops.filter((n) => !game.HasUnlocked(n)) : [];
         const dominion = game.santaLevel === 13 ? ["Santa's dominion"] : [];
-        for (const n of santaLeft) {
-            trials.push({ group: 'santa', apply: () => { buy([n].concat(dominion))(); game.santaLevel++; } });
+        const santaTrials = santaLeft.length ? santaLeft.map((n) => [n]) : game.santaLevel < 14 ? [[]] : [];
+        for (const names of santaTrials) {
+            trials.push({ group: 'santa', apply: () => { buy(names.concat(dominion))(); game.santaLevel++; } });
         }
         const first = (names) => missing(names)[0];
         const cookie = first(game.reindeerDrops);

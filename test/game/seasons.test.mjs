@@ -181,3 +181,19 @@ test('stays in the calendar season while it still has drops to give', { skip }, 
         assert.equal(out.season, 'easter', JSON.stringify(out.plan));
         assert.equal(out.uses, 0);
     }));
+
+test('the last Santa level is taken for Santa\'s dominion once every drop is out', { skip }, () =>
+    withMod(async (game) => {
+        await bakery(game);
+        await game.eval(() => {
+            // Fixture: Santa at level 13 with all 14 of his drops found, and a bank for the last level.
+            Game.Upgrades['A festive hat'].earn();
+            for (const n of Game.santaDrops) Game.Unlock(n);
+            Game.santaLevel = 13;
+            Game.Earn(1e18);
+        });
+        await game.advanceSeconds(60);
+        const out = await game.eval(() => ({ santa: Game.santaLevel, dominion: Game.Has("Santa's dominion"), offers: MushieCookies.seasons.report().offers }));
+        assert.equal(out.santa, 14, JSON.stringify(out.offers));
+        assert.equal(out.dominion, 1, 'the buyer buys the dominion the last level unlocks');
+    }));
