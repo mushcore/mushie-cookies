@@ -176,3 +176,22 @@ test('during a CpS buff the buyer keeps buying from the last ranking and re-rank
         const c = await game.eval(() => MushieCookies.buyer.activity());
         assert.ok(c.ranks - b.ranks > 0, 're-ranked once the frenzy ended');
     }));
+
+test('a long CpS buff (an hour of Sugar frenzy) is not waited out: the buyer re-ranks after purchases as usual', { skip }, () =>
+    withGame(async (game) => {
+        await game.eval(() => {
+            Game.Earn(1e9);
+            FrozenCookies.autoBuy = 1;
+            FCStart();
+        });
+        await game.advanceSeconds(20);
+        await game.eval(() => {
+            Game.Earn(1e12);
+            Game.gainBuff('sugar frenzy', 3600, 3); // what a sugar lump buys (main.js:11043)
+        });
+        const a = await game.eval(() => MushieCookies.buyer.activity());
+        await game.advanceSeconds(25);
+        const b = await game.eval(() => MushieCookies.buyer.activity());
+        assert.ok(b.purchases - a.purchases > 0, 'buying');
+        assert.ok(b.ranks - a.ranks > 0, 'and re-ranking after purchases');
+    }));

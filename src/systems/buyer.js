@@ -10,6 +10,10 @@ const RERANK_FRAMES = 150; // five seconds
 const PURCHASES_PER_TICK = 2; // each purchase re-ranks; two keep a tick well inside a frame
 const BULK = 10;
 const FAILED_COOLDOWN_FRAMES = 30 * 60; // a purchase the game refused is not tried again for a minute
+// A golden cookie's CpS buff lasts minutes at most (Frenzy: 77 s times the duration upgrades);
+// Sugar frenzy lasts an hour and a loan hours (main.js:11043, minigameMarket.js:376), too long
+// to buy on from an old ranking.
+const SHORT_BUFF_SECONDS = 10 * 60;
 
 /** Upgrades whose worth the income model cannot see; bought when they cost under a minute of income. */
 const ENABLERS = new Set([
@@ -51,6 +55,8 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
     // add a share of the buffed CpS, main.js:4692-4708), so rankings are made between buffs and
     // the last one is kept while a buff runs.
     const cpsBuffRunning = () => Object.values(game.buffs).some((b) => b.multCpS && b.multCpS !== 1);
+    const shortCpsBuffRunning = () =>
+        Object.values(game.buffs).some((b) => b.multCpS && b.multCpS !== 1 && b.time <= SHORT_BUFF_SECONDS * game.fps);
     // While a click buff runs each click is worth hundreds of ordinary ones, and a ranking pass
     // (hundreds of what-ifs inside Game.Logic) holds the page's one thread while the clicker's
     // timer waits: in the game's runtime, during a Click frenzy with a rich bank, the clicker got
@@ -173,9 +179,9 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
             state.last = { choice, reserve: state.reserve };
             if (!choice) break;
             if (!buy(choice)) break;
-            // During a CpS buff the ranking is left out of date (refreshIfStale redoes it once the
-            // buff ends) and buying goes on down it, less what this purchase changed.
-            if (cpsBuffRunning()) state.ranked = withoutBought(state.ranked, choice);
+            // During a short CpS buff the ranking is left out of date (refreshIfStale redoes it
+            // once the buff ends) and buying goes on down it, less what this purchase changed.
+            if (shortCpsBuffRunning()) state.ranked = withoutBought(state.ranked, choice);
             else rank(frame);
         }
         enablers();
