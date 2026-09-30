@@ -1,0 +1,87 @@
+# Garden stall repair, 2026-09-30. node tools/dev/garden.mjs 12 garden --no-golden [--click 0] --mod <build>
+# Luck-free, autoBuy on. 'before' is 311b524, 'after' is the repaired build (e954aa7).
+
+## before, no clicking (--click 0)
+  1h 2/34 target=thumbcorn mode=breed soil=fertilizer planted=5 harvested=1 seeds=8.34% of income cps=9.65e+9 sacrifices=0
+  2h 3/34 target=bakeberry mode=breed soil=fertilizer planted=11 harvested=2 seeds=9.17% of income cps=9.63e+9 sacrifices=0
+  3h 3/34 target=bakeberry mode=breed soil=fertilizer planted=18 harvested=2 seeds=9.99% of income cps=9.65e+9 sacrifices=0
+  4h 3/34 target=bakeberry mode=breed soil=fertilizer planted=23 harvested=2 seeds=9.58% of income cps=1.15e+10 sacrifices=0
+  5h 3/34 target=bakeberry mode=breed soil=fertilizer planted=29 harvested=2 seeds=9.67% of income cps=1.21e+10 sacrifices=0
+  6h 3/34 target=bakeberry mode=breed soil=fertilizer planted=35 harvested=2 seeds=9.73% of income cps=1.25e+10 sacrifices=0
+  7h 3/34 target=bakeberry mode=breed soil=fertilizer planted=41 harvested=2 seeds=9.77% of income cps=1.25e+10 sacrifices=0
+  8h 3/34 target=bakeberry mode=breed soil=fertilizer planted=47 harvested=2 seeds=9.80% of income cps=1.25e+10 sacrifices=0
+  9h 3/34 target=bakeberry mode=breed soil=fertilizer planted=53 harvested=2 seeds=9.82% of income cps=1.25e+10 sacrifices=0
+ 10h 3/34 target=bakeberry mode=breed soil=fertilizer planted=59 harvested=2 seeds=9.82% of income cps=1.42e+10 sacrifices=0
+ 11h 3/34 target=bakeberry mode=breed soil=fertilizer planted=65 harvested=2 seeds=9.84% of income cps=1.42e+10 sacrifices=0
+ 12h 3/34 target=bakeberry mode=breed soil=fertilizer planted=71 harvested=2 seeds=9.85% of income cps=1.49e+10 sacrifices=0
+
+## after, no clicking (--click 0)
+  1h 2/34 target=thumbcorn mode=breed soil=fertilizer planted=0 harvested=1 seeds=0.00% of income cps=9.47e+9 sacrifices=0
+  2h 2/34 target=bakeberry mode=breed soil=woodchips planted=10 harvested=1 seeds=8.30% of income cps=9.88e+9 sacrifices=0
+  3h 3/34 target=bakeberry mode=breed soil=fertilizer planted=12 harvested=2 seeds=6.64% of income cps=9.66e+9 sacrifices=0
+  4h 3/34 target=bakeberry mode=breed soil=woodchips planted=22 harvested=2 seeds=9.15% of income cps=9.90e+9 sacrifices=0
+  5h 3/34 target=cronerice mode=breed soil=fertilizer planted=22 harvested=2 seeds=7.20% of income cps=1.13e+10 sacrifices=0
+  6h 4/34 target=cronerice mode=breed soil=fertilizer planted=22 harvested=3 seeds=5.80% of income cps=1.19e+10 sacrifices=0
+  7h 4/34 target=cronerice mode=breed soil=fertilizer planted=22 harvested=3 seeds=4.84% of income cps=1.23e+10 sacrifices=0
+  8h 4/34 target=cronerice mode=breed soil=fertilizer planted=22 harvested=3 seeds=4.14% of income cps=1.23e+10 sacrifices=0
+  9h 4/34 target=cronerice mode=breed soil=fertilizer planted=22 harvested=3 seeds=3.62% of income cps=1.23e+10 sacrifices=0
+ 10h 4/34 target=brownMold mode=weeds soil=woodchips planted=34 harvested=3 seeds=9.95% of income cps=1.23e+10 sacrifices=0
+ 11h 4/34 target=brownMold mode=weeds soil=fertilizer planted=40 harvested=3 seeds=9.96% of income cps=1.23e+10 sacrifices=0
+ 12h 5/34 target=chocoroot mode=breed soil=fertilizer planted=43 harvested=4 seeds=9.45% of income cps=1.40e+10 sacrifices=0
+
+## before, 50 clicks a second
+  1h 2/34 target=bakeberry mode=breed soil=fertilizer planted=20 harvested=1 seeds=9.70% of income cps=1.07e+10 sacrifices=0
+  2h 3/34 target=bakeberry mode=breed soil=woodchips planted=32 harvested=2 seeds=7.34% of income cps=1.23e+10 sacrifices=0
+  3h 3/34 target=bakeberry mode=breed soil=woodchips planted=44 harvested=2 seeds=6.66% of income cps=1.33e+10 sacrifices=0
+  4h 3/34 target=bakeberry mode=breed soil=woodchips planted=54 harvested=2 seeds=6.04% of income cps=1.60e+10 sacrifices=0
+  5h 3/34 target=brownMold mode=weeds soil=woodchips planted=70 harvested=2 seeds=7.40% of income cps=1.73e+10 sacrifices=0
+  6h 5/34 target=cronerice mode=breed soil=fertilizer planted=91 harvested=4 seeds=7.97% of income cps=1.86e+10 sacrifices=0
+  7h 7/34 target=cronerice mode=breed soil=woodchips planted=104 harvested=6 seeds=8.29% of income cps=1.87e+10 sacrifices=0
+  8h 7/34 target=cronerice mode=breed soil=fertilizer planted=114 harvested=6 seeds=8.62% of income cps=1.90e+10 sacrifices=0
+  9h 7/34 target=whiteChocoroot mode=breed soil=fertilizer planted=117 harvested=6 seeds=8.55% of income cps=2.52e+10 sacrifices=0
+ 10h 7/34 target=whiteChocoroot mode=breed soil=fertilizer planted=118 harvested=6 seeds=8.36% of income cps=2.72e+10 sacrifices=0
+ 11h 7/34 target=whiteChocoroot mode=breed soil=fertilizer planted=120 harvested=6 seeds=9.16% of income cps=2.70e+10 sacrifices=0
+ 12h 8/34 target=gildmillet mode=breed soil=fertilizer planted=121 harvested=7 seeds=8.84% of income cps=3.39e+10 sacrifices=0
+
+## after, 50 clicks a second
+  1h 3/34 target=bakeberry mode=breed soil=fertilizer planted=18 harvested=2 seeds=8.72% of income cps=1.07e+10 sacrifices=0
+  2h 3/34 target=cronerice mode=breed soil=fertilizer planted=26 harvested=2 seeds=5.77% of income cps=1.28e+10 sacrifices=0
+  3h 3/34 target=cronerice mode=breed soil=fertilizer planted=26 harvested=2 seeds=3.46% of income cps=1.32e+10 sacrifices=0
+  4h 4/34 target=brownMold mode=weeds soil=fertilizer planted=51 harvested=3 seeds=9.86% of income cps=1.57e+10 sacrifices=0
+  5h 7/34 target=glovemorel mode=breed soil=fertilizer planted=61 harvested=6 seeds=8.59% of income cps=1.57e+10 sacrifices=0
+  6h 7/34 target=glovemorel mode=breed soil=fertilizer planted=61 harvested=6 seeds=6.69% of income cps=1.85e+10 sacrifices=0
+  7h 7/34 target=glovemorel mode=breed soil=fertilizer planted=61 harvested=6 seeds=5.45% of income cps=1.85e+10 sacrifices=0
+  8h 8/34 target=glovemorel mode=breed soil=fertilizer planted=61 harvested=7 seeds=4.58% of income cps=2.36e+10 sacrifices=0
+  9h 8/34 target=glovemorel mode=breed soil=fertilizer planted=61 harvested=7 seeds=3.79% of income cps=2.51e+10 sacrifices=0
+ 10h 8/34 target=glovemorel mode=breed soil=fertilizer planted=61 harvested=7 seeds=3.20% of income cps=2.68e+10 sacrifices=0
+ 11h 8/34 target=glovemorel mode=breed soil=woodchips planted=73 harvested=7 seeds=8.94% of income cps=2.68e+10 sacrifices=0
+ 12h 9/34 target=chocoroot mode=breed soil=fertilizer planted=73 harvested=8 seeds=7.81% of income cps=3.39e+10 sacrifices=0
+
+# The verifier's scenario on the repaired build: CpS 3.4e4, no golden cookies, clicking and autoBuy off,
+# seeds bakerWheat/thumbcorn/cronerice/bakeberry/meddleweed. spentMin: minutes of CpS spent on seeds.
+1h 5/34 target=gildmillet mode=breed planted=0 budget=1.21e+7 spentMin=0.0 share=0.0% bought={}
+2h 5/34 target=gildmillet mode=breed planted=0 budget=2.42e+7 spentMin=0.0 share=0.0% bought={}
+3h 5/34 target=gildmillet mode=breed planted=0 budget=3.63e+7 spentMin=0.0 share=0.0% bought={}
+4h 5/34 target=gildmillet mode=breed planted=0 budget=4.84e+7 spentMin=0.0 share=0.0% bought={}
+5h 5/34 target=gildmillet mode=breed planted=0 budget=6.05e+7 spentMin=0.0 share=0.0% bought={}
+6h 5/34 target=gildmillet mode=breed planted=0 budget=7.26e+7 spentMin=0.0 share=0.0% bought={}
+7h 5/34 target=gildmillet mode=breed planted=0 budget=8.47e+7 spentMin=0.0 share=0.0% bought={}
+8h 5/34 target=gildmillet mode=breed planted=0 budget=9.68e+7 spentMin=0.0 share=0.0% bought={}
+9h 5/34 target=gildmillet mode=breed planted=0 budget=1.09e+8 spentMin=0.0 share=0.0% bought={}
+10h 5/34 target=gildmillet mode=breed planted=0 budget=1.21e+8 spentMin=0.0 share=0.0% bought={}
+11h 5/34 target=gildmillet mode=breed planted=0 budget=1.33e+8 spentMin=0.0 share=0.0% bought={}
+12h 5/34 target=gildmillet mode=breed planted=0 budget=1.45e+8 spentMin=0.0 share=0.0% bought={}
+13h 5/34 target=gildmillet mode=breed planted=0 budget=1.57e+8 spentMin=0.0 share=0.0% bought={}
+14h 5/34 target=gildmillet mode=breed planted=0 budget=1.69e+8 spentMin=0.0 share=0.0% bought={}
+15h 5/34 target=gildmillet mode=breed planted=0 budget=1.81e+8 spentMin=0.0 share=0.0% bought={}
+16h 5/34 target=gildmillet mode=breed planted=0 budget=1.94e+8 spentMin=0.0 share=0.0% bought={}
+17h 5/34 target=gildmillet mode=breed planted=0 budget=2.06e+8 spentMin=0.0 share=0.0% bought={}
+18h 5/34 target=gildmillet mode=breed planted=0 budget=2.18e+8 spentMin=0.0 share=0.0% bought={}
+19h 5/34 target=gildmillet mode=breed planted=0 budget=2.30e+8 spentMin=0.0 share=0.0% bought={}
+20h 5/34 target=gildmillet mode=breed planted=6 budget=6.05e+7 spentMin=90.0 share=7.5% bought={"cronerice":6}
+21h 5/34 target=gildmillet mode=breed planted=6 budget=7.26e+7 spentMin=90.0 share=7.1% bought={"cronerice":6}
+22h 5/34 target=gildmillet mode=breed planted=6 budget=8.47e+7 spentMin=90.0 share=6.8% bought={"cronerice":6}
+23h 5/34 target=brownMold mode=weeds planted=33 budget=1.98e+6 spentMin=137.0 share=9.9% bought={"cronerice":6,"thumbcorn":5,"meddleweed":22}
+24h 7/34 target=clover mode=breed planted=37 budget=2.81e+6 spentMin=140.5 share=9.8% bought={"cronerice":6,"thumbcorn":5,"meddleweed":26}
+25h 9/34 target=clover mode=breed planted=37 budget=1.49e+7 spentMin=141.0 share=9.4% bought={"cronerice":6,"thumbcorn":5,"meddleweed":26}
+26h 9/34 target=clover mode=breed planted=37 budget=2.70e+7 spentMin=141.0 share=9.0% bought={"cronerice":6,"thumbcorn":5,"meddleweed":26}
