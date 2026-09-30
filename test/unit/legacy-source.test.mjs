@@ -90,6 +90,18 @@ test('the inherited lump harvest is gone: the lump system is the only thing that
     assert.deepEqual(found, []);
 });
 
+test('the game\'s own time display is left alone', () => {
+    // Game.sayTime's callers pass `detail` and rely on '' for no time left (main.js:6477-6482).
+    const found = all.filter(([, src]) => /Game\.sayTime\s*=[^=]/.test(src)).map(([file]) => file);
+    assert.deepEqual(found, []);
+});
+
+test('nothing calls window.prompt, which throws on Steam', () => {
+    // Electron replaces it with a function that throws; the game's own Game.Prompt works.
+    const found = all.filter(([, src]) => /(^|[^\w$.])prompt\s*\(|window\.prompt\s*\(/m.test(src)).map(([file]) => file);
+    assert.deepEqual(found, []);
+});
+
 test('every function called by bare name is defined somewhere', () => {
     // Catches a deletion that removed a function something still calls.
     const defined = new Set();

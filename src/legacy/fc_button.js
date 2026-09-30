@@ -26,10 +26,6 @@ $("<style>")
     )
     .appendTo("head");
 
-if (typeof Game.oldUpdateMenu != "function") {
-    Game.oldUpdateMenu = Game.UpdateMenu;
-}
-
 // Add custom styles
 (function () {
     var style = document.createElement("style");
@@ -113,427 +109,441 @@ if (typeof Game.oldUpdateMenu != "function") {
     document.head.appendChild(style);
 })();
 
-function FCMenu() {
+// The Mushie menu. The override is installed once, over whatever Game.UpdateMenu is by then:
+// a wrapper another mod added before keeps working, and one added after wraps this. It used to
+// be reinstalled over the game's original on every FCStart, dropping any other mod's wrapper.
+function installFCMenu() {
+    if (Game.fcMenuInstalled) return;
+    Game.fcMenuInstalled = true;
+    var inner = Game.UpdateMenu;
     Game.UpdateMenu = function () {
-        if (Game.onMenu !== "fc_menu") {
-            return Game.oldUpdateMenu();
-        }
-        if (!Game.callingMenu) {
-            Game.callingMenu = true;
-            setTimeout(() => {
-                Game.callingMenu = false;
-                Game.UpdateMenu();
-            }, 1000);
-        }
-        var currentCookies,
-            maxCookies,
-            isTarget,
-            isMax,
-            targetTxt,
-            maxTxt,
-            currHC,
-            resetHC,
-            cps,
-            baseChosen,
-            frenzyChosen,
-            clickStr,
-            buildTable,
-            bankLucky,
-            bankLuckyFrenzy,
-            bankChain,
-            menu = $("#menu")
-                .empty()
-                .append(
-                    $("<div>")
-                        .addClass("section")
-                        .text(
-                            "Mushie Cookies v " +
-                                FrozenCookies.branch +
-                                "." +
-                                FrozenCookies.version
-                        )
-                )
-                // Add the log/info panel button
-                .append(
-                    $("<div>")
-                        .addClass("listing")
-                        .append(
-                            $("<button>")
-                                .attr("id", "fcOpenLogPanel")
-                                .attr(
-                                    "title",
-                                    "Open the Cookie Clicker about/version info panel"
-                                )
-                                .text("Cookie Clicker Info")
-                                .click(openGameLogPanel)
-                        )
-                )
-                // Add a documentations page button
-                .append(
-                    $("<div>")
-                        .addClass("listing")
-                        .append(
-                            $("<button>")
-                                .attr("id", "fcOpenDocPage")
-                                .attr(
-                                    "title",
-                                    "Open the Mushie Cookies readme"
-                                )
-                                .text("Mushie Cookies Readme")
-                                .click(openDocumentationPage)
-                        )
-                );
+        if (Game.onMenu !== "fc_menu") return inner.apply(this, arguments);
+        buildFCMenu();
+    };
+    // While the menu is open, its figures are refreshed every second on the mod's loop. The
+    // options, most of the menu, are rebuilt only when one changes (FCStart). Never while the
+    // mouse is down, so that a click on the menu is not cut in two (as the game does,
+    // main.js:16601).
+    MushieCookies.loop.add("legacy:menu", refreshFCMenu, {
+        everyFrames: 30,
+        enabled: function () {
+            return Game.onMenu === "fc_menu" && !Game.mouseDown;
+        },
+    });
+}
 
-        // --- BUYING SECTION ---
-        function buildListing(label, name) {
-            return $("<div>")
-                .addClass("listing")
-                .append($("<b>").text(label + ":"), " ", name);
-        }
-        var report = MushieCookies.buyer ? MushieCookies.buyer.report() : null;
-        subsection = $("<div>")
-            .addClass("subsection")
-            .append($("<div>").addClass("title").text("Buying"));
-        if (report && report.income) {
-            var income = report.income;
-            var next = report.next;
-            subsection.append(
-                buildListing("Next purchase", next ? next.name : "nothing worth buying")
-            );
-            if (next) {
-                subsection.append(buildListing("Cost", Beautify(next.price)));
-                subsection.append(
-                    buildListing("Adds per second", Beautify(next.deltaIncome))
-                );
-                subsection.append(
-                    buildListing("Pays back in", timeDisplay(next.payback))
-                );
-                subsection.append(
-                    buildListing(
-                        "Ready in",
-                        timeDisplay(
-                            divCps(
-                                Math.max(0, next.price + report.reserve - Game.cookies),
-                                income.total
-                            )
-                        )
-                    )
-                );
-            }
-            subsection.append(
-                buildListing("Golden cookie reserve", Beautify(report.reserve))
-            );
-            subsection.append(
-                buildListing(
-                    "Income per second",
-                    Beautify(income.total) +
-                        " (" +
-                        Beautify(income.passive) +
-                        " buildings, " +
-                        Beautify(income.click) +
-                        " clicks, " +
-                        Beautify(income.golden) +
-                        " golden cookies)"
-                )
-            );
-            subsection.append(buildListing("Purchases this session", report.purchases));
-            var table = $("<table>")
-                .prop("id", "fcEfficiencyTable")
-                .append(
-                    $("<tr>").append(
-                        $("<th>").text("Candidate"),
-                        $("<th>").text("Cost"),
-                        $("<th>").text("Adds / s"),
-                        $("<th>").text("Pays back")
-                    )
-                );
-            report.top.forEach(function (c) {
-                table.append(
-                    $("<tr>").append(
-                        $("<td>").append($("<b>").text(c.name)),
-                        $("<td>").text(Beautify(c.price)),
-                        $("<td>").text(Beautify(c.deltaIncome)),
-                        $("<td>").text(isFinite(c.payback) ? timeDisplay(c.payback) : "never")
-                    )
-                );
-            });
-            subsection.append($("<div>").addClass("listing").append(table));
-        } else {
-            subsection.append(buildListing("Next purchase", "not ranked yet"));
-        }
-        menu.append(subsection);
+function buildFCMenu() {
+    var menu = $("#menu").empty();
+    fcMenuHeader(menu);
+    menu.append(
+        fcMenuBuying(),
+        fcMenuOptions(),
+        fcMenuAscension(),
+        fcMenuHarvesting(),
+        fcMenuOther()
+    );
+}
 
-        // --- OPTIONS SECTION ---
-        if (FrozenCookies.preferenceValues) {
-            subsection = $("<div>").addClass("subsection");
-            subsection.append(
-                $("<div>").addClass("title").text("Mushie Cookies Controls"),
-                // Add warning below the title
-                $("<div>")
-                    .addClass("fc-warning")
-                    .text(" ⚠️ All options take effect immediately.")
-            );
-            _.keys(FrozenCookies.preferenceValues).forEach(function (
-                preference
-            ) {
-                var listing,
-                    prefVal = FrozenCookies.preferenceValues[preference],
-                    hint = prefVal.hint,
-                    display = prefVal.display,
-                    extras = prefVal.extras,
-                    current = FrozenCookies[preference],
-                    preferenceButtonId = preference + "Button";
-                if (display && display.length > 0 && display.length > current) {
-                    listing = $("<div>").addClass("listing");
-                    // Show hint as a subsection head before the button(s)
-                    if (hint) {
-                        listing.append(
-                            $("<label>")
-                                .addClass("fc-hint-label")
-                                .text(
-                                    hint.replace(
-                                        /\$\{(.+)\}/g,
-                                        function (s, id) {
-                                            return FrozenCookies[id];
-                                        }
-                                    )
-                                )
-                        );
-                    }
-                    if (display.length === 2) {
-                        // Render on/off option buttons side by side
-                        var buttonGroup = $("<div>").addClass(
-                            "fc-multichoice-group-2col"
-                        );
-                        display.forEach(function (label, idx) {
-                            buttonGroup.append(
-                                $("<button>")
-                                    .addClass("option fc-multichoice-btn")
-                                    .toggleClass("selected", idx === current)
-                                    .prop("id", preferenceButtonId + "_" + idx)
-                                    .click(function () {
-                                        setPreferenceDirect(preference, idx);
-                                    })
-                                    .text(label)
-                            );
-                        });
-                        listing.append(buttonGroup);
-                    } else {
-                        // Add "choose one" label automatically
-                        listing.append(
-                            $("<div>")
-                                .addClass("fc-choose-one-label")
-                                .text("Choose one:")
-                        );
-                        // Determine column class based on number of options
-                        let groupClass = "fc-multichoice-group-vertical";
-                        if (display.length > 8) {
-                            groupClass = "fc-multichoice-group-3col";
-                        } else if (display.length > 4) {
-                            groupClass = "fc-multichoice-group-2col";
-                        }
-                        // Render a group of buttons for direct selection, stacked or in columns
-                        var buttonGroup = $("<div>").addClass(groupClass);
-                        display.forEach(function (label, idx) {
-                            buttonGroup.append(
-                                $("<button>")
-                                    .addClass("option fc-multichoice-btn")
-                                    .toggleClass("selected", idx === current)
-                                    .prop("id", preferenceButtonId + "_" + idx)
-                                    .click(function () {
-                                        setPreferenceDirect(preference, idx);
-                                    })
-                                    .text(label)
-                            );
-                        });
-                        listing.append(buttonGroup);
-                    }
-                    if (extras) {
-                        // If extras is a function, call it with FrozenCookies, else treat as string
-                        var extrasHtml =
-                            typeof extras === "function"
-                                ? extras(FrozenCookies)
-                                : extras.replace(
-                                      /\$\{(.+)\}/g,
-                                      function (s, id) {
-                                          return fcBeautify(FrozenCookies[id]);
-                                      }
-                                  );
-                        listing.append($(extrasHtml));
-                    }
-                    subsection.append(listing);
-                }
-                // if no options, still display the hint as a subsection head
-                if (!display) {
-                    listing = $("<div>").addClass("fc-section-heading");
-                    if (hint) {
-                        listing.append(
-                            $("<br>"),
-                            $("<label>").text(
-                                hint.replace(/\$\{(.+)\}/g, function (s, id) {
-                                    return FrozenCookies[id];
-                                })
-                            )
-                        );
-                    }
-                    subsection.append(listing);
-                }
-            });
-            menu.append(subsection);
-        }
+// Replaces the sections whose figures change and leaves the rest of the menu as it is.
+function refreshFCMenu() {
+    [fcMenuBuying, fcMenuAscension, fcMenuHarvesting, fcMenuOther].forEach(function (build) {
+        var section = build();
+        var shown = document.getElementById(section.attr("id"));
+        if (shown) $(shown).replaceWith(section);
+    });
+}
 
-        // --- ASCENSION SECTION ---
-        subsection = $("<div>").addClass("subsection");
-        subsection.append($("<div>").addClass("title").text("Ascension"));
-        var ascension = MushieCookies.ascension ? MushieCookies.ascension.report() : null;
-        subsection.append(buildListing("Prestige now", Beautify(Game.prestige)));
-        subsection.append(buildListing("Heavenly chips", Beautify(Game.heavenlyChips)));
-        if (ascension) {
-            subsection.append(buildListing("Prestige if ascending now", Beautify(Math.floor(ascension.projected))));
-            subsection.append(buildListing("Chips gained by ascending", Beautify(ascension.gain)));
-            if (ascension.firstTarget) {
-                subsection.append(buildListing("First ascension at", Beautify(ascension.firstTarget) + " prestige"));
-            }
-            if (ascension.verdict) {
-                subsection.append(buildListing("Verdict", ascension.verdict.reason));
-            }
-            subsection.append(buildListing("This run", timeDisplay(ascension.runSeconds)));
-            if (ascension.last) {
-                subsection.append(
-                    buildListing(
-                        "Last ascension bought",
-                        ascension.last.bought.join(", ") || "nothing"
-                    )
-                );
-                if (ascension.last.saving) {
-                    subsection.append(buildListing("Saving for", ascension.last.saving));
-                }
-                if (ascension.last.slots.length) {
-                    subsection.append(buildListing("Permanent slots", ascension.last.slots.join(", ")));
-                }
-            }
-        }
-        menu.append(subsection);
+function fcListing(label, name) {
+    return $("<div>")
+        .addClass("listing")
+        .append($("<b>").text(label + ":"), " ", name);
+}
 
-        // --- HARVESTING (BANK) INFO SECTION ---
-        if (FrozenCookies.setHarvestBankPlant) {
-            subsection = $("<div>").addClass("subsection");
-            subsection.append(
-                $("<div>").addClass("title").text("Harvesting Information")
-            );
-            subsection.append(buildListing("Base CPS", Beautify(baseCps())));
-            subsection.append(
-                buildListing("Plant to harvest", FrozenCookies.harvestPlant)
-            );
-            subsection.append(
-                buildListing(
-                    "Minutes of CpS",
-                    FrozenCookies.harvestMinutes + " min"
-                )
-            );
-            subsection.append(
-                buildListing(
-                    "Max percent of Bank",
-                    FrozenCookies.harvestMaxPercent * 100 + " %"
-                )
-            );
-            subsection.append(
-                buildListing(
-                    "Single " +
-                        FrozenCookies.harvestPlant +
-                        (FrozenCookies.setHarvestBankPlant < 6
-                            ? " harvesting"
-                            : " exploding") +
-                        "",
-                    Beautify(
-                        (baseCps() *
-                            60 *
-                            FrozenCookies.harvestMinutes *
-                            FrozenCookies.harvestFrenzy *
-                            FrozenCookies.harvestBuilding) /
-                            Math.pow(10, FrozenCookies.maxSpecials)
+function fcMenuHeader(menu) {
+    menu.append(
+        $("<div>")
+            .addClass("section")
+            .text(
+                "Mushie Cookies v " +
+                    FrozenCookies.branch +
+                    "." +
+                    FrozenCookies.version
+            ),
+        // Add the log/info panel button
+        $("<div>")
+            .addClass("listing")
+            .append(
+                $("<button>")
+                    .attr("id", "fcOpenLogPanel")
+                    .attr(
+                        "title",
+                        "Open the Cookie Clicker about/version info panel"
                     )
-                )
-            );
-            subsection.append(
-                buildListing(
-                    "Full garden " +
-                        (FrozenCookies.setHarvestBankPlant < 6
-                            ? " harvesting"
-                            : " exploding") +
-                        " (36 plots)",
-                    Beautify(
-                        (36 *
-                            baseCps() *
-                            60 *
-                            FrozenCookies.harvestMinutes *
-                            FrozenCookies.harvestFrenzy *
-                            FrozenCookies.harvestBuilding) /
-                            Math.pow(10, FrozenCookies.maxSpecials)
-                    )
-                )
-            );
-            menu.append(subsection);
-        }
+                    .text("Cookie Clicker Info")
+                    .click(openGameLogPanel)
+            ),
+        // Add a documentations page button
+        $("<div>")
+            .addClass("listing")
+            .append(
+                $("<button>")
+                    .attr("id", "fcOpenDocPage")
+                    .attr("title", "Open the Mushie Cookies readme")
+                    .text("Mushie Cookies Readme")
+                    .click(openDocumentationPage)
+            )
+    );
+}
 
-        // --- OTHER INFO SECTION ---
-        subsection = $("<div>").addClass("subsection");
+function fcMenuBuying() {
+    var report = MushieCookies.buyer ? MushieCookies.buyer.report() : null;
+    var subsection = $("<div>")
+        .attr("id", "fcMenuBuying")
+        .addClass("subsection")
+        .append($("<div>").addClass("title").text("Buying"));
+    if (report && report.income) {
+        var income = report.income;
+        var next = report.next;
         subsection.append(
-            $("<div>").addClass("title").html("Other Information")
+            fcListing("Next purchase", next ? next.name : "nothing worth buying")
         );
-        cps =
-            baseCps() +
-            (FrozenCookies.autoClick
-                ? Game.computedMouseCps * Math.min(FrozenCookies.cookieClickSpeed, 50)
-                : 0);
-        baseChosen = Game.hasBuff("Frenzy") ? "" : " (*)";
-        frenzyChosen = Game.hasBuff("Frenzy") ? " (*)" : "";
-        clickStr = FrozenCookies.autoClick ? " + Autoclick" : "";
+        if (next) {
+            subsection.append(fcListing("Cost", Beautify(next.price)));
+            subsection.append(
+                fcListing("Adds per second", Beautify(next.deltaIncome))
+            );
+            subsection.append(
+                fcListing("Pays back in", timeDisplay(next.payback))
+            );
+            subsection.append(
+                fcListing(
+                    "Ready in",
+                    timeDisplay(
+                        divCps(
+                            Math.max(0, next.price + report.reserve - Game.cookies),
+                            income.total
+                        )
+                    )
+                )
+            );
+        }
         subsection.append(
-            buildListing("Base CPS" + clickStr + baseChosen + "", Beautify(cps))
+            fcListing("Golden cookie reserve", Beautify(report.reserve))
         );
         subsection.append(
-            buildListing(
-                "Frenzy CPS" + clickStr + frenzyChosen + "",
-                Beautify(cps * 7)
+            fcListing(
+                "Income per second",
+                Beautify(income.total) +
+                    " (" +
+                    Beautify(income.passive) +
+                    " buildings, " +
+                    Beautify(income.click) +
+                    " clicks, " +
+                    Beautify(income.golden) +
+                    " golden cookies)"
             )
         );
-        subsection.append(
-            buildListing("Estimated Effective CPS", Beautify(effectiveCps()))
-        );
-        if (Game.HasUnlocked("Chocolate egg") && !Game.Has("Chocolate egg")) {
-            subsection.append(
-                buildListing("Chocolate Egg Value", Beautify(chocolateValue()))
+        subsection.append(fcListing("Purchases this session", report.purchases));
+        var table = $("<table>")
+            .prop("id", "fcEfficiencyTable")
+            .append(
+                $("<tr>").append(
+                    $("<th>").text("Candidate"),
+                    $("<th>").text("Cost"),
+                    $("<th>").text("Adds / s"),
+                    $("<th>").text("Pays back")
+                )
             );
-            if (!Game.hasAura("Earth Shatterer")) {
-                subsection.append(
-                    buildListing(
-                        "+ Earth Shatterer",
-                        Beautify(chocolateValue(null, true))
+        report.top.forEach(function (c) {
+            table.append(
+                $("<tr>").append(
+                    $("<td>").append($("<b>").text(c.name)),
+                    $("<td>").text(Beautify(c.price)),
+                    $("<td>").text(Beautify(c.deltaIncome)),
+                    $("<td>").text(isFinite(c.payback) ? timeDisplay(c.payback) : "never")
+                )
+            );
+        });
+        subsection.append($("<div>").addClass("listing").append(table));
+    } else {
+        subsection.append(fcListing("Next purchase", "not ranked yet"));
+    }
+    return subsection;
+}
+
+function fcMenuOptions() {
+    if (!FrozenCookies.preferenceValues) return $();
+    var subsection = $("<div>").addClass("subsection");
+    subsection.append(
+        $("<div>").addClass("title").text("Mushie Cookies Controls"),
+        // Add warning below the title
+        $("<div>")
+            .addClass("fc-warning")
+            .text(" ⚠️ All options take effect immediately.")
+    );
+    _.keys(FrozenCookies.preferenceValues).forEach(function (
+        preference
+    ) {
+        var listing,
+            prefVal = FrozenCookies.preferenceValues[preference],
+            hint = prefVal.hint,
+            display = prefVal.display,
+            extras = prefVal.extras,
+            current = FrozenCookies[preference],
+            preferenceButtonId = preference + "Button";
+        if (display && display.length > 0 && display.length > current) {
+            listing = $("<div>").addClass("listing");
+            // Show hint as a subsection head before the button(s)
+            if (hint) {
+                listing.append(
+                    $("<label>")
+                        .addClass("fc-hint-label")
+                        .text(
+                            hint.replace(
+                                /\$\{(.+)\}/g,
+                                function (s, id) {
+                                    return FrozenCookies[id];
+                                }
+                            )
+                        )
+                );
+            }
+            if (display.length === 2) {
+                // Render on/off option buttons side by side
+                var buttonGroup = $("<div>").addClass(
+                    "fc-multichoice-group-2col"
+                );
+                display.forEach(function (label, idx) {
+                    buttonGroup.append(
+                        $("<button>")
+                            .addClass("option fc-multichoice-btn")
+                            .toggleClass("selected", idx === current)
+                            .prop("id", preferenceButtonId + "_" + idx)
+                            .click(function () {
+                                setPreferenceDirect(preference, idx);
+                            })
+                            .text(label)
+                    );
+                });
+                listing.append(buttonGroup);
+            } else {
+                // Add "choose one" label automatically
+                listing.append(
+                    $("<div>")
+                        .addClass("fc-choose-one-label")
+                        .text("Choose one:")
+                );
+                // Determine column class based on number of options
+                let groupClass = "fc-multichoice-group-vertical";
+                if (display.length > 8) {
+                    groupClass = "fc-multichoice-group-3col";
+                } else if (display.length > 4) {
+                    groupClass = "fc-multichoice-group-2col";
+                }
+                // Render a group of buttons for direct selection, stacked or in columns
+                var buttonGroup = $("<div>").addClass(groupClass);
+                display.forEach(function (label, idx) {
+                    buttonGroup.append(
+                        $("<button>")
+                            .addClass("option fc-multichoice-btn")
+                            .toggleClass("selected", idx === current)
+                            .prop("id", preferenceButtonId + "_" + idx)
+                            .click(function () {
+                                setPreferenceDirect(preference, idx);
+                            })
+                            .text(label)
+                    );
+                });
+                listing.append(buttonGroup);
+            }
+            if (extras) {
+                // If extras is a function, call it with FrozenCookies, else treat as string
+                var extrasHtml =
+                    typeof extras === "function"
+                        ? extras(FrozenCookies)
+                        : extras.replace(
+                              /\$\{(.+)\}/g,
+                              function (s, id) {
+                                  return fcBeautify(FrozenCookies[id]);
+                              }
+                          );
+                listing.append($(extrasHtml));
+            }
+            subsection.append(listing);
+        }
+        // if no options, still display the hint as a subsection head
+        if (!display) {
+            listing = $("<div>").addClass("fc-section-heading");
+            if (hint) {
+                listing.append(
+                    $("<br>"),
+                    $("<label>").text(
+                        hint.replace(/\$\{(.+)\}/g, function (s, id) {
+                            return FrozenCookies[id];
+                        })
                     )
                 );
             }
+            subsection.append(listing);
         }
-        if (liveWrinklers().length > 0) {
-            subsection.append(
-                buildListing("Wrinkler Value", Beautify(wrinklerValue()))
-            );
+    });
+    return subsection;
+}
+
+function fcMenuAscension() {
+    var subsection = $("<div>").attr("id", "fcMenuAscension").addClass("subsection");
+    subsection.append($("<div>").addClass("title").text("Ascension"));
+    var ascension = MushieCookies.ascension ? MushieCookies.ascension.report() : null;
+    subsection.append(fcListing("Prestige now", Beautify(Game.prestige)));
+    subsection.append(fcListing("Heavenly chips", Beautify(Game.heavenlyChips)));
+    if (ascension) {
+        subsection.append(fcListing("Prestige if ascending now", Beautify(Math.floor(ascension.projected))));
+        subsection.append(fcListing("Chips gained by ascending", Beautify(ascension.gain)));
+        if (ascension.firstTarget) {
+            subsection.append(fcListing("First ascension at", Beautify(ascension.firstTarget) + " prestige"));
         }
-        subsection.append(buildListing("Game Seed", Game.seed));
-        menu.append(subsection);
-        if (!Game.HasAchiev("Olden days"))
+        if (ascension.verdict) {
+            subsection.append(fcListing("Verdict", ascension.verdict.reason));
+        }
+        subsection.append(fcListing("This run", timeDisplay(ascension.runSeconds)));
+        if (ascension.last) {
             subsection.append(
-                $(
-                    '<div id="oldenDays" style="text-align:right;width:100%;"><div ' +
-                        Game.clickStr +
-                        "=\"Game.SparkleAt(Game.mouseX,Game.mouseY);PlaySound('snd/tick.mp3');PlaySound('snd/shimmerClick.mp3');Game.Win('Olden days');Game.UpdateMenu();\" class=\"icon\" style=\"display:inline-block;transform:scale(0.5);cursor:pointer;width:48px;height:48px;background-position:" +
-                        -12 * 48 +
-                        "px " +
-                        -3 * 48 +
-                        'px;"></div></div>'
+                fcListing(
+                    "Last ascension bought",
+                    ascension.last.bought.join(", ") || "nothing"
                 )
             );
-    };
+            if (ascension.last.saving) {
+                subsection.append(fcListing("Saving for", ascension.last.saving));
+            }
+            if (ascension.last.slots.length) {
+                subsection.append(fcListing("Permanent slots", ascension.last.slots.join(", ")));
+            }
+        }
+    }
+    return subsection;
+}
+
+function fcMenuHarvesting() {
+    var subsection = $("<div>").attr("id", "fcMenuHarvesting");
+    if (!FrozenCookies.setHarvestBankPlant) return subsection;
+    subsection.addClass("subsection");
+    subsection.append(
+        $("<div>").addClass("title").text("Harvesting Information")
+    );
+    subsection.append(fcListing("Base CPS", Beautify(baseCps())));
+    subsection.append(
+        fcListing("Plant to harvest", FrozenCookies.harvestPlant)
+    );
+    subsection.append(
+        fcListing(
+            "Minutes of CpS",
+            FrozenCookies.harvestMinutes + " min"
+        )
+    );
+    subsection.append(
+        fcListing(
+            "Max percent of Bank",
+            FrozenCookies.harvestMaxPercent * 100 + " %"
+        )
+    );
+    subsection.append(
+        fcListing(
+            "Single " +
+                FrozenCookies.harvestPlant +
+                (FrozenCookies.setHarvestBankPlant < 6
+                    ? " harvesting"
+                    : " exploding") +
+                "",
+            Beautify(
+                (baseCps() *
+                    60 *
+                    FrozenCookies.harvestMinutes *
+                    FrozenCookies.harvestFrenzy *
+                    FrozenCookies.harvestBuilding) /
+                    Math.pow(10, FrozenCookies.maxSpecials)
+            )
+        )
+    );
+    subsection.append(
+        fcListing(
+            "Full garden " +
+                (FrozenCookies.setHarvestBankPlant < 6
+                    ? " harvesting"
+                    : " exploding") +
+                " (36 plots)",
+            Beautify(
+                (36 *
+                    baseCps() *
+                    60 *
+                    FrozenCookies.harvestMinutes *
+                    FrozenCookies.harvestFrenzy *
+                    FrozenCookies.harvestBuilding) /
+                    Math.pow(10, FrozenCookies.maxSpecials)
+            )
+        )
+    );
+    return subsection;
+}
+
+function fcMenuOther() {
+    var cps, baseChosen, frenzyChosen, clickStr;
+    var subsection = $("<div>").attr("id", "fcMenuOther").addClass("subsection");
+    subsection.append(
+        $("<div>").addClass("title").html("Other Information")
+    );
+    cps =
+        baseCps() +
+        (FrozenCookies.autoClick
+            ? Game.computedMouseCps * Math.min(FrozenCookies.cookieClickSpeed, 50)
+            : 0);
+    baseChosen = Game.hasBuff("Frenzy") ? "" : " (*)";
+    frenzyChosen = Game.hasBuff("Frenzy") ? " (*)" : "";
+    clickStr = FrozenCookies.autoClick ? " + Autoclick" : "";
+    subsection.append(
+        fcListing("Base CPS" + clickStr + baseChosen + "", Beautify(cps))
+    );
+    subsection.append(
+        fcListing(
+            "Frenzy CPS" + clickStr + frenzyChosen + "",
+            Beautify(cps * 7)
+        )
+    );
+    subsection.append(
+        fcListing("Estimated Effective CPS", Beautify(effectiveCps()))
+    );
+    if (Game.HasUnlocked("Chocolate egg") && !Game.Has("Chocolate egg")) {
+        subsection.append(
+            fcListing("Chocolate Egg Value", Beautify(chocolateValue()))
+        );
+        if (!Game.hasAura("Earth Shatterer")) {
+            subsection.append(
+                fcListing(
+                    "+ Earth Shatterer",
+                    Beautify(chocolateValue(null, true))
+                )
+            );
+        }
+    }
+    if (liveWrinklers().length > 0) {
+        subsection.append(
+            fcListing("Wrinkler Value", Beautify(wrinklerValue()))
+        );
+    }
+    subsection.append(fcListing("Game Seed", Game.seed));
+    if (!Game.HasAchiev("Olden days"))
+        subsection.append(
+            $(
+                '<div id="oldenDays" style="text-align:right;width:100%;"><div ' +
+                    Game.clickStr +
+                    "=\"Game.SparkleAt(Game.mouseX,Game.mouseY);PlaySound('snd/tick.mp3');PlaySound('snd/shimmerClick.mp3');Game.Win('Olden days');Game.UpdateMenu();\" class=\"icon\" style=\"display:inline-block;transform:scale(0.5);cursor:pointer;width:48px;height:48px;background-position:" +
+                    -12 * 48 +
+                    "px " +
+                    -3 * 48 +
+                    'px;"></div></div>'
+            )
+        );
+    return subsection;
 }
 
 // New function for multiple choice options
