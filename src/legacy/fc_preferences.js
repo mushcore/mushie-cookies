@@ -130,6 +130,11 @@ FrozenCookies.preferenceValues = {
         ],
         default: 0,
     },
+    autoLumps: {
+        hint: "Spend sugar lumps: minigames, Farm 9, Cursor 12, then the best building level (keeps 100 with Sugar baking).",
+        display: ["Spend Lumps OFF", "Spend Lumps ON"],
+        default: 0,
+    },
     sugarBakingGuard: {
         hint: "Don't spend lumps below 101 (keep Sugar Baking bonus).",
         display: ["Sugar Baking Guard OFF", "Sugar Baking Guard ON"],

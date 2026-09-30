@@ -2,6 +2,7 @@
 // `FrozenCookies`, the blacklist presets, and the extra-reserve helpers.
 import { createBuyer } from '../systems/buyer.js';
 import { createAscension } from '../systems/ascension.js';
+import { createLumps } from '../systems/lumps.js';
 
 const CHAIN_REACH = 15;
 
@@ -51,5 +52,6 @@ export function startSystems({ game, loop, legacy, log }) {
         buyer,
         extras: () => legacy.wrinklerValue() + legacy.chocolateValue(),
     });
-    return { buyer, ascension };
+    const lumps = createLumps({ game, settings, loop, log });
+    return { buyer, ascension, lumps };
 }
