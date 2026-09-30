@@ -3,7 +3,9 @@ import { createGuard } from './core/guard.js';
 import { createLoop } from './core/loop.js';
 import { register } from './game/boot.js';
 
-export { simulate, takeSnapshot, diffSnapshots } from './core/sim.js';
+export { simulate, simulateEach, takeSnapshot, diffSnapshots } from './core/sim.js';
+export { readState, measureCandidates } from './game/measure.js';
+export { awardForBuildings, awardForUpgrades } from './game/awards.js';
 
 export const version = __MUSHIE_VERSION__;
 

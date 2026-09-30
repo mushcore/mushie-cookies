@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { takeSnapshot, restoreSnapshot, diffSnapshots, simulate } from '../../src/core/sim.js';
+import { takeSnapshot, restoreSnapshot, diffSnapshots, simulate, simulateEach } from '../../src/core/sim.js';
 
 // A small stand-in for the game: two buildings at 50 CpS each, one doubling upgrade, and an
 // achievement that the recalculation awards at 200 CpS, as the real game does for CpS milestones.
@@ -171,4 +171,49 @@ test('a collection that grows after a snapshot is picked up by the next one', ()
     assert.deepEqual(diffSnapshots(before, takeSnapshot(game)), ['upgrade 2 bought']);
     restoreSnapshot(game, before);
     assert.equal(game.UpgradesById[2].bought, 0);
+});
+
+test('simulateEach measures each trial from the same start and leaves no difference', () => {
+    const game = fakeGame();
+    const before = takeSnapshot(game);
+    const out = simulateEach(
+        game,
+        [
+            { apply: () => { game.ObjectsById[0].amount += 1; } },
+            { apply: () => { game.ObjectsById[1].amount += 1; } },
+            { apply: () => { game.UpgradesById[1].bought = 1; } },
+        ],
+        () => game.cookiesPs
+    );
+    assert.deepEqual(out, [200, 200, 300]);
+    assert.deepEqual(diffSnapshots(before, takeSnapshot(game)), []);
+    assert.equal(game.cookiesPs, 150);
+    assert.deepEqual(game.wins, []);
+});
+
+test('an achievement earned inside a what-if counts for that measurement only', () => {
+    const game = fakeGame();
+    game.Achievements = { 'Fast baker': game.AchievementsById[1] };
+    game.CountsAsAchievementOwned = () => true;
+    const owned = game.AchievementsOwned;
+    const out = simulateEach(
+        game,
+        [{ apply: () => { game.UpgradesById[1].bought = 1; } }, { apply: () => {} }],
+        () => game.AchievementsOwned
+    );
+    assert.deepEqual(out, [owned + 1, owned]);
+    assert.equal(game.AchievementsOwned, owned);
+    assert.equal(game.AchievementsById[1].won, 0);
+});
+
+test('a throwing trial restores the start and the session still closes', () => {
+    const game = fakeGame();
+    const before = takeSnapshot(game);
+    const win = game.Win;
+    assert.throws(
+        () => simulateEach(game, [{ apply: () => { game.ObjectsById[0].amount += 9; throw new Error('trial broke'); } }], () => 0),
+        /trial broke/
+    );
+    assert.deepEqual(diffSnapshots(before, takeSnapshot(game)), []);
+    assert.equal(game.Win, win);
 });
