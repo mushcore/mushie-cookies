@@ -2143,3 +2143,17 @@ The plan above is kept as written. These are the places where the work departed 
 | Task 7, fix 6: rename `countAntiMatter` | The block that used it is deleted | The count was never set and that building is never sold, so the block could not run |
 | Task 9: live smoke test in the Steam game | A test inside the Electron runtime copied from the install | It checks the same Chrome 87 without touching Steam or a real save |
 | Not planned | `tools/dev/profile.mjs` | Needed to find why the harness slowed from 1,000 to 25 times real time with the mod buying |
+
+## Independent review
+
+A fresh reviewer went over the branch against the game's source and confirmed seven defects by running them, two of them regressions introduced here. All were fixed on the M2 branch before M1 was merged, each with a test that reproduces it:
+
+| Finding | Fix |
+|---|---|
+| The infobox was moved to the logic loop, but it draws on a canvas the game clears every frame, so it was never visible | Computed on the loop, drawn from the game's draw hook; the test now checks the draw comes after the clear |
+| `setOverrides` zeroed the timer handles before `FCStart` could clear them, so a save loaded while running duplicated every timer | The handles are left for `FCStart` to clear; timer census test |
+| "One second of frames" is not safely after the save load: frames are catch-up driven, and a slow start could run 30 frames before the game's 100 ms save timer | The mod starts on the first frame after `Game.LoadSave` has run, with a ten-second fallback |
+| The `Game.Reset` override dropped the `hard` argument, so a save wipe kept prestige upgrades | The argument is passed through; the pre-ascension routine runs only for soft resets |
+| The `reincarnate` system reincarnated any ascension while auto-ascend was on, including manual ones | Only an ascension the mod started |
+| Hooks registered with the game were unguarded; an exception in one stops the game's own loop | Guarded, and registered after the settings load |
+| Upgrade side effects written by the eval'd fragments (`seasonUses`, `seasonT`, `pledgeT`) were outside the snapshot | Added to the snapshot; the fragments themselves were removed in M2 |
