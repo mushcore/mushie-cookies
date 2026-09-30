@@ -1,0 +1,18 @@
+{
+  "name": "mushie-cookies",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-contained Cookie Clicker automation mod for Steam. Fork of Frozen Cookies.",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "deploy": "node tools/build.mjs && node tools/deploy.mjs",
+    "test": "node --test \"test/unit/*.test.mjs\"",
+    "test:game": "node tools/build.mjs && node --test --test-concurrency=1 \"test/game/*.test.mjs\"",
+    "test:all": "npm test && npm run test:game"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "playwright-core": "^1.55.0"
+  }
+}
