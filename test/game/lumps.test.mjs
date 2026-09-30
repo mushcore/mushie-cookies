@@ -58,6 +58,26 @@ test('with Sugar baking owned, a hundred lumps stay in the jar', { skip }, async
     }
 });
 
+test('with Sugar baking owned, the Farm and Cursor targets wait for lumps above the hundred', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await game.eval(() => {
+            Game.Earn(1e12);
+            for (const name of ['Cursor', 'Grandma', 'Farm', 'Bank', 'Temple', 'Wizard tower']) Game.Objects[name].buy(10);
+            for (const name of ['Wizard tower', 'Temple', 'Farm', 'Bank']) Game.Objects[name].level = 1;
+            Game.Upgrades['Sugar baking'].earn();
+            Game.lumpsTotal = 100;
+            Game.lumps = 100;
+            FrozenCookies.autoLumps = 1;
+        });
+        await game.advanceSeconds(30);
+        const out = await game.eval(() => ({ lumps: Game.lumps, farm: Game.Objects.Farm.level, cursor: Game.Objects.Cursor.level }));
+        assert.deepEqual(out, { lumps: 100, farm: 1, cursor: 0 });
+    } finally {
+        await game.close();
+    }
+});
+
 test('with the setting off, no lump is spent', { skip }, async () => {
     const game = await launchWithMod();
     try {

@@ -24,14 +24,16 @@ export function createLumps({ game, settings, loop, log = () => {} }) {
         }));
     }
 
+    // Ownership, not Has(): Has() is false for heavenly upgrades in Born again mode.
+    const sugarBakingOwned = () => !!(game.Upgrades['Sugar baking'] && game.Upgrades['Sugar baking'].bought);
+
     function tick() {
         if (!game.canLumps() || game.OnAscend) return;
         const choice = nextLevelUp({
             buildings: buildingsNow(),
             lumps: game.lumps,
-            // Ownership, not Has(): Has() is false for heavenly upgrades in Born again mode, and
-            // the Sugar Baking Guard setting asks for the same hold.
-            sugarBaking: !!(game.Upgrades['Sugar baking'] && game.Upgrades['Sugar baking'].bought) || settings.sugarBakingGuard == 1,
+            sugarBaking: sugarBakingOwned(),
+            guard: settings.sugarBakingGuard == 1,
         });
         if (!choice) return;
         const building = game.Objects[choice.name];

@@ -45,9 +45,33 @@ test('with Sugar baking, a hundred lumps are held and only the excess is spent',
     assert.ok(nextLevelUp({ buildings: bakery(done), lumps: 2, sugarBaking: false }), 'without Sugar baking nothing is held');
 });
 
-test('the community targets come before the Sugar baking hold', () => {
-    const out = nextLevelUp({ buildings: bakery({ 'Wizard tower': { level: 1 }, Temple: { level: 1 }, Farm: { level: 1 }, Bank: { level: 1 } }), lumps: 50, sugarBaking: true });
+test('the guard alone holds a jar for Sugar baking but lets the community targets go first', () => {
+    const minigamesDone = { 'Wizard tower': { level: 1 }, Temple: { level: 1 }, Farm: { level: 1 }, Bank: { level: 1 } };
+    const out = nextLevelUp({ buildings: bakery(minigamesDone), lumps: 50, sugarBaking: false, guard: true });
     assert.equal(out.name, 'Farm');
+    const done = { ...minigamesDone, Farm: { level: 9 }, Cursor: { level: 12 } };
+    assert.equal(nextLevelUp({ buildings: bakery(done), lumps: 100, sugarBaking: false, guard: true }), null);
+    assert.ok(nextLevelUp({ buildings: bakery(done), lumps: 101, sugarBaking: false, guard: true }));
+});
+
+test('once Sugar baking is owned, the Farm and Cursor targets respect the hold too', () => {
+    // Defect: with Sugar baking owned the targets spent up to 44 + 78 lumps below 100, each lump
+    // costing 1/(100 + L) of all CpS until it grew back (main.js:5095).
+    const minigamesDone = { 'Wizard tower': { level: 1 }, Temple: { level: 1 }, Farm: { level: 1 }, Bank: { level: 1 } };
+    assert.equal(nextLevelUp({ buildings: bakery(minigamesDone), lumps: 100, sugarBaking: true }), null, 'Farm 2 would leave 98');
+    assert.equal(nextLevelUp({ buildings: bakery(minigamesDone), lumps: 101, sugarBaking: true }), null, 'Farm 2 costs 2: 99 left');
+    assert.deepEqual(
+        (({ name, cost }) => ({ name, cost }))(nextLevelUp({ buildings: bakery(minigamesDone), lumps: 102, sugarBaking: true })),
+        { name: 'Farm', cost: 2 }
+    );
+    const farmDone = { ...minigamesDone, Farm: { level: 9 } };
+    assert.equal(nextLevelUp({ buildings: bakery(farmDone), lumps: 100, sugarBaking: true }), null, 'Cursor 1 would leave 99');
+    assert.equal(nextLevelUp({ buildings: bakery(farmDone), lumps: 101, sugarBaking: true }).name, 'Cursor');
+});
+
+test('the four minigame unlocks are never held: a lump each opens a whole minigame', () => {
+    assert.equal(nextLevelUp({ buildings: bakery(), lumps: 1, sugarBaking: true }).name, 'Wizard tower');
+    assert.equal(nextLevelUp({ buildings: bakery({ 'Wizard tower': { level: 1 } }), lumps: 50, sugarBaking: true, guard: true }).name, 'Temple');
 });
 
 test('nothing owned, nothing to level', () => {
