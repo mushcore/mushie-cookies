@@ -6,11 +6,12 @@
 /** Setting name → value under Autopilot. */
 export const AUTOPILOT = Object.freeze({
     // Clicking. The game ignores a click less than 20 ms after the last one it counted
-    // (main.js Game.ClickCookie). On real, jittery timers a 50-a-second clicker loses every click
-    // that lands at 19 ms; calling at 250 a second (4 ms, the browser's timer floor) lands each one
-    // within a few ms of the window opening. Frenzy clicking adds nothing beyond that.
+    // (main.js:4770). The clicker times each call for the moment the game will count it
+    // (src/systems/clicker.js), so the speed is only a cap, and 50 is as fast as the game counts.
+    // Frenzy clicking adds nothing beyond that. Golden cookies, reindeer and fortunes: the shimmer
+    // system (src/systems/shimmers.js).
     autoClick: 1,
-    cookieClickSpeed: 250,
+    cookieClickSpeed: 50,
     autoFrenzy: 0,
     autoGC: 1,
     autoReindeer: 1,

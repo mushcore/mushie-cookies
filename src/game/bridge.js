@@ -8,6 +8,8 @@ import { createGarden } from '../systems/garden.js';
 import { createMarket } from '../systems/market.js';
 import { createGods } from '../systems/gods.js';
 import { createDragon } from '../systems/dragon.js';
+import { createShimmers } from '../systems/shimmers.js';
+import { createClicker } from '../systems/clicker.js';
 
 const CHAIN_REACH = 15;
 
@@ -45,8 +47,23 @@ export function extraReserveFrom(settings, helpers) {
 }
 
 /** Starts the new systems once the legacy code has started. Returns them by name. */
-export function startSystems({ game, loop, legacy, log }) {
+export function startSystems({ game, loop, legacy, log, guard }) {
     const settings = legacy.settings;
+    // First on the loop: a shimmer is popped in the frame it appears, before any system reads the
+    // screen (see src/systems/shimmers.js).
+    const shimmers = createShimmers({
+        game,
+        settings,
+        loop,
+        log,
+        // Asked from the loop only, once `ascension` below exists.
+        ascensionImminent: () => {
+            if (settings.autoAscendToggle != 1) return false;
+            const verdict = ascension.verdict();
+            return ascension.phase() !== 'playing' || !!(verdict && verdict.ascend);
+        },
+    });
+    const clicker = createClicker({ game, settings, loop, log, guard });
     let lumps = null; // created below; the buyer keeps the bank a golden lump is timed to pay on
     const buyer = createBuyer({
         game,
@@ -82,5 +99,5 @@ export function startSystems({ game, loop, legacy, log }) {
     // The dragon trains before the gods pick auras; `dragon` tells them when a level is gained.
     const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve() });
     const gods = createGods({ game, settings, loop, log, buyer, dragon });
-    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon };
+    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, shimmers, clicker };
 }

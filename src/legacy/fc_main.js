@@ -521,7 +521,7 @@ function storeNumberCallback(base, min, max) {
 function updateSpeed(base) {
     userInputPrompt(
         "Autoclicking!",
-        "How many times per second do you want to click? (the game counts at most 50)",
+        "At most how many times per second should it click? The game counts at most 50; any value of 50 or more clicks as fast as the game counts.",
         FrozenCookies[base],
         storeNumberCallback(base, 0, 1000)
     );
@@ -640,11 +640,6 @@ function minigameCheckAction() {
     if (!T) T = Game.Objects["Temple"].minigame; //Pantheon
     if (!M) M = Game.Objects["Wizard tower"].minigame; //Grimoire
     if (G && B && T && M) clearInterval(FrozenCookies.autoMinigameCheckBot);
-}
-
-function autoTicker() {
-    if (Game.TickerEffect && Game.TickerEffect.type == "fortune")
-        Game.tickerL.click();
 }
 
 function autoEasterAction() {
@@ -1027,28 +1022,6 @@ function shouldPopWrinklers() {
     return toPop;
 }
 
-function autoFrenzyClick() {
-    if (hasClickBuff() && !FrozenCookies.autoFrenzyBot) {
-        if (FrozenCookies.autoclickBot) {
-            clearInterval(FrozenCookies.autoclickBot);
-            FrozenCookies.autoclickBot = 0;
-        }
-        FrozenCookies.autoFrenzyBot = setInterval(
-            MushieCookies.guard("legacy:fcClickCookie", fcClickCookie),
-            1000 / FrozenCookies.frenzyClickSpeed
-        );
-    } else if (!hasClickBuff() && FrozenCookies.autoFrenzyBot) {
-        clearInterval(FrozenCookies.autoFrenzyBot);
-        FrozenCookies.autoFrenzyBot = 0;
-        if (FrozenCookies.autoClick && FrozenCookies.cookieClickSpeed) {
-            FrozenCookies.autoclickBot = setInterval(
-                MushieCookies.guard("legacy:fcClickCookie", fcClickCookie),
-                1000 / FrozenCookies.cookieClickSpeed
-            );
-        }
-    }
-}
-
 function autoGSBuy() {
     if (hasClickBuff() && !Game.hasBuff("Cursed finger")) {
         if (
@@ -1156,18 +1129,6 @@ function goldenCookieLife() {
         if (Game.shimmers[i].type == "golden") return Game.shimmers[i].life;
     }
     return null;
-}
-
-function reindeerLife() {
-    for (var i in Game.shimmers) {
-        if (Game.shimmers[i].type == "reindeer") return Game.shimmers[i].life;
-    }
-    return null;
-}
-
-function fcClickCookie() {
-    if (!Game.OnAscend && !Game.AscendTimer && !Game.specialTabHovered)
-        Game.ClickCookie();
 }
 
 // --- Adapters over the buyer (src/systems/buyer.js). Other legacy code keeps calling these names.
@@ -1295,18 +1256,7 @@ function autoCookieBody() {
 
     var itemBought = false;
 
-
-    // This apparently *has* to stay here, or else fast purchases will multi-click it.
-    if (goldenCookieLife() && FrozenCookies.autoGC) {
-        for (var i in Game.shimmers) {
-            if (Game.shimmers[i].type == "golden") Game.shimmers[i].pop();
-        }
-    }
-    if (reindeerLife() > 0 && FrozenCookies.autoReindeer) {
-        for (var i in Game.shimmers) {
-            if (Game.shimmers[i].type == "reindeer") Game.shimmers[i].pop();
-        }
-    }
+    // Golden cookies, reindeer and fortunes: src/systems/shimmers.js, on its own guard.
     if (FrozenCookies.autoBlacklistOff) autoBlacklistOff();
     var currentFrenzy = cpsBonus() * clickBuffBonus();
     if (currentFrenzy != FrozenCookies.last_gc_state) {
@@ -1391,19 +1341,6 @@ function FCStart() {
         clearInterval(FrozenCookies.cookieBot);
         FrozenCookies.cookieBot = 0;
     }
-    if (FrozenCookies.autoclickBot) {
-        clearInterval(FrozenCookies.autoclickBot);
-        FrozenCookies.autoclickBot = 0;
-    }
-    if (FrozenCookies.frenzyClickBot) {
-        clearInterval(FrozenCookies.frenzyClickBot);
-        FrozenCookies.frenzyClickBot = 0;
-    }
-    if (FrozenCookies.autoFrenzyBot) {
-        clearInterval(FrozenCookies.autoFrenzyBot);
-        FrozenCookies.autoFrenzyBot = 0;
-    }
-
     if (FrozenCookies.autoGSBot) {
         clearInterval(FrozenCookies.autoGSBot);
         FrozenCookies.autoGSBot = 0;
@@ -1417,11 +1354,6 @@ function FCStart() {
         clearInterval(FrozenCookies.autoCastingBot);
         FrozenCookies.autoCastingBot = 0;
     }
-    if (FrozenCookies.autoFortuneBot) {
-        clearInterval(FrozenCookies.autoFortuneBot);
-        FrozenCookies.autoFortuneBot = 0;
-    }
-
     if (FrozenCookies.autoFTHOFComboBot) {
         clearInterval(FrozenCookies.autoFTHOFComboBot);
         FrozenCookies.autoFTHOFComboBot = 0;
@@ -1512,19 +1444,7 @@ function FCStart() {
         );
     }
 
-    if (FrozenCookies.autoClick && FrozenCookies.cookieClickSpeed) {
-        FrozenCookies.autoclickBot = setInterval(
-            MushieCookies.guard("legacy:fcClickCookie", fcClickCookie),
-            1000 / FrozenCookies.cookieClickSpeed
-        );
-    }
-
-    if (FrozenCookies.autoFrenzy && FrozenCookies.frenzyClickSpeed) {
-        FrozenCookies.frenzyClickBot = setInterval(
-            MushieCookies.guard("legacy:autoFrenzyClick", autoFrenzyClick),
-            FrozenCookies.frequency
-        );
-    }
+    // Clicking (Autoclick, Autofrenzy): src/systems/clicker.js reads the settings live.
 
     if (FrozenCookies.autoGS) {
         FrozenCookies.autoGSBot = setInterval(
@@ -1543,13 +1463,6 @@ function FCStart() {
     if (FrozenCookies.autoCasting) {
         FrozenCookies.autoCastingBot = setInterval(
             MushieCookies.guard("legacy:autoCast", autoCast),
-            FrozenCookies.frequency * 10
-        );
-    }
-
-    if (FrozenCookies.autoFortune) {
-        FrozenCookies.autoFortuneBot = setInterval(
-            MushieCookies.guard("legacy:autoTicker", autoTicker),
             FrozenCookies.frequency * 10
         );
     }
