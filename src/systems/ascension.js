@@ -60,7 +60,10 @@ export function createAscension({ game, settings, loop, extras = () => 0, collec
     // stalls (it catches up at most 5 s, main.js:16788), and a rate measured across that gap
     // reads as a run that stopped growing. The run-length guard reads this clock too; the first
     // ascension's target is a prestige level and reads no clock.
-    const runSeconds = () => (state.run ? state.run.seconds : wallAge());
+    // Between a reincarnation and the next tick the run held is the ended one: the new run is then
+    // read as trackRun will first measure it.
+    const sameRun = () => !!state.run && state.run.resets === game.resets && state.run.startDate === game.startDate;
+    const runSeconds = () => (sameRun() ? state.run.seconds : wallAge());
 
     function firstTarget() {
         if (options.firstTarget) return options.firstTarget;
@@ -93,8 +96,7 @@ export function createAscension({ game, settings, loop, extras = () => 0, collec
      * Its clock advances by the logic frames the mod sees, whether Auto Ascend is on or not.
      */
     function trackRun(frame) {
-        const current = { resets: game.resets, startDate: game.startDate };
-        if (state.run && state.run.resets === current.resets && state.run.startDate === current.startDate) {
+        if (sameRun()) {
             state.run.seconds += (frame - state.run.frame) / game.fps;
             state.run.frame = frame;
             return;
@@ -102,6 +104,7 @@ export function createAscension({ game, settings, loop, extras = () => 0, collec
         // The run began at the prestige its reset left: measured from there even when the mod
         // starts mid-run, the average is not understated and the ascension not put off. What came
         // before the mod saw the run can only be read from the wall clock.
+        const current = { resets: game.resets, startDate: game.startDate };
         state.run = { ...current, start: { t: 0, projected: game.HowMuchPrestige(game.cookiesReset) }, seconds: wallAge(), frame };
         state.history = [];
         state.lastSampleAt = -Infinity;
@@ -249,6 +252,16 @@ export function createAscension({ game, settings, loop, extras = () => 0, collec
         history: () => state.history.slice(),
         /** The last growth verdict (shouldAscend), or null before the first; cheap, for other systems. */
         verdict: () => state.verdict,
+        /**
+         * The last verdict if it judged the run being played, else null: for up to a tick after a
+         * reincarnation (main.js:3461-3500 dates the new run) the verdict held is on the ended run.
+         */
+        currentVerdict: () => (state.verdict && state.verdict.startDate === game.startDate ? state.verdict : null),
+        /**
+         * Seconds of play in this run: logic frames, so a machine sleep adds nothing (the game makes
+         * nothing then, main.js:16788). Read-only, for the horizons of other systems.
+         */
+        runSeconds: () => runSeconds(),
         /** 'playing', 'settling' (collected, about to ascend) or 'ascending'. */
         phase: () => state.phase,
     };

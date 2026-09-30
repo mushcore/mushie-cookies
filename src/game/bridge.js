@@ -62,7 +62,9 @@ export function startSystems({ game, loop, legacy, log, guard }) {
         // Asked from the loop only, once `ascension` below exists.
         ascensionImminent: () => {
             if (settings.autoAscendToggle != 1) return false;
-            const verdict = ascension.verdict();
+            // Only a verdict on this run: the ended run's says "ascend" until the ascension's next
+            // tick after a reincarnation, as lumps.js's frenzy check allows for too.
+            const verdict = ascension.currentVerdict();
             return ascension.phase() !== 'playing' || !!(verdict && verdict.ascend);
         },
     });

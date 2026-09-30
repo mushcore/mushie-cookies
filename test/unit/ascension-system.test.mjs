@@ -107,6 +107,37 @@ test('the run clock counts the run as the mod found it, then only what is played
     assert.ok(Math.abs(ascension.report().runSeconds - (HOUR + 1260)) < 1.5, `run clock ${ascension.report().runSeconds}`);
 });
 
+test('other systems read the run clock: play only, and the new run\'s age right after a reincarnation', (t) => {
+    // The dragon's horizon read the wall clock: a night asleep made the run look eight hours
+    // longer, and so every level eight hours more worth training.
+    const { clock, game, loop, ascension, grow } = growingRun(t);
+    loop.play(1200, grow);
+    clock.move(8 * HOUR * 1000);
+    loop.play(60, grow);
+    assert.ok(Math.abs(ascension.runSeconds() - (HOUR + 1260)) < 1.5, `run clock ${ascension.runSeconds()}`);
+    assert.equal(ascension.runSeconds(), ascension.report().runSeconds);
+    // Reincarnated (main.js:3461-3500 dates the new run): until the ascension's next tick its run
+    // is the old one, whose hours say nothing about the new run.
+    game.resets++;
+    game.startDate = clock.now() - 5000;
+    assert.ok(Math.abs(ascension.runSeconds() - 5) < 0.01, `a new run five seconds old: ${ascension.runSeconds()}`);
+});
+
+test('the verdict on the run being played is told apart from one left from the run before', (t) => {
+    // For up to a tick after the mod reincarnates, the verdict it holds judged the ended run; read
+    // as current, it said an ascension was imminent at the start of the new one.
+    const { clock, game, loop, ascension, grow } = growingRun(t);
+    loop.play(60, grow);
+    assert.ok(ascension.verdict());
+    assert.equal(ascension.currentVerdict(), ascension.verdict());
+    game.resets++;
+    game.startDate = clock.now();
+    assert.ok(ascension.verdict(), 'still held');
+    assert.equal(ascension.currentVerdict(), null, 'but not on this run');
+    loop.play(1, grow);
+    assert.equal(ascension.currentVerdict().startDate, game.startDate, 'the next tick judges the new run');
+});
+
 test('the run clock goes on while Auto Ascend is off, and a sleep then is not counted either', (t) => {
     const { clock, settings, loop, ascension, grow } = growingRun(t);
     loop.play(1200, grow);
