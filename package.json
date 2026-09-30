@@ -8,7 +8,7 @@
     "build": "node tools/build.mjs",
     "deploy": "node tools/build.mjs && node tools/deploy.mjs",
     "test": "node --test \"test/unit/*.test.mjs\"",
-    "test:game": "node tools/build.mjs && node --test --test-concurrency=1 \"test/game/*.test.mjs\"",
+    "test:game": "node tools/build.mjs && node --test --test-concurrency=1 --test-timeout=300000 \"test/game/*.test.mjs\"",
     "test:all": "npm test && npm run test:game"
   },
   "devDependencies": {

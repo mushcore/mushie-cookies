@@ -117,6 +117,11 @@ export async function launchWithMod(options = {}) {
         await game.close();
         throw new Error('errors while loading: ' + game.bootErrors.join(' | '));
     }
-    await game.modStarted();
+    try {
+        await game.modStarted();
+    } catch (error) {
+        await game.close();
+        throw error;
+    }
     return game;
 }

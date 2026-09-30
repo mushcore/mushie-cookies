@@ -3,6 +3,8 @@ import { createGuard } from './core/guard.js';
 import { createLoop } from './core/loop.js';
 import { register } from './game/boot.js';
 
+export { simulate, takeSnapshot, diffSnapshots } from './core/sim.js';
+
 export const version = __MUSHIE_VERSION__;
 
 const report = (message) => console.error(`[Mushie Cookies] ${message}`);

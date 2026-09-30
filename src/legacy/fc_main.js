@@ -190,7 +190,6 @@ function setOverrides(gameSaveData) {
         cost: 0,
         efficiency: 0,
     };
-    FrozenCookies.disabledPopups = true;
     FrozenCookies.lastGraphDraw = 0;
     FrozenCookies.calculatedCpsByType = {};
 
@@ -207,9 +206,6 @@ function setOverrides(gameSaveData) {
 
     // Caching
     emptyCaches();
-
-    //Whether to currently display achievement popups
-    FrozenCookies.showAchievements = true;
 
     if (!blacklist[FrozenCookies.blacklist]) FrozenCookies.blacklist = 0;
 
@@ -228,7 +224,6 @@ function setOverrides(gameSaveData) {
         Game.oldReset = Game.Reset;
         Game.Reset = fcReset;
     }
-    Game.Win = fcWin;
     // Remove the following when turning on tooltip code
     nextPurchase(true);
     Game.RefreshStore();
@@ -1721,7 +1716,6 @@ function purchaseEfficiency(price, deltaCps, baseDeltaCps, currentCps) {
 
 function recommendationList(recalculate) {
     if (recalculate) {
-        FrozenCookies.showAchievements = false;
         FrozenCookies.caches.recommendationList = addScores(
             upgradeStats(recalculate)
                 .concat(buildingStats(recalculate))
@@ -1736,7 +1730,6 @@ function recommendationList(recalculate) {
         );
         if (FrozenCookies.pastemode)
             FrozenCookies.caches.recommendationList.reverse();
-        FrozenCookies.showAchievements = true;
     }
     return FrozenCookies.caches.recommendationList;
 }
@@ -1777,7 +1770,6 @@ function addScores(recommendations) {
 
 function nextPurchase(recalculate) {
     if (recalculate) {
-        FrozenCookies.showAchievements = false;
         var recList = recommendationList(recalculate);
         var purchase = null;
         var target = null;
@@ -1808,7 +1800,6 @@ function nextPurchase(recalculate) {
             FrozenCookies.caches.nextPurchase = defaultPurchase();
             FrozenCookies.caches.nextChainedPurchase = defaultPurchase();
         }
-        FrozenCookies.showAchievements = true;
     }
     return FrozenCookies.caches.nextPurchase;
     //  return purchase;
@@ -1868,15 +1859,19 @@ function buildingStats(recalculate) {
                 var currentBank = bestBank(0).cost;
                 var baseCpsOrig = baseCps();
                 var cpsOrig = effectiveCps(Math.min(Game.cookies, currentBank)); // baseCpsOrig + gcPs(cookieValue(Math.min(Game.cookies, currentBank))) + baseClickingCps(FrozenCookies.autoClick * FrozenCookies.cookieClickSpeed);
-                var existingAchievements = Object.values(
-                    Game.AchievementsById
-                ).map(function (item, i) {
-                    return item.won;
+                var measured = MushieCookies.simulate(Game, {
+                    apply: function () {
+                        buildingApply(current);
+                    },
+                    measure: function () {
+                        return {
+                            base: baseCps(),
+                            effective: effectiveCps(currentBank),
+                        };
+                    },
                 });
-                buildingToggle(current);
-                var baseCpsNew = baseCps();
-                var cpsNew = effectiveCps(currentBank); // baseCpsNew + gcPs(cookieValue(currentBank)) + baseClickingCps(FrozenCookies.autoClick * FrozenCookies.cookieClickSpeed);
-                buildingToggle(current, existingAchievements);
+                var baseCpsNew = measured.base;
+                var cpsNew = measured.effective;
                 var deltaCps = cpsNew - cpsOrig;
                 var baseDeltaCps = baseCpsNew - baseCpsOrig;
                 var efficiency = purchaseEfficiency(
@@ -1919,26 +1914,30 @@ function upgradeStats(recalculate) {
                         var cpsOrig = effectiveCps(
                             Math.min(Game.cookies, currentBank)
                         );
-                        var existingAchievements = Object.values(
-                            Game.AchievementsById
-                        ).map(function (item) {
-                            return item.won;
-                        });
-                        var existingWrath = Game.elderWrath;
                         var discounts = totalDiscount() + totalDiscount(true);
-                        var reverseFunctions = upgradeToggle(current);
-                        var baseCpsNew = baseCps();
-                        var cpsNew = effectiveCps(currentBank);
-                        var priceReduction =
-                            discounts == totalDiscount() + totalDiscount(true)
-                                ? 0
-                                : checkPrices(current);
-                        upgradeToggle(
-                            current,
-                            existingAchievements,
-                            reverseFunctions
-                        );
-                        Game.elderWrath = existingWrath;
+                        var reverseFunctions;
+                        var measured = MushieCookies.simulate(Game, {
+                            apply: function () {
+                                reverseFunctions = upgradeApply(current);
+                            },
+                            measure: function () {
+                                return {
+                                    base: baseCps(),
+                                    effective: effectiveCps(currentBank),
+                                    priceReduction:
+                                        discounts ==
+                                        totalDiscount() + totalDiscount(true)
+                                            ? 0
+                                            : checkPrices(current),
+                                };
+                            },
+                            revert: function () {
+                                upgradeRevert(current, reverseFunctions);
+                            },
+                        });
+                        var baseCpsNew = measured.base;
+                        var cpsNew = measured.effective;
+                        var priceReduction = measured.priceReduction;
                         var deltaCps = cpsNew - cpsOrig;
                         var baseDeltaCps = baseCpsNew - baseCpsOrig;
                         var efficiency =
@@ -2233,10 +2232,11 @@ function unfinishedUpgradePrereqs(upgrade) {
     return needed.length ? needed : null;
 }
 
-function upgradeToggle(upgrade, achievements, reverseFunctions) {
-    const oldHighest = Game.cookiesPsRawHighest; // Save current value before simulating
-    if (!achievements) {
-        reverseFunctions = {};
+// Applies an upgrade, and whatever it still needs, for a what-if.
+// Returns what upgradeRevert needs to undo it. Call only inside MushieCookies.simulate.
+function upgradeApply(upgrade) {
+    {
+        var reverseFunctions = {};
         if (!upgrade.unlocked) {
             var prereqs = upgradeJson[upgrade.id];
             if (prereqs) {
@@ -2261,7 +2261,7 @@ function upgradeToggle(upgrade, achievements, reverseFunctions) {
                         if (!upgrade.bought) {
                             reverseFunctions.prereqUpgrades.push({
                                 id: id,
-                                reverseFunctions: upgradeToggle(upgrade),
+                                reverseFunctions: upgradeApply(upgrade),
                             });
                         }
                     });
@@ -2271,7 +2271,12 @@ function upgradeToggle(upgrade, achievements, reverseFunctions) {
         upgrade.bought = 1;
         Game.UpgradesOwned += 1;
         reverseFunctions.current = buyFunctionToggle(upgrade);
-    } else {
+    }
+    return reverseFunctions;
+}
+
+function upgradeRevert(upgrade, reverseFunctions) {
+    {
         if (reverseFunctions.prereqBuildings) {
             reverseFunctions.prereqBuildings.forEach(function (b) {
                 var building = Game.ObjectsById[b.id];
@@ -2283,48 +2288,20 @@ function upgradeToggle(upgrade, achievements, reverseFunctions) {
         if (reverseFunctions.prereqUpgrades) {
             reverseFunctions.prereqUpgrades.forEach(function (u) {
                 var upgrade = Game.UpgradesById[u.id];
-                upgradeToggle(upgrade, [], u.reverseFunctions);
+                upgradeRevert(upgrade, u.reverseFunctions);
             });
         }
         upgrade.bought = 0;
         Game.UpgradesOwned -= 1;
         buyFunctionToggle(reverseFunctions.current);
-        Game.AchievementsOwned = 0;
-        achievements.forEach(function (won, index) {
-            var achievement = Game.AchievementsById[index];
-            achievement.won = won;
-            if (won && achievement.pool != "shadow") {
-                Game.AchievementsOwned += 1;
-            }
-        });
     }
-    Game.recalculateGains = 1;
-    Game.CalculateGains();
-    Game.cookiesPsRawHighest = oldHighest; // Restore after simulation
-    return reverseFunctions;
 }
 
-function buildingToggle(building, achievements) {
-    const oldHighest = Game.cookiesPsRawHighest; // Save current value before simulating
-    if (!achievements) {
-        building.amount += 1;
-        building.bought += 1;
-        Game.BuildingsOwned += 1;
-    } else {
-        building.amount -= 1;
-        building.bought -= 1;
-        Game.BuildingsOwned -= 1;
-        Game.AchievementsOwned = 0;
-        achievements.forEach(function (won, index) {
-            var achievement = Game.AchievementsById[index];
-            achievement.won = won;
-            if (won && achievement.pool != "shadow")
-                Game.AchievementsOwned += 1;
-        });
-    }
-    Game.recalculateGains = 1;
-    Game.CalculateGains();
-    Game.cookiesPsRawHighest = oldHighest; // Restore after simulation
+// Adds one building for a what-if. Call only inside MushieCookies.simulate, which undoes it.
+function buildingApply(building) {
+    building.amount += 1;
+    building.bought += 1;
+    Game.BuildingsOwned += 1;
 }
 
 function buyFunctionToggle(upgrade) {
@@ -2467,53 +2444,6 @@ function updateCaches() {
         }
         recalcCount += 1;
     } while (FrozenCookies.recalculateCaches && recalcCount < 10);
-}
-
-//Why the hell is fcWin being called so often? It seems to be getting called repeatedly on the CPS achievements,
-//which should only happen when you actually win them?
-function fcWin(what) {
-    if (typeof what === "string") {
-        if (Game.Achievements[what]) {
-            if (Game.Achievements[what].won == 0) {
-                var achname = Game.Achievements[what].shortName
-                    ? Game.Achievements[what].shortName
-                    : Game.Achievements[what].name;
-                Game.Achievements[what].won = 1;
-                //This happens a ton of times on CPS achievements; it seems like they would be CHECKED for, but a debug message placed
-                //here gets repeatedly called seeming to indicate that the achievements.won value is 1, even though the achievement isn't
-                //being unlocked. This also means that placing a function to log the achievement spams out messages. Are the Achievement.won
-                //values being turned off before the game checks again? There must be some reason Game.Win is replaced with fcWin
-                if (!FrozenCookies.disabledPopups) {
-                    logEvent(
-                        "Achievement",
-                        "Achievement unlocked :<br>" +
-                            Game.Achievements[what].name +
-                            "<br> ",
-                        true
-                    );
-                }
-                if (FrozenCookies.showAchievements) {
-                    Game.Notify(
-                        "Achievement unlocked",
-                        '<div class="title" style="font-size:18px;margin-top:-2px;">' +
-                            achname +
-                            "</div>",
-                        Game.Achievements[what].icon
-                    );
-                    if (App && Game.Achievements[what].vanilla)
-                        App.gotAchiev(Game.Achievements[what].id);
-                }
-                if (Game.Achievements[what].pool != "shadow")
-                    Game.AchievementsOwned++;
-                Game.recalculateGains = 1;
-            }
-        }
-    } else {
-        logEvent("fcWin Else condition");
-        for (var i in what) {
-            Game.Win(what[i]);
-        }
-    }
 }
 
 function logEvent(event, text, popup) {
@@ -2888,8 +2818,7 @@ function autoCookieBody() {
         recommendation.time = Date.now() - Game.startDate;
         //      full_history.push(recommendation);  // Probably leaky, maybe laggy?
         recommendation.purchase.clickFunction = null;
-        disabledPopups = false;
-        //      console.log(purchase.name + ': ' + Beautify(recommendation.efficiency) + ',' + Beautify(recommendation.delta_cps));
+            //      console.log(purchase.name + ': ' + Beautify(recommendation.efficiency) + ',' + Beautify(recommendation.delta_cps));
         if (
             Math.floor(
                 Game.HowMuchPrestige(Game.cookiesReset + Game.cookiesEarned)
@@ -2986,8 +2915,7 @@ function autoCookieBody() {
                     " CPS."
             );
         }
-        disabledPopups = true;
-        if (FrozenCookies.autobuyCount >= 10) {
+            if (FrozenCookies.autobuyCount >= 10) {
             Game.Draw();
             FrozenCookies.autobuyCount = 0;
         }
