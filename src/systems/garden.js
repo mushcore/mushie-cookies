@@ -9,8 +9,9 @@
 // A seed costs minutes to hours of CpS (minigameGarden.js:1097-1101) and the late parents die and
 // are planted again, so a garden that spends whenever it can starves every purchase. Seeds are
 // paid for out of a budget, a share of what the bakery earns, and never out of the buyer's
-// reserve; the target is the one expected to unlock soonest on that budget.
-import { optimizeLayout, agePerTick, plantNow, expectedUnlock } from '../core/garden.js';
+// reserve; a layout is planted only once the budget covers all of it, and the target is the one
+// expected to unlock soonest on that budget, saving included.
+import { optimizeLayout, agePerTick, expectedUnlock, layoutCost, plantGroup } from '../core/garden.js';
 import { gardenOf, plotTiles, chanceFunction, findRecipes, chooseSoil, soilFor } from '../game/garden.js';
 
 const TICK_EVERY = 30; // frames
@@ -108,47 +109,49 @@ export function createGarden({ game, settings, loop, reserve = () => 0, log = ()
         return { ...out, fresh };
     }
 
+    /** A parent tile as plantGroup and layoutCost see it, in ticks of the plant's own growth. */
+    function parentSlot(M, key, t, age) {
+        const plant = M.plants[key];
+        const perTick = agePerTick(plant);
+        const life = plant.immortal ? Infinity : 100 / perTick; // dies at age 100 (minigameGarden.js:1886-1890)
+        const planted = age !== null;
+        const grown = planted ? age / perTick : 0;
+        return {
+            key,
+            planted,
+            grown,
+            ticksLeft: Math.max(0, plant.mature / perTick - grown),
+            lifeLeft: life - grown,
+            grow: plant.mature / perTick,
+            life,
+            cost: M.getCost(plant),
+            x: t.x,
+            y: t.y,
+        };
+    }
+
     /**
-     * What a layout is expected to cost and how long it takes. Parents already growing where the
-     * layout wants them cost nothing more and are further along.
+     * What a layout is expected to cost and how long it takes, on the budget. Parents already
+     * growing where the layout wants them cost nothing more and are further along, if they live
+     * until the rest has been saved for and grown.
      */
     function appraise(M, tiles, layout, score) {
-        let cost = 0;
-        let replantCost = 0;
-        let growTicks = 0;
-        let windowTicks = Infinity;
+        const parents = [];
         tiles.forEach((t, i) => {
             const key = layout[i];
             if (!key) return;
-            const plant = M.plants[key];
-            const perTick = agePerTick(plant);
-            const price = M.getCost(plant);
             const here = plantAt(M, t.x, t.y);
-            if (here && here.plant.key === key) {
-                growTicks = Math.max(growTicks, Math.max(0, plant.mature - here.age) / perTick);
-            } else {
-                cost += price;
-                growTicks = Math.max(growTicks, plant.mature / perTick);
-            }
-            if (!plant.immortal) {
-                replantCost += price;
-                windowTicks = Math.min(windowTicks, (100 - plant.mature) / perTick);
-            }
+            const s = parentSlot(M, key, t, here && here.plant.key === key ? here.age : null);
+            parents.push({ price: s.cost, grow: s.grow, life: s.life, age: s.planted ? s.grown : null });
         });
         const fertilizer = M.parent.amount >= M.soils.fertilizer.req;
-        return expectedUnlock({
-            score,
-            cost,
-            replantCost,
-            growTicks,
-            windowTicks,
-            // Growing on fertilizer if the farms allow it, waiting on wood chips or dirt (both
-            // five minutes a tick; minigameGarden.js:877-929).
-            growSeconds: 60 * (fertilizer ? M.soils.fertilizer.tick : M.soils.dirt.tick),
-            waitSeconds: 60 * M.soils.dirt.tick,
-            // Seed prices are minutes of CpS, so CpS is the unit the budget is measured in.
-            budgetRate: options.seedShare * game.cookiesPs,
-        });
+        // Growing on fertilizer if the farms allow it, waiting on wood chips or dirt (both five
+        // minutes a tick; minigameGarden.js:877-929).
+        const growSeconds = 60 * (fertilizer ? M.soils.fertilizer.tick : M.soils.dirt.tick);
+        // Seed prices are minutes of CpS, so CpS is the unit the budget is measured in.
+        const budgetRate = options.seedShare * game.cookiesPs;
+        const needs = layoutCost({ parents, saved: state.budget, budgetRate, tickSeconds: growSeconds });
+        return expectedUnlock({ score, ...needs, growSeconds, waitSeconds: 60 * M.soils.dirt.tick, budgetRate, saved: state.budget });
     }
 
     // Soonest first; between equals, cheaper, then likelier.
@@ -180,6 +183,10 @@ export function createGarden({ game, settings, loop, reserve = () => 0, log = ()
             if (fresh) layoutsLeft--;
             // No layout of these tiles produces it (a ring of eight on a 2×2 plot): not a target.
             if (!(score > 0)) continue;
+            // One the budget cannot pay for scores Infinity and loses to any other; it is still
+            // better than nothing, since a pot that cannot pay plants nothing (plantGroup), and
+            // a budget of nothing can be a passing moment (Cursed finger stops CpS for seconds,
+            // main.js:13920-13933).
             const candidate = { target, parents, layout, score, value: appraise(M, job.tiles, layout, score) };
             if (!job.best || better(candidate, job.best)) job.best = candidate;
         }
@@ -240,24 +247,27 @@ export function createGarden({ game, settings, loop, reserve = () => 0, log = ()
                 if (!plant.unlocked) return;
                 if (planned === plant.key) {
                     if (plan.mode === 'weeds' && age >= OLD_MEDDLEWEED) M.harvest(t.x, t.y);
-                    else slots.push({ key: planned, planted: true, ticksLeft: Math.max(0, (plant.mature - age) / agePerTick(plant)) });
+                    else slots.push(parentSlot(M, planned, t, age));
                     return;
                 }
                 M.harvest(t.x, t.y); // weeds, stray mutations of plants already unlocked
                 return;
             }
-            if (planned) slots.push({ key: planned, planted: false, ticksLeft: M.plants[planned].mature / agePerTick(M.plants[planned]), x: t.x, y: t.y });
+            if (planned) slots.push(parentSlot(M, planned, t, null));
         });
 
         // Seeds cost minutes of the current, buffed CpS: plant only between buffs.
         if (buffRunning()) return slots;
-        const allowed = plantNow(slots);
-        for (const slot of slots) {
-            if (slot.planted || !allowed.has(slot.key)) continue;
+        // Never into what the buyer holds back.
+        const spare = () => game.cookies - reserve();
+        // A meddleweed is harvested old for a chance of a fungus on its own, so each is bought
+        // alone; a layout's parents are bought as plantGroup allows, all of a group at once.
+        const buy = plan.mode === 'weeds' ? slots.filter((s) => !s.planted) : plantGroup(slots, { budget: state.budget, spare: spare() });
+        for (const slot of buy) {
             const plant = M.plants[slot.key];
             const cost = M.getCost(plant);
-            // Out of the garden's own money, and never into what the buyer holds back.
-            if (cost > state.budget || game.cookies - cost < reserve()) continue;
+            // Out of the garden's own money.
+            if (cost > state.budget || cost > spare()) break;
             if (M.useTool(plant.id, slot.x, slot.y)) {
                 state.planted++;
                 state.budget -= cost;

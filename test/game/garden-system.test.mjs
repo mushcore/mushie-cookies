@@ -70,6 +70,110 @@ async function untilPlanned(game) {
     throw new Error('no plan within two minutes');
 }
 
+/**
+ * Follows every seed the garden plants until it is gone, and counts the cookies spent on seeds
+ * that were never mature while the plot could produce the garden's target: a mutation of the
+ * target has a chance in some empty tile, from the mature plants around it
+ * (minigameGarden.js:1930-1967). Checked every second, against garden ticks of minutes.
+ */
+function trackWaste() {
+    const M = Game.Objects['Farm'].minigame;
+    const seeds = new Map(); // "x,y" -> { id, cost, useful }
+    window.waste = { spent: 0, wasted: 0, seeds: 0, lost: 0, usefulTicks: 0 };
+    const use = M.useTool;
+    M.useTool = function (what, x, y) {
+        const before = Game.cookies;
+        const ok = use.apply(this, arguments);
+        if (ok) {
+            seeds.set(x + ',' + y, { id: what, cost: before - Game.cookies, useful: false });
+            window.waste.spent += before - Game.cookies;
+            window.waste.seeds++;
+        }
+        return ok;
+    };
+    const producing = (target) => {
+        for (let y = 0; y < 6; y++) {
+            for (let x = 0; x < 6; x++) {
+                if (!M.isTileUnlocked(x, y) || M.plot[y][x][0] > 0) continue;
+                const neighs = {};
+                const neighsM = {};
+                for (const key of Object.keys(M.plants)) neighs[key] = neighsM[key] = 0;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const tile = (dx || dy) && M.getTile(x + dx, y + dy);
+                        if (!tile || !(tile[0] > 0)) continue;
+                        const plant = M.plantsById[tile[0] - 1];
+                        neighs[plant.key]++;
+                        if (tile[1] >= plant.mature) neighsM[plant.key]++;
+                    }
+                }
+                if (M.getMuts(neighs, neighsM).some(([key, chance]) => key === target && chance > 0)) return true;
+            }
+        }
+        return false;
+    };
+    let frames = 0;
+    Game.registerHook('logic', () => {
+        if (++frames % 30) return;
+        const target = MushieCookies.garden.report().target;
+        const useful = !!target && producing(target);
+        if (useful) window.waste.usefulTicks++;
+        for (const [at, seed] of seeds) {
+            const [x, y] = at.split(',').map(Number);
+            const tile = M.plot[y][x];
+            if (tile[0] !== seed.id + 1) {
+                // Gone: died of old age, or harvested.
+                if (!seed.useful) {
+                    window.waste.wasted += seed.cost;
+                    window.waste.lost++;
+                }
+                seeds.delete(at);
+            } else if (useful && tile[1] >= M.plantsById[seed.id].mature) seed.useful = true;
+        }
+    });
+}
+
+// Ten game hours: about five minutes of wall time on its own.
+test('seeds are bought only for a layout that can be mature together', { skip, timeout: 20 * 60 * 1000 }, () =>
+    // From these seeds only gildmillet can be bred, from cronerice and thumbcorn. Seed prices are
+    // minutes of CpS and the budget a tenth of income, so a cronerice takes two and a half hours to
+    // afford and lives under seven (minigameGarden.js:51-62, 1097-1101). Bought one seed at a time,
+    // the cronerice died before the layout filled, and the thumbcorn, held back until every
+    // cronerice slot was planted, never was: cookies spent, nothing produced.
+    withGarden({ unlocked: ['bakerWheat', 'thumbcorn', 'cronerice', 'bakeberry', 'meddleweed'] }, async (game) => {
+        await game.eval(() => {
+            Game.shimmerTypes.golden.spawnConditions = () => false;
+            FrozenCookies.autoGarden = 1;
+        });
+        await game.eval(trackWaste);
+        await game.advanceSeconds(10 * 3600);
+        const out = await game.eval(() => ({ waste: window.waste, cps: Game.cookiesPs, report: MushieCookies.garden.report(), failures: failures() }));
+        const minutes = (cookies) => (cookies / out.cps / 60).toFixed(1);
+        assert.equal(
+            out.waste.wasted,
+            0,
+            `${out.waste.lost} of ${out.waste.seeds} seeds died unproductive, ${minutes(out.waste.wasted)} of ${minutes(out.waste.spent)} minutes of CpS spent (${JSON.stringify(out.report)})`
+        );
+        assert.deepEqual(out.failures, []);
+    }));
+
+test('a layout the pot covers is planted and produces', { skip }, () =>
+    withGarden({ unlocked: ['bakerWheat', 'thumbcorn'] }, async (game) => {
+        await game.eval(() => {
+            Game.shimmerTypes.golden.spawnConditions = () => false;
+            FrozenCookies.autoGarden = 1;
+        });
+        await game.eval(trackWaste);
+        await game.advanceSeconds(2);
+        await untilPlanned(game);
+        await game.eval(() => Game.Earn(1e25)); // seed money for a whole planting
+        await game.advanceSeconds(3600);
+        const out = await game.eval(() => ({ waste: window.waste, report: MushieCookies.garden.report(), failures: failures() }));
+        assert.ok(out.waste.seeds > 0, 'planted');
+        assert.ok(out.waste.usefulTicks > 0, `the layout produced: ${JSON.stringify(out)}`);
+        assert.deepEqual(out.failures, []);
+    }));
+
 test("seeds are bought only with cookies above the buyer's reserve", { skip }, () =>
     withGarden({}, async (game) => {
         await game.eval(() => {
@@ -130,6 +234,9 @@ test("seeds take no more than the garden's share of income", { skip }, () =>
                 window.seeds += amount;
             };
             window.earnedAt = Game.cookiesEarned;
+            // Ten times CpS in income, as clicking earns: a tenth of an hour of CpS alone pays
+            // for no whole layout, and a layout is planted only whole.
+            Game.registerHook('logic', () => Game.Earn((9 * Game.cookiesPs) / Game.fps));
             FrozenCookies.autoGarden = 1;
         });
         await game.advanceSeconds(3600);

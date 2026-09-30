@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { optimizeLayout, agePerTick, plantNow, expectedUnlock } from '../../src/core/garden.js';
+import { optimizeLayout, agePerTick, plantNow, expectedUnlock, layoutCost, plantGroup } from '../../src/core/garden.js';
 import { findRecipes, findRecipe, chanceFunction, chooseSoil, soilFor } from '../../src/game/garden.js';
 
 const grid = (w, h) => {
@@ -102,7 +102,7 @@ test('a layout that cannot produce the target is never worth planting', () => {
 });
 
 test('immortal parents are paid for once; the wait is growing plus the expected ticks to a mutation', () => {
-    const out = expectedUnlock(plan());
+    const out = expectedUnlock(plan({ saved: 1000 }));
     assert.equal(out.cost, 1000);
     assert.equal(out.seconds, 10 * 180 + (1 / 0.05) * 300);
 });
@@ -116,13 +116,129 @@ test('parents that die before a mutation lands are paid for again', () => {
     assert.ok(out.seconds > expectedUnlock(plan()).seconds, 'failed plantings take time too');
 });
 
-test('when seed money is the bottleneck, the time is what the budget takes to pay for the seeds', () => {
+test('nothing is planted until the pot covers the layout, so saving for it comes before growing', () => {
+    // plantGroup waits for the whole layout's money: the saving and the growing do not overlap.
     const out = expectedUnlock(plan({ budgetRate: 0.01 }));
-    assert.equal(out.seconds, 1000 / 0.01);
+    assert.equal(out.seconds, 1000 / 0.01 + 10 * 180 + 20 * 300);
     // Of two equally likely plans, the cheaper one is sooner.
     assert.ok(expectedUnlock(plan({ budgetRate: 0.01, cost: 100, replantCost: 100 })).seconds < out.seconds);
-    // Plants already in place cost nothing more.
+    // Plants already in place cost nothing more, and money already in the pot is not saved again.
     assert.equal(expectedUnlock(plan({ budgetRate: 0.01, cost: 0 })).seconds, 10 * 180 + 20 * 300);
+    assert.equal(expectedUnlock(plan({ budgetRate: 0.01, saved: 600 })).seconds, 400 / 0.01 + 10 * 180 + 20 * 300);
+    // No income: a layout still to be paid for is out of reach.
+    assert.equal(expectedUnlock(plan({ budgetRate: 0 })).seconds, Infinity);
+});
+
+test('after a planting fails, the next waits until the pot has saved for it again', () => {
+    // Mortal parents, a window of 10 ticks: the failed planting lasts 10 × 180 + 10 × 300 s.
+    const plantings = 1 / (1 - Math.exp(-0.05 * 10));
+    const quick = expectedUnlock(plan({ windowTicks: 10, saved: 1000 }));
+    assert.ok(Math.abs(quick.seconds - (10 * 180 + (plantings - 1) * (10 * 180 + 10 * 300) + 10 * 300)) < 1e-6, String(quick.seconds));
+    // Saving 1000 at 0.01 a second takes far longer than a planting lasts: that sets the pace.
+    const poor = expectedUnlock(plan({ windowTicks: 10, saved: 1000, budgetRate: 0.01 }));
+    assert.ok(Math.abs(poor.seconds - (10 * 180 + (plantings - 1) * (1000 / 0.01) + 10 * 300)) < 1e-6, String(poor.seconds));
+});
+
+// What a layout still needs, with some of its parents already growing in place.
+
+const parent = (over = {}) => ({ price: 100, grow: 10, life: 40, age: null, ...over });
+
+test('parents already growing where the layout wants them cost nothing and are further along', () => {
+    const out = layoutCost({ parents: [parent({ age: 6 }), parent({ grow: 4, life: 14 })], saved: 100, budgetRate: 1, tickSeconds: 60 });
+    assert.equal(out.cost, 100, 'only the missing parent is bought');
+    assert.equal(out.growTicks, 4);
+    assert.equal(out.replantCost, 200);
+    assert.equal(out.regrowTicks, 10);
+    assert.equal(out.windowTicks, 10);
+});
+
+test('a parent in place that would die before the rest of the layout is paid for is bought again', () => {
+    // The missing parent takes (300 - 0) / 1 = 300 s = 5 ticks of saving, then 10 to grow: the
+    // one in place (age 20 of 40) dies at tick 20, after everything is mature at tick 15: kept.
+    const kept = layoutCost({ parents: [parent({ age: 20 }), parent({ price: 300 })], budgetRate: 1, tickSeconds: 60 });
+    assert.equal(kept.cost, 300);
+    // At a third of the income saving takes 15 ticks; everything would be mature at tick 25, and
+    // the one in place is dead by then, so it has to be bought too, which takes longer still.
+    const lost = layoutCost({ parents: [parent({ age: 20 }), parent({ price: 300 })], budgetRate: 1 / 3, tickSeconds: 60 });
+    assert.equal(lost.cost, 400);
+    assert.equal(lost.growTicks, 10);
+    // Immortal parents never die waiting.
+    assert.equal(layoutCost({ parents: [parent({ age: 20, life: Infinity }), parent({ price: 300 })], budgetRate: 1e-9, tickSeconds: 60 }).cost, 300);
+});
+
+// Which seeds to plant this tick.
+
+// A slot as tend() describes it: a parent tile of the layout, planted or not.
+const slot = (key, over = {}) => ({ key, planted: false, ticksLeft: 10, lifeLeft: Infinity, grow: 10, life: 40, cost: 100, ...over });
+const rich = { budget: Infinity, spare: Infinity };
+
+test('a slow parent is not bought until the pot covers the rest of the layout', () => {
+    // Like cronerice and thumbcorn: six slow parents (73 ticks to grow, 133 to live) and five fast ones.
+    const layout = () => [
+        ...Array.from({ length: 6 }, () => slot('slow', { ticksLeft: 73, grow: 73, life: 133, cost: 3 })),
+        ...Array.from({ length: 5 }, () => slot('fast', { ticksLeft: 3, grow: 3, life: 14, cost: 1 })),
+    ];
+    assert.equal(plantGroup(layout(), { budget: 3, spare: Infinity }).length, 0, 'one slow seed is affordable, the layout is not');
+    assert.equal(plantGroup(layout(), { budget: 22, spare: Infinity }).length, 0);
+    const group = plantGroup(layout(), { budget: 23, spare: Infinity });
+    assert.deepEqual(group.map((s) => s.key), Array(6).fill('slow'), 'every slow parent at once, the fast ones later');
+});
+
+test('the group is planted whole or not at all, and never into the bank the buyer holds back', () => {
+    const layout = [slot('a'), slot('a'), slot('b', { ticksLeft: 2, grow: 2 })];
+    assert.equal(plantGroup(layout, { budget: 300, spare: 199 }).length, 0);
+    assert.equal(plantGroup(layout, { budget: 300, spare: 200 }).length, 2, 'the bank needs to cover only the group');
+    assert.equal(plantGroup(layout, { budget: 299, spare: Infinity }).length, 0, 'the pot must cover what follows too');
+});
+
+test('a later group is paid from what the pot kept for it', () => {
+    const layout = [slot('slow', { planted: true, ticksLeft: 1, lifeLeft: 60 }), slot('fast', { ticksLeft: 2, grow: 2, cost: 50 })];
+    assert.deepEqual(plantGroup(layout, { budget: 50, spare: 50 }).map((s) => s.key), ['fast']);
+    assert.equal(plantGroup(layout, { budget: 49, spare: 50 }).length, 0);
+});
+
+test('a fast parent is not planted when its slow partner dies before it matures', () => {
+    // The slow partner dies in 2 ticks and a new one takes 73 to grow: the fast one would die alone.
+    const layout = [slot('slow', { planted: true, ticksLeft: 0, lifeLeft: 2, grow: 73, life: 133 }), slot('fast', { ticksLeft: 3, grow: 3, life: 14 })];
+    assert.equal(plantGroup(layout, rich).length, 0);
+    // With 20 ticks of life left the slow partner is mature alongside it.
+    layout[0].lifeLeft = 20;
+    assert.equal(plantGroup(layout, rich).length, 1);
+});
+
+test('a slow parent is replanted though a fast partner dies first: the partner is replaced in time', () => {
+    const layout = [slot('slow', { ticksLeft: 73, grow: 73, life: 133, cost: 3 }), slot('fast', { planted: true, ticksLeft: 0, lifeLeft: 5, grow: 3, life: 14, cost: 1 })];
+    assert.deepEqual(plantGroup(layout, { budget: 4, spare: 3 }).map((s) => s.key), ['slow']);
+    // The fast partner needs a new seed before the slow one matures, so the pot must hold it too.
+    assert.equal(plantGroup(layout, { budget: 3, spare: 3 }).length, 0);
+});
+
+test('seeds afforded one at a time fill a layout whose slow parent dies before the next is afforded', () => {
+    // A small garden: parents age one tick a tick and die at `life`; the pot fills `income` a
+    // tick up to one planting. Six slow parents at 3 each, five fast ones at 1; income 0.02 a tick,
+    // so one slow seed takes 150 ticks to afford and a planted one lives 133.
+    const kinds = { slow: { grow: 73, life: 133, cost: 3 }, fast: { grow: 3, life: 14, cost: 1 } };
+    const tiles = [...Array(6).fill('slow'), ...Array(5).fill('fast')].map((key) => ({ key, age: null }));
+    let budget = 0;
+    let spent = 0;
+    let together = 0; // ticks with every parent mature
+    for (let t = 0; t < 4000; t++) {
+        budget = Math.min(budget + 0.02, 23);
+        for (const tile of tiles) if (tile.age !== null && ++tile.age >= kinds[tile.key].life) tile.age = null;
+        if (tiles.every((tile) => tile.age !== null && tile.age >= kinds[tile.key].grow)) together++;
+        const slots = tiles.map((tile) => {
+            const k = kinds[tile.key];
+            const planted = tile.age !== null;
+            return { key: tile.key, planted, ticksLeft: planted ? Math.max(0, k.grow - tile.age) : k.grow, lifeLeft: planted ? k.life - tile.age : Infinity, grow: k.grow, life: k.life, cost: k.cost, tile };
+        });
+        for (const s of plantGroup(slots, { budget, spare: Infinity })) {
+            s.tile.age = 0;
+            budget -= s.cost;
+            spent += s.cost;
+        }
+    }
+    assert.ok(together > 0, 'the layout is mature together at some point');
+    assert.ok(spent >= 23, 'and was paid for');
 });
 
 // Recipes, asked of a small stand-in for the game's mutation table.
