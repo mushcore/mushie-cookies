@@ -97,3 +97,35 @@ test('a forecast further ahead matches the cast that many casts later', { skip }
         }, castAndRead.toString());
         assert.deepEqual(out.ahead, out.actual);
     }));
+
+test('forecast casting skips bad outcomes, casts good ones and pops the cookie', { skip }, () =>
+    withGrimoire(async (game) => {
+        await game.eval(() => {
+            FrozenCookies.autoFate = 1;
+            FrozenCookies.autoCasting = 0;
+            FrozenCookies.autoClick = 1;
+            FrozenCookies.cookieClickSpeed = 50;
+            FCStart();
+        });
+        await game.advanceSeconds(3 * 3600);
+        const out = await game.eval(() => ({
+            report: MushieCookies.grimoire.report(),
+            spells: Game.Objects['Wizard tower'].minigame.spellsCastTotal,
+            status: Object.entries(MushieCookies.status()).filter(([, s]) => s.failures > 0).map(([n, s]) => `${n}: ${s.lastError}`),
+        }));
+        assert.ok(out.report.casts > 0, 'should have cast Force the Hand of Fate');
+        assert.equal(out.spells, out.report.casts + out.report.skips, 'every spell cast is one the system chose');
+        assert.deepEqual(out.status, []);
+        assert.deepEqual(game.errors, []);
+    }));
+
+test('forecast casting stands aside while an inherited casting mode is on', { skip }, () =>
+    withGrimoire(async (game) => {
+        await game.eval(() => {
+            FrozenCookies.autoFate = 1;
+            FrozenCookies.autoCasting = 2;
+            FCStart();
+        });
+        await game.advanceSeconds(600);
+        assert.equal(await game.eval(() => MushieCookies.grimoire.report().casts), 0);
+    }));

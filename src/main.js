@@ -13,6 +13,7 @@ export { rankCandidates, chooseReserve, decide } from './core/buyer.js';
 export { shouldAscend } from './core/ascension.js';
 export { nextLevelUp } from './core/lumps.js';
 export { forecastFate, forecastMany } from './game/fate.js';
+export { outcomeValue, decideCast } from './core/grimoire.js';
 export { rankHeavenly, planChips } from './core/heavenly.js';
 export { heavenlyCandidates, planHeavenly, slotCandidates, fillPermanentSlots } from './game/prestige.js';
 
@@ -25,6 +26,7 @@ const log = (message) => console.log(`[Mushie Cookies] ${message}`);
 export let buyer = null;
 export let ascension = null;
 export let lumps = null;
+export let grimoire = null;
 
 const guards = createGuard({
     maxFailures: 5,
@@ -68,6 +70,7 @@ const runtime = {
         buyer = systems.buyer;
         ascension = systems.ascension;
         lumps = systems.lumps;
+        grimoire = systems.grimoire;
     },
     save: () => window.saveFCData(),
     load: (data) => window.setOverrides(data),

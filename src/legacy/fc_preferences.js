@@ -247,6 +247,11 @@ FrozenCookies.preferenceValues = {
         default: 0,
         extras: '<a class="option" id="manaMax" onclick="updateManaMax(\'manaMax\');">${manaMax} max Mana</a>',
     },
+    autoFate: {
+        hint: "Cast Force the Hand of Fate by forecast: skip bad outcomes, land good ones on a running buff. Needs the casting modes below OFF.",
+        display: ["Forecast Casting OFF", "Forecast Casting ON"],
+        default: 0,
+    },
     autoCasting: {
         hint: "Auto-cast selected spell when mana is full.",
         display: [
