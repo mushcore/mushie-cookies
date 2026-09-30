@@ -559,67 +559,7 @@ function autoDragonsCurve() {
     return;
 }
 
-function autoDragonAction() {
-    if (
-        !Game.HasUnlocked("A crumbly egg") ||
-        Game.dragonLevel > 26 ||
-        hasClickBuff()
-    ) {
-        return;
-    }
-
-    if (Game.HasUnlocked("A crumbly egg") && !Game.Has("A crumbly egg")) {
-        Game.Upgrades["A crumbly egg"].buy();
-        logEvent("autoDragon", "Bought an egg");
-    }
-
-    if (
-        Game.dragonLevel < Game.dragonLevels.length - 1 &&
-        Game.dragonLevels[Game.dragonLevel].cost()
-    ) {
-        Game.specialTab = "dragon";
-        Game.UpgradeDragon();
-        if (Game.dragonLevel + 1 >= Game.dragonLevels.length)
-            Game.ToggleSpecialMenu();
-        logEvent(
-            "autoDragon",
-            "Upgraded the dragon to level " + Game.dragonLevel
-        );
-    }
-}
-
-function petDragonAction() {
-    if (
-        !Game.Has("A crumbly egg") ||
-        Game.dragonLevel < 4 ||
-        !Game.Has("Pet the dragon") ||
-        hasClickBuff()
-    ) {
-        return;
-    }
-
-    //Calculate current pet drop and if we have it
-    Math.seedrandom(Game.seed + "/dragonTime");
-    let drops = [
-        "Dragon scale",
-        "Dragon claw",
-        "Dragon fang",
-        "Dragon teddy bear",
-    ];
-    drops = shuffle(drops);
-    Math.seedrandom();
-    let currentDrop =
-        drops[Math.floor((new Date().getMinutes() / 60) * drops.length)];
-
-    //Pet the dragon
-    if (!Game.Has(currentDrop) && !Game.HasUnlocked(currentDrop)) {
-        Game.specialTab = "dragon";
-        Game.ToggleSpecialMenu(1);
-        Game.ClickSpecialPic();
-        Game.ToggleSpecialMenu(0);
-        //logEvent("autoDragon", "Who's a good dragon? You are!");
-    }
-}
+// Training and petting the dragon (autoDragon, petDragon) belong to src/systems/dragon.js.
 
 function autoDragonAura0Action() {
     if (
@@ -695,15 +635,16 @@ function autoDragonAura1Action() {
 }
 
 function autoDragonOrbsAction() {
-    if (!T) return;
+    // The interval outlives the setting (only FCStart clears it), so the setting is read each tick.
+    if (!T || FrozenCookies.autoDragonOrbs != 1) return;
     if (
-        FrozenCookies.autoDragonOrbs == 1 &&
-        (!Game.hasAura("Dragon Orbs") ||
-            Game.hasGod("ruin") ||
-            Game.Objects["You"].amount < 1)
+        !Game.hasAura("Dragon Orbs") ||
+        Game.hasGod("ruin") ||
+        Game.Objects["You"].amount < 1
     ) {
         FrozenCookies.autoDragonOrbs = 0;
         logEvent("autoDragonOrbs", "Not currently possible to use Dragon Orbs");
+        return;
     }
 
     var buffsN = 0;

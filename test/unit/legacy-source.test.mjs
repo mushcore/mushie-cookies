@@ -66,6 +66,16 @@ test('functions the audit found unreferenced are gone', () => {
     assert.deepEqual(found, []);
 });
 
+test('inherited actions a new system replaced are gone, so two systems never act on one thing', () => {
+    // The dragon system (src/systems/dragon.js) trains and pets; these acted on the same dragon.
+    const replaced = ['autoDragonAction', 'petDragonAction', 'autoDragonBot', 'petDragonBot'];
+    const found = [];
+    for (const [file, src] of all) {
+        for (const name of replaced) if (new RegExp(`\\b${name}\\b`).test(src)) found.push(`${file}: ${name}`);
+    }
+    assert.deepEqual(found, []);
+});
+
 test('every function called by bare name is defined somewhere', () => {
     // Catches a deletion that removed a function something still calls.
     const defined = new Set();

@@ -308,7 +308,7 @@ FrozenCookies.preferenceValues = {
         default: 0,
     },
     petDragon: {
-        hint: "Auto-pet dragon for drops.",
+        hint: "Pet the dragon for its drops, only while this quarter hour's drop is missing (needs Pet the dragon).",
         display: ["Dragon Petting OFF", "Dragon Petting ON"],
         default: 0,
     },
