@@ -165,6 +165,43 @@ test('a pair not castable yet is valued on the buffs still running when it can b
     assert.equal(double('multiply cookies', 'click frenzy', { ctx: contextAt(rich, 30) }).action, 'single');
 });
 
+test('with golden cookies clicked as they spawn, the second outcome held alone would land on a natural boost', () => {
+    // Held alone, a click frenzy is cast on the first CpS boost to land once mana pays for it, or
+    // at a full bar (decideCast): here 26 magic left grows to the 64 a cast costs, then to 90.
+    const window = regenSeconds(26, 90, 90) - regenSeconds(26, 64, 90);
+    const natural = { interval: 60, odds: { frenzy: 0.5, 'multiply cookies': 0.5 } };
+    const out = double('frenzy', 'click frenzy', { ctx: { ...ctx, natural } });
+    // Natural frenzies spawn one every 120 s on average: the chance one lands in the window.
+    const landed = 1 - Math.exp(-window / 120);
+    near(out.later, landed * outcomeValue('click frenzy', { ...ctx, buffs: [buff('Frenzy', 7, 77)] }) + (1 - landed) * outcomeValue('click frenzy', ctx));
+    // So a frenzy cast now adds little the click frenzy would not have had anyway.
+    assert.equal(out.action, 'single', out.reason);
+    // Without golden cookies spawning, it lands on nothing.
+    assert.equal(double('frenzy', 'click frenzy', { ctx: { ...ctx, natural: { ...natural, interval: Infinity } } }).action, 'double');
+    assert.equal(double('frenzy', 'click frenzy', { ctx: { ...ctx, natural: null } }).action, 'double');
+});
+
+test('a natural boost counts only if the held outcome would be cast on it', () => {
+    // A frenzy is not cast on a 30 s building special, which covers less than half of it
+    // (decideCast), nor on a natural Frenzy, which it would only lengthen.
+    for (const odds of [{ 'building special': 1 }, { frenzy: 1 }]) {
+        const out = double('click frenzy', 'frenzy', { ctx: { ...ctx, natural: { interval: 60, odds } } });
+        near(out.later, outcomeValue('frenzy', ctx));
+    }
+    // A click frenzy is, on any of the building specials' picks.
+    const out = double('frenzy', 'click frenzy', { ctx: { ...ctx, natural: { interval: 60, odds: { 'building special': 1 } } } });
+    const window = regenSeconds(26, 90, 90) - regenSeconds(26, 64, 90);
+    const landed = 1 - Math.exp(-window / 60);
+    near(out.later, landed * outcomeValue('click frenzy', { ...ctx, buffs: [buff('High-five', 11, 30)] }) + (1 - landed) * outcomeValue('click frenzy', ctx));
+});
+
+test('later casts held for natural boosts make the mana a double cast takes worth more', () => {
+    const natural = { interval: 60, odds: { frenzy: 0.5, 'multiply cookies': 0.5 } };
+    const quiet = double('frenzy', 'cookie storm drop');
+    const golden = double('frenzy', 'cookie storm drop', { ctx: { ...ctx, natural } });
+    assert.ok(golden.penalty > quiet.penalty, `${golden.penalty} is not above ${quiet.penalty}`);
+});
+
 test('a sugar lump is cast on its own', () => {
     assert.equal(double('frenzy', 'free sugar lump').action, 'single');
     assert.equal(double('free sugar lump', 'click frenzy').action, 'single');

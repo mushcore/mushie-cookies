@@ -89,6 +89,9 @@ export function createGrimoire({ game, settings, loop, buyer = null, log = () =>
             stormReach: now.golden.stormReach,
             buildingSpecials: buildingSpecials(),
             buffs: runningBuffs(),
+            // A cast held for a buff lands on a natural golden cookie's only if it is clicked; the
+            // shimmers system clicks them as they spawn with autoGC on (src/systems/shimmers.js).
+            natural: settings.autoGC == 1 ? { interval: now.golden.meanInterval, odds: now.golden.probabilities } : null,
         };
     }
 

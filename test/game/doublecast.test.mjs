@@ -333,6 +333,51 @@ test('nothing is kept for a pair whose worth rests on a buff that ends before ma
         assert.deepEqual(game.errors, []);
     }));
 
+test('with golden cookies clicked as they spawn, a click frenzy natural boosts would carry anyway is not double-cast', { skip }, () =>
+    withLateBakery(async (game) => {
+        const pair = await game.eval(burnTo, ['frenzy', 'click frenzy']);
+        assert.deepEqual(pair, ['frenzy', 'click frenzy']);
+        await game.eval(instrument);
+        await game.eval(() => {
+            // Test fixture: golden cookies spawning about every two minutes (main.js:5231-5260),
+            // their timer reset so none spawns during the test. The late bakery's only building
+            // at 10 or more is its 400 Wizard towers, so a building special is a ×41 Manabloom.
+            for (const name of ['Lucky day', 'Serendipity', 'Golden goose egg', 'Heavenly luck']) Game.Upgrades[name].earn();
+            Game.shimmerTypes.golden.spawnConditions = () => true;
+            Game.shimmerTypes.golden.time = 0;
+            const M = Game.Objects['Wizard tower'].minigame;
+            // Enough for the cast, not full: forecast casting holds the frenzy for a buff.
+            M.magic = M.magicM - 5;
+            Object.assign(FrozenCookies, { autoFate: 1, autoFTHOFCombo: 1, autoCasting: 0, auto100ConsistencyCombo: 0, autoClick: 1, cookieClickSpeed: 50, autoBuy: 0, autoGC: 0 });
+        });
+        const kept = () => game.eval(() => ({ kept: MushieCookies.buyer.kept('grimoire'), casts: MushieCookies.grimoire.report().casts }));
+        await game.advance(16);
+        // Left on screen, natural golden cookies give the click frenzy nothing to land on.
+        const unclicked = await kept();
+        assert.equal(unclicked.casts, 0);
+        assert.ok(unclicked.kept > 0, 'the buy-back is kept while golden cookies are not clicked');
+        await game.eval(() => {
+            FrozenCookies.autoGC = 1;
+        });
+        await game.advance(16);
+        const clicked = await kept();
+        assert.equal(clicked.casts, 0);
+        assert.equal(clicked.kept, 0, 'nothing is kept once they are clicked');
+        // At a full bar the frenzy is cast, alone.
+        await game.eval(() => {
+            const M = Game.Objects['Wizard tower'].minigame;
+            M.magic = M.magicM;
+        });
+        await game.advance(16);
+        const out = await read(game);
+        const fate = out.log.filter((e) => e.kind === 'cast' && e.spell === 'fate');
+        assert.deepEqual(fate.map((c) => c.made), ['frenzy'], JSON.stringify(out.report));
+        assert.equal(out.log.filter((e) => e.kind === 'sell').length, 0);
+        assert.equal(out.report.double.action, 'single', out.report.double.reason);
+        assert.deepEqual(out.status, []);
+        assert.deepEqual(game.errors, []);
+    }));
+
 test('Double Cast FTHOF runs forecast casting with double casts; the inherited combo casts nothing', { skip }, () =>
     withLateBakery(async (game) => {
         // A good outcome next, one that pairs with nothing: the inherited combo would cast Haggler's

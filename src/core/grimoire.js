@@ -233,6 +233,21 @@ function landsOnBoost(buffs, name, seconds) {
 }
 
 /**
+ * The boost an outcome held for a buff is cast on, among the buffs running now, or null: one that
+ * covers at least half of it (landsOnBoost). A building special needs half of its picks to land.
+ * @returns {{mult: number, stacked: true} | null}
+ */
+export function boostLandedOn(outcome, ctx) {
+    const buffs = ctx.buffs || [];
+    const specials = ctx.buildingSpecials || [];
+    const effect = outcome === 'building special' && !specials.length ? 'frenzy' : outcome;
+    const seconds = EFFECT_SECONDS[effect] && EFFECT_SECONDS[effect] * ctx.durationMult;
+    const picks = effect === 'building special' ? specials.map((s) => landsOnBoost(buffs, s.name, seconds)) : [landsOnBoost(buffs, OUTCOME_BUFF[effect], seconds)];
+    const landed = picks.filter((p) => p.stacked);
+    return landed.length && landed.length * 2 >= picks.length ? landed[0] : null;
+}
+
+/**
  * @param {object} args
  * @param {{success: boolean, outcome: string}} args.next   the forecast for the next cast
  * @param {number} args.mana
@@ -269,16 +284,8 @@ export function decideCast({ next, mana, maxMana, fateCost, skipCost, ctx }) {
     }
     if (later) return out('wait', holding(later));
 
-    const buffs = ctx.buffs || [];
-    const specials = ctx.buildingSpecials || [];
-    const outcome = next.outcome === 'building special' && !specials.length ? 'frenzy' : next.outcome;
-    const seconds = EFFECT_SECONDS[outcome] && EFFECT_SECONDS[outcome] * ctx.durationMult;
-    // A building special lands on a boost if at least half the buildings it may pick would.
-    const picks = outcome === 'building special' ? specials.map((s) => landsOnBoost(buffs, s.name, seconds)) : [landsOnBoost(buffs, OUTCOME_BUFF[outcome], seconds)];
-    const landed = picks.filter((p) => p.stacked);
-    if (landed.length && landed.length * 2 >= picks.length) {
-        return out('cast', `${next.outcome} on a running ×${landed[0].mult.toFixed(1)} buff`);
-    }
+    const landed = boostLandedOn(next.outcome, ctx);
+    if (landed) return out('cast', `${next.outcome} on a running ×${landed.mult.toFixed(1)} buff`);
     if (full) return out('cast', `${next.outcome}, mana is full`);
     return out('wait', `holding ${next.outcome} for a buff`);
 }
