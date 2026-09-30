@@ -21,6 +21,18 @@ export { listCandidates, NEVER_BUY } from './game/candidates.js';
 export { estimateIncome } from './core/income.js';
 export { rankCandidates, chooseReserve, decide } from './core/buyer.js';
 export { shouldAscend } from './core/ascension.js';
+export {
+    KINDS as BUFF_KINDS,
+    BUFF_TYPES,
+    classifyBuff,
+    classifyBuffs,
+    cpsMultOf,
+    clickMultOf,
+    incomeSpikeRunning,
+    longestSpikeSecondsLeft,
+    unbuffedFactors,
+    worthFinishing,
+} from './core/buffs.js';
 export { nextLevelUp } from './core/lumps.js';
 export { forecastFate, forecastMany } from './game/fate.js';
 export { outcomeValue, decideCast } from './core/grimoire.js';
