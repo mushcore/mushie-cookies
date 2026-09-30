@@ -30,7 +30,7 @@ const FIRST_SHOPPING_LIST = [
  * @param {object} deps.loop
  * @param {() => number} deps.extras   cookies collecting before an ascension would add (wrinklers, chocolate egg)
  * @param {() => void} [deps.collect]  pops the wrinklers, a tick before prepare: they pay on later logic frames
- * @param {() => void} deps.prepare    collects the rest: sells stock, harvests, the chocolate egg
+ * @param {() => void} deps.prepare    the rest: sells stock, harvests, sells buildings into the chocolate egg
  * @param {{invalidate(): void}} [deps.buyer]
  * @param {(what: string) => void} [deps.log]
  */
@@ -132,8 +132,7 @@ export function createAscension({ game, settings, loop, extras = () => 0, collec
                 (state.plan.saving ? `; saving for ${state.plan.saving.name}` : '')
         );
         // Collect now, so it counts toward this ascension; the game grants chips at the end of
-        // the ascend animation, long before the reset that used to do this.
-        settings.preparedForAscension = true;
+        // the ascend animation, long before the reset.
         // Wrinklers first: they pay on the next logic frame, and the chocolate egg in prepare()
         // pays 5% of the bank, which should include them (main.js:10398-10403, 14457-14513).
         collect();

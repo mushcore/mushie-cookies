@@ -102,3 +102,71 @@ test('a run the mod joins midway is measured from where it really began', { skip
         const expected = (Math.log(1 + r.projected) - Math.log(1 + 1000)) / (r.runSeconds + 300);
         assert.ok(Math.abs(r.average - expected) / expected < 0.01, `average ${r.average} against ${expected}`);
     }));
+
+// In the page: a bakery worth an ascension with everything the pre-ascension routine would act on
+// (buildings, an unlocked Chocolate egg, Earth Shatterer learned, wrinklers holding cookies), and a
+// log of those actions, each marked when it happens on the ascension screen, where the store and
+// the minigames are hidden (style.css .ascending) and a player can do none of them.
+const ASCENSION_FIXTURE = `window.__fixture = function () {
+    Game.Earn(1e18);
+    for (const b of Game.ObjectsById) b.buy(20);
+    Game.Unlock('Chocolate egg');
+    Game.dragonLevel = 12; // fixture: Earth Shatterer is learned
+    for (let i = 0; i < 5; i++) {
+        const w = Game.wrinklers[i];
+        w.phase = 2; w.close = 1; w.hp = Game.wrinklerHP; w.type = 0; w.sucked = 1e15;
+    }
+    window.__acts = [];
+    const wrap = (obj, name, label) => {
+        const original = obj[name];
+        obj[name] = function () {
+            window.__acts.push(label(this) + (Game.OnAscend ? ' on the ascension screen' : ''));
+            return original.apply(this, arguments);
+        };
+    };
+    for (const b of Game.ObjectsById) wrap(b, 'sell', (me) => 'sell ' + me.name);
+    wrap(Game.Upgrades['Chocolate egg'], 'buy', () => 'buy the Chocolate egg');
+    wrap(Game, 'CollectWrinklers', () => 'collect the wrinklers');
+    wrap(Game, 'SetDragonAura', () => 'set a dragon aura');
+    const market = Game.Objects['Bank'].minigame;
+    if (market) wrap(market, 'sellGood', () => 'sell stock');
+    const garden = Game.Objects['Farm'].minigame;
+    if (garden) wrap(garden, 'harvestAll', () => 'harvest the garden');
+};`;
+
+/** The player ascends, waits on the ascension screen, then reincarnates; what the mod did meanwhile. */
+async function playerAscends(game) {
+    await game.eval(() => Game.Ascend(1)); // the player ascends
+    await game.advanceSeconds(10);
+    const screen = await game.eval(() => ({ onAscend: Game.OnAscend, earned: Game.cookiesEarned, reset: Game.cookiesReset }));
+    assert.equal(screen.onAscend, 1, 'fixture: the ascension screen is reached');
+    await game.eval(() => Game.Reincarnate(1)); // the player reincarnates
+    const after = await game.eval(() => ({ resets: Game.resets, reset: Game.cookiesReset, acts: window.__acts.slice() }));
+    assert.equal(after.resets, 1, 'fixture: reincarnated');
+    return { screen, after };
+}
+
+test("a player's own ascension is left alone, with every option off", { skip }, () =>
+    withMod(async (game) => {
+        await game.eval(ASCENSION_FIXTURE);
+        await game.eval(() => window.__fixture());
+        const { screen, after } = await playerAscends(game);
+        assert.deepEqual(after.acts, [], 'nothing is sold, bought, popped, harvested or switched for the player');
+        assert.equal(after.reset - screen.reset, screen.earned, 'the reset counts what the ascension screen showed, and no more');
+    }));
+
+test("with the Autopilot on, a player's own ascension is still not touched on the ascension screen", { skip }, () =>
+    withMod(async (game) => {
+        await game.eval(ASCENSION_FIXTURE);
+        await game.eval(() => {
+            setPreferenceDirect('autopilot', 1); // the one switch, as the menu button does it
+            window.__fixture();
+        });
+        const { screen, after } = await playerAscends(game);
+        assert.deepEqual(
+            after.acts.filter((a) => a.endsWith('on the ascension screen')),
+            [],
+            'nothing is done while the store and the minigames are hidden'
+        );
+        assert.equal(after.reset - screen.reset, screen.earned, 'the reset counts what the ascension screen showed, and no more');
+    }));

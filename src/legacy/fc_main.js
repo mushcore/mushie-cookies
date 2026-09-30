@@ -345,10 +345,10 @@ function fcDraw(from, text, origin) {
 }
 
 function fcReset(hard) {
-    // Run for an ascension the player started; the mod's own ascension collects beforehand,
-    // while it still counts (the game grants chips before this reset).
-    if (!hard && !FrozenCookies.preparedForAscension) prepareForAscension();
-    FrozenCookies.preparedForAscension = false;
+    // Nothing is collected here. The game calls this from Reincarnate, on the ascension screen,
+    // where a player can neither sell nor buy, after the chips are granted (main.js:4094, 4125);
+    // popped wrinklers could no longer pay (main.js:16165, 3532). The mod's own ascension collects
+    // before Game.Ascend; an ascension the player starts is theirs.
     Game.oldReset(hard);
     FrozenCookies.frenzyTimes = {};
     FrozenCookies.last_gc_state =
@@ -364,15 +364,28 @@ function fcReset(hard) {
     if (MushieCookies.buyer) MushieCookies.buyer.invalidate();
 }
 
-// Everything worth doing in the last moment before an ascension. The wrinkler system collects the
-// wrinklers a tick earlier, so their payout is in the bank when the egg takes its 5%.
+// The last steps of an ascension the mod starts, a tick after the wrinkler system has popped the
+// wrinklers, so their payout is already in the bank (they pay on a later logic frame,
+// main.js:14513). Only the ascension system calls this, before Game.Ascend.
+//
+// What each step gains, by the game's code:
+// - Selling stock or buildings adds to the bank, not to the cookies baked this run
+//   (minigameMarket.js:252-253, main.js:7873-7874), and the reset wipes the bank. The sales count
+//   toward prestige only through the Chocolate egg, bought last, which earns 5% of the bank
+//   (main.js:10398-10403). A stock sale can also earn a stock market achievement
+//   (minigameMarket.js:246-250), which is kept; the market's stock and profit are zeroed at the
+//   reset anyway (minigameMarket.js:774-779). Goods bought in the current market minute cannot be
+//   sold (minigameMarket.js:243) and are lost with the reset.
+// - Harvesting pays each plant's harvest effect (cookies through Game.Earn, which count) and
+//   unlocks the seeds of mature plants; the reset clears the plot unharvested. It runs before the
+//   buildings are sold, while the CpS that caps the cookie harvests is intact.
 function prepareForAscension() {
-    if (B) {
-        for (let i = 0; i < B.goodsById.length; i++) {
-            B.sellGood(i, 10000);
-        } // sell all stock
+    var market = Game.Objects["Bank"].minigame;
+    if (market && market.goodsById) {
+        for (let i = 0; i < market.goodsById.length; i++) market.sellGood(i, 10000);
     }
-    if (G) G.harvestAll(); // harvest all plants
+    var garden = Game.Objects["Farm"].minigame;
+    if (garden) garden.harvestAll();
     if (
         Game.dragonLevel >= 5 + 4 &&
         !Game.hasAura("Earth Shatterer") &&
