@@ -24,7 +24,6 @@ function legacyStart(saveData) {
             document.getElementById("storeBulk100").click();
         }
     });
-    Game.registerHook("draw", updateTimers); // called every draw tick
     Game.registerHook("ticker", function () {
         // News ticker messages, split between normal and Business Day (April Fools)
         // Todo: add messages for garden and stock market minigames
@@ -140,6 +139,13 @@ function legacyStart(saveData) {
         if (hard) emptyCaches();
         // if the user is starting fresh, code will likely need to be called to reinitialize some historical data here as well
     });
+    MushieCookies.loop.add(
+        "infobox",
+        function () {
+            updateTimers();
+        },
+        { everyFrames: 8 }
+    );
     // Leaves the ascension screen once the game is ready for it.
     MushieCookies.loop.add(
         "reincarnate",
@@ -183,8 +189,6 @@ function setOverrides(gameSaveData) {
     FrozenCookies.frequency = 100;
     FrozenCookies.efficiencyWeight = 1.0;
 
-    // Becomes 0 almost immediately after user input, so default to 0
-    FrozenCookies.timeTravelAmount = 0;
 
     // Force redraw every 10 purchases
     FrozenCookies.autobuyCount = 0;
@@ -209,11 +213,9 @@ function setOverrides(gameSaveData) {
         efficiency: 0,
     };
     FrozenCookies.lastGraphDraw = 0;
-    FrozenCookies.calculatedCpsByType = {};
 
     // Allow autoCookie to run
     FrozenCookies.processing = false;
-    FrozenCookies.priceReductionTest = false;
 
     FrozenCookies.cookieBot = 0;
     FrozenCookies.autoclickBot = 0;
@@ -536,10 +538,6 @@ document.addEventListener("keydown", function (event) {
     }
 });
 
-function writeFCButton(setting) {
-    var current = FrozenCookies[setting];
-}
-
 function userInputPrompt(title, description, existingValue, callback) {
     Game.Prompt(
         `<h3>${title}</h3><div class="block" style="text-align:center;">${description}</div><div class="block"><input type="text" style="text-align:center;width:100%;" id="fcGenericInput" value="${existingValue}"/></div>`,
@@ -671,29 +669,6 @@ function updateManBank(base) {
 
 
 
-
-function cyclePreference(preferenceName) {
-    var preference = FrozenCookies.preferenceValues[preferenceName];
-    if (preference) {
-        var display = preference.display;
-        var current = FrozenCookies[preferenceName];
-        var preferenceButton = $("#" + preferenceName + "Button");
-        if (
-            display &&
-            display.length > 0 &&
-            preferenceButton &&
-            preferenceButton.length > 0
-        ) {
-            var newValue = (current + 1) % display.length;
-            preferenceButton[0].innerText = display[newValue];
-            FrozenCookies[preferenceName] = newValue;
-            FrozenCookies.recalculateCaches = true;
-            Game.RefreshStore();
-            Game.RebuildUpgrades();
-            FCStart();
-        }
-    }
-}
 
 function toggleFrozen(setting) {
     if (!FrozenCookies[setting]) {
@@ -979,14 +954,6 @@ function getProbabilityModifiers(listType) {
     return result;
 }
 
-function cumulativeProbability(listType, start, stop) {
-    return (
-        1 -
-        (1 - getProbabilityList(listType)[stop]) /
-            (1 - getProbabilityList(listType)[start])
-    );
-}
-
 function probabilitySpan(listType, start, endProbability) {
     var startProbability = getProbabilityList(listType)[start];
     return _.sortedIndex(
@@ -1157,100 +1124,6 @@ function cookieValue(bankAmount, wrathValue, wrinklerCount) {
     return value;
 }
 
-function cookieStats(bankAmount, wrathValue, wrinklerCount) {
-    var cps = baseCps();
-    var clickCps = baseClickingCps(
-        FrozenCookies.autoClick * FrozenCookies.cookieClickSpeed
-    );
-    var frenzyCps = FrozenCookies.autoFrenzy
-        ? baseClickingCps(
-              FrozenCookies.autoFrenzy * FrozenCookies.frenzyClickSpeed
-          )
-        : clickCps;
-    var luckyMod = Game.Has("Get lucky") ? 2 : 1;
-    var clickFrenzyMod = clickBuffBonus();
-    wrathValue = wrathValue != null ? wrathValue : Game.elderWrath;
-    wrinklerCount = wrinklerCount != null ? wrinklerCount : wrathValue ? 10 : 0;
-    var wrinkler = wrinklerMod(wrinklerCount);
-
-    var result = {};
-    // Clot
-    result.clot =
-        -1 *
-        cookieInfo.clot.odds[wrathValue] *
-        (wrinkler * cps + clickCps) *
-        luckyMod *
-        66 *
-        0.5;
-    // Frenzy
-    result.frenzy =
-        cookieInfo.frenzy.odds[wrathValue] *
-        (wrinkler * cps + clickCps) *
-        luckyMod *
-        77 *
-        7;
-    // Blood
-    result.blood =
-        cookieInfo.blood.odds[wrathValue] *
-        (wrinkler * cps + clickCps) *
-        luckyMod *
-        666 *
-        6;
-    // Chain
-    result.chain =
-        cookieInfo.chain.odds[wrathValue] *
-        calculateChainValue(bankAmount, cps, 7 - wrathValue / 3);
-    // Ruin
-    result.ruin =
-        -1 *
-        cookieInfo.ruin.odds[wrathValue] *
-        (Math.min(bankAmount * 0.05, cps * 60 * 10) + 13);
-    // Frenzy + Ruin
-    result.frenzyRuin =
-        -1 *
-        cookieInfo.frenzyRuin.odds[wrathValue] *
-        (Math.min(bankAmount * 0.05, cps * 60 * 10 * 7) + 13);
-    // Clot + Ruin
-    result.clotRuin =
-        -1 *
-        cookieInfo.clotRuin.odds[wrathValue] *
-        (Math.min(bankAmount * 0.05, cps * 60 * 10 * 0.5) + 13);
-    // Lucky
-    result.lucky =
-        cookieInfo.lucky.odds[wrathValue] *
-        (Math.min(bankAmount * 0.15, cps * 60 * 15) + 13);
-    // Frenzy + Lucky
-    result.frenzyLucky =
-        cookieInfo.frenzyLucky.odds[wrathValue] *
-        (Math.min(bankAmount * 0.15, cps * 60 * 15 * 7) + 13);
-    // Clot + Lucky
-    result.clotLucky =
-        cookieInfo.clotLucky.odds[wrathValue] *
-        (Math.min(bankAmount * 0.15, cps * 60 * 15 * 0.5) + 13);
-    // Click
-    result.click =
-        cookieInfo.click.odds[wrathValue] * frenzyCps * luckyMod * 13 * 777;
-    // Frenzy + Click
-    result.frenzyClick =
-        cookieInfo.frenzyClick.odds[wrathValue] *
-        frenzyCps *
-        luckyMod *
-        13 *
-        777 *
-        7;
-    // Clot + Click
-    result.clotClick =
-        cookieInfo.clotClick.odds[wrathValue] *
-        frenzyCps *
-        luckyMod *
-        13 *
-        777 *
-        0.5;
-    // Blah
-    result.blah = 0;
-    return result;
-}
-
 function reindeerValue(wrathValue) {
     var value = 0;
     if (Game.season == "christmas") {
@@ -1331,41 +1204,6 @@ function wrinklerValue() {
     return Game.wrinklers.reduce(function (s, w) {
         return s + popValue(w);
     }, 0);
-}
-
-function buildingRemaining(building, amount) {
-    var cost = cumulativeBuildingCost(
-        building.basePrice,
-        building.amount,
-        amount
-    );
-    var availableCookies =
-        Game.cookies +
-        wrinklerValue() +
-        Game.ObjectsById.reduce(function (s, b) {
-            return (
-                s +
-                (b.name == building.name
-                    ? 0
-                    : cumulativeBuildingCost(b.basePrice, 1, b.amount + 1) / 2)
-            );
-        }, 0);
-    availableCookies *=
-        Game.HasUnlocked("Chocolate egg") && !Game.Has("Chocolate egg")
-            ? 1.05
-            : 1;
-    return Math.max(0, cost - availableCookies);
-}
-
-function earnedRemaining(total) {
-    return Math.max(
-        0,
-        total - (Game.cookiesEarned + wrinklerValue() + chocolateValue())
-    );
-}
-
-function estimatedTimeRemaining(cookies) {
-    return timeDisplay(cookies / effectiveCps());
 }
 
 function canCastSE() {
@@ -1582,48 +1420,6 @@ function bestBank(minEfficiency) {
     };
 }
 
-function weightedCookieValue(useCurrent) {
-    var cps = baseCps();
-    var lucky_mod = Game.Has("Get lucky");
-    var base_wrath = lucky_mod ? 401.835 * cps : 396.51 * cps;
-    //  base_wrath += 192125500000;
-    var base_golden = lucky_mod ? 2804.76 * cps : 814.38 * cps;
-    if (Game.cookiesEarned >= 100000) {
-        var remainingProbability = 1;
-        var startingValue = "6666";
-        var rollingEstimate = 0;
-        for (
-            var i = 5;
-            i < Math.min(Math.floor(Game.cookies).toString().length, 12);
-            i++
-        ) {
-            startingValue += "6";
-            rollingEstimate += 0.1 * remainingProbability * startingValue;
-            remainingProbability -= remainingProbability * 0.1;
-        }
-        rollingEstimate += remainingProbability * startingValue;
-        //    base_golden += 10655700000;
-        base_golden += rollingEstimate * 0.0033;
-        base_wrath += rollingEstimate * 0.0595;
-    }
-    if (useCurrent && Game.cookies < maxLuckyBank()) {
-        if (lucky_mod) {
-            base_golden -=
-                (900 * cps - Math.min(900 * cps, Game.cookies * 0.15)) *
-                    0.49 *
-                    0.5 +
-                (maxLuckyValue() - Game.cookies * 0.15) * 0.49 * 0.5;
-        } else {
-            base_golden -= (maxLuckyValue() - Game.cookies * 0.15) * 0.49;
-            base_wrath -= (maxLuckyValue() - Game.cookies * 0.15) * 0.29;
-        }
-    }
-    return (
-        (Game.elderWrath / 3.0) * base_wrath +
-        ((3 - Game.elderWrath) / 3.0) * base_golden
-    );
-}
-
 function maxLuckyValue() {
     var gcMod = Game.Has("Get lucky") ? 6300 : 900;
     return baseCps() * gcMod;
@@ -1644,24 +1440,8 @@ function gcPs(gcValue) {
     return gcValue;
 }
 
-function gcEfficiency() {
-    if (gcPs(weightedCookieValue()) <= 0) return Number.MAX_VALUE;
-    var cost = Math.max(0, maxLuckyValue() * 10 - Game.cookies);
-    var deltaCps = gcPs(weightedCookieValue() - weightedCookieValue(true));
-    return divCps(cost, deltaCps);
-}
-
 function delayAmount() {
     return bestBank(nextChainedPurchase().efficiency).cost;
-    /*
-        if (nextChainedPurchase().efficiency > gcEfficiency() || (Game.frenzy && Game.Has('Get lucky'))) {
-          return maxLuckyValue() * 10;
-        } else if (weightedCookieValue() > weightedCookieValue(true)) {
-          return Math.min(maxLuckyValue() * 10, Math.max(0,(nextChainedPurchase().efficiency - (gcEfficiency() * baseCps())) / gcEfficiency()));
-        } else {
-         return 0;
-        }
-      */
 }
 
 function haveAll(holiday) {
@@ -2446,22 +2226,6 @@ function logEvent(event, text, popup) {
     var output = time + " " + event + ": " + text;
     if (FrozenCookies.logging) console.log(output);
     if (popup) Game.Popup(text);
-}
-
-function transpose(a) {
-    return Object.keys(a[0]).map(function (c) {
-        return a.map(function (r) {
-            return r[c];
-        });
-    });
-}
-
-// Unused
-function shouldClickGC() {
-    for (var i in Game.shimmers) {
-        if (Game.shimmers[i].type == "golden")
-            return Game.shimmers[i].life > 0 && FrozenCookies.autoGC;
-    }
 }
 
 function liveWrinklers() {
