@@ -66,6 +66,30 @@ test('functions the audit found unreferenced are gone', () => {
     assert.deepEqual(found, []);
 });
 
+test('inherited actions a new system replaced are gone, so two systems never act on one thing', () => {
+    // The dragon system (src/systems/dragon.js) trains and pets; these acted on the same dragon.
+    const replaced = ['autoDragonAction', 'petDragonAction', 'autoDragonBot', 'petDragonBot'];
+    const found = [];
+    for (const [file, src] of all) {
+        for (const name of replaced) if (new RegExp(`\\b${name}\\b`).test(src)) found.push(`${file}: ${name}`);
+    }
+    assert.deepEqual(found, []);
+});
+
+test('the inherited lump harvest is gone: the lump system is the only thing that clicks the lump', () => {
+    // autoSL's ripe click lived in autoCookieBody and clicked in Born again; Auto Rigidel sold
+    // buildings and spent pantheon swaps; the Dragon's Curve step fought the aura system; lumpIn
+    // wrote Game.lumpT. Rigidel and Dragon's Curve steps belong to the gods system.
+    const found = [];
+    for (const [file, src] of all) {
+        for (const name of ['autoRigidel', 'autoDragonsCurve', 'rigiSell', 'lumpIn', 'dragonsCurve']) {
+            if (new RegExp(`\\b${name}\\b`).test(src)) found.push(`${file}: ${name}`);
+        }
+        if (/clickLump|lumpT\s*=[^=]/.test(src)) found.push(`${file}: touches the lump`);
+    }
+    assert.deepEqual(found, []);
+});
+
 test('every function called by bare name is defined somewhere', () => {
     // Catches a deletion that removed a function something still calls.
     const defined = new Set();

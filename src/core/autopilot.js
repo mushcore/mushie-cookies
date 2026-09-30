@@ -30,12 +30,12 @@ export const AUTOPILOT = Object.freeze({
     autoWrinkler: 1,
     shinyPop: 0,
 
-    // Sugar lumps: harvest when ripe, spend with the lump system. Rigidel and aura swaps around
-    // the harvest would fight the pantheon and aura system, so they stay off.
+    // Sugar lumps: the lump system harvests at ripe (a golden lump by its payout), spends, and
+    // takes Sugar frenzy near the end of a run.
     autoSL: 1,
-    dragonsCurve: 0,
     sugarBakingGuard: 1,
     autoLumps: 1,
+    sugarFrenzy: 1,
 
     // Minigames: the new systems, and every inherited system that acts on the same thing off.
     autoFate: 1,
@@ -65,10 +65,10 @@ export const AUTOPILOT = Object.freeze({
     autoBank: 0,
     autoBroker: 0,
 
-    // Dragon. The inherited petting reseeds the game's generator every second, so it stays off
-    // until the dragon system pets with a private forecast.
+    // Dragon: trained by what each level's aura repays, petted for drops forecast on a private
+    // generator (src/systems/dragon.js).
     autoDragon: 1,
-    petDragon: 0,
+    petDragon: 1,
 
     // Seasons. The inherited Easter and Halloween switches fight each other at rising prices,
     // ignore the buyer's reserve and pop every wrinkler all season; off until the season planner.

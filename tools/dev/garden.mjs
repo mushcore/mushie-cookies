@@ -15,6 +15,8 @@ try {
         Game.Earn(1e30);
         for (const name of ['Cursor', 'Grandma', 'Farm', 'Mine', 'Factory']) Game.Objects[name].buy(name === 'Farm' ? 320 : 100);
         Game.cookies = 1e15;
+        // The garden's seed budget is a share of cookies earned: at 1e30 no income would register.
+        Game.cookiesEarned = Game.cookies;
         if (Game.Objects['Farm'].amount < 300) throw new Error('fixture: only ' + Game.Objects['Farm'].amount + ' farms');
         Game.Objects['Farm'].level = 9;
         Game.LoadMinigames();

@@ -12,8 +12,23 @@ try {
 }
 
 const DIR = path.join(os.tmpdir(), 'mushie-cookies-harness-slots');
-/** MUSHIE_MAX_GAMES overrides; the default leaves most of the machine to everything else. */
-export const MAX_GAMES = Math.max(1, Number(process.env.MUSHIE_MAX_GAMES) || Math.max(2, Math.floor(os.cpus().length / 4)));
+const CAP_FILE = path.join(DIR, 'max-games');
+
+/**
+ * How many games may run at once: MUSHIE_MAX_GAMES, else the number in the shared `max-games`
+ * file (read at every launch, so the cap can be raised or lowered while runs are going), else
+ * half the logical CPUs.
+ */
+export function maxGames() {
+    const fromEnv = Number(process.env.MUSHIE_MAX_GAMES);
+    if (fromEnv > 0) return Math.floor(fromEnv);
+    try {
+        const fromFile = Number(fs.readFileSync(CAP_FILE, 'utf8').trim());
+        if (fromFile > 0) return Math.floor(fromFile);
+    } catch (e) {}
+    return Math.max(2, Math.floor(os.cpus().length / 2));
+}
+export const MAX_GAMES = maxGames();
 
 const held = new Set();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -57,7 +72,8 @@ function tryTake(i) {
 export async function takeSlot() {
     fs.mkdirSync(DIR, { recursive: true });
     for (let waited = 0; ; waited++) {
-        for (let i = 0; i < MAX_GAMES; i++) {
+        const max = maxGames();
+        for (let i = 0; i < max; i++) {
             const file = tryTake(i);
             if (file) {
                 held.add(file);
@@ -72,7 +88,7 @@ export async function takeSlot() {
                 };
             }
         }
-        if (waited === 0) process.stderr.write(`harness: all ${MAX_GAMES} game slots are busy; waiting\n`);
+        if (waited === 0) process.stderr.write(`harness: all ${max} game slots are busy; waiting\n`);
         await sleep(2000);
     }
 }

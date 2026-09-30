@@ -1,5 +1,6 @@
 // Casts Force the Hand of Fate at the right moment: the next outcome is forecast, bad ones are
-// burnt with a harmless spell, good ones wait for a buff to land on unless mana is full.
+// burnt with a harmless spell, good ones wait out a debuff that ends soon enough, and wait for a
+// buff to land on unless mana is full.
 import { forecastFate } from '../game/fate.js';
 import { decideCast } from '../core/grimoire.js';
 import { readState } from '../game/measure.js';

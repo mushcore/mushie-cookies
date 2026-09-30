@@ -103,21 +103,8 @@ FrozenCookies.preferenceValues = {
         default: 0,
     },
     autoSL: {
-        hint: "Auto-harvest sugar lumps (optionally with Rigidel).",
-        display: [
-            "Autoharvest SL OFF",
-            "Autoharvest SL ON",
-            "Autoharvest SL ON + AUTO RIGIDEL",
-        ],
-        default: 0,
-    },
-    dragonsCurve: {
-        hint: "Swap in Dragon's Curve (and Reality Bending) for lump harvest.",
-        display: [
-            "Auto-Dragon's Curve OFF",
-            "Auto-Dragon's Curve ON",
-            "Auto-Dragon's Curve ON + REALITY BENDING",
-        ],
+        hint: "Harvest sugar lumps when ripe; a golden lump waits for a full bank or a CpS buff, never past falling. Nothing in Born again.",
+        display: ["Autoharvest SL OFF", "Autoharvest SL ON"],
         default: 0,
     },
     autoLumps: {
@@ -126,8 +113,13 @@ FrozenCookies.preferenceValues = {
         default: 0,
     },
     sugarBakingGuard: {
-        hint: "Don't spend lumps below 101 (keep Sugar Baking bonus).",
+        hint: "Before Sugar baking is owned, keep 100 lumps ready for it after the minigame, Farm 9 and Cursor 12 targets (once owned, 100 are always kept).",
         display: ["Sugar Baking Guard OFF", "Sugar Baking Guard ON"],
+        default: 0,
+    },
+    sugarFrenzy: {
+        hint: "Spend a lump on Sugar frenzy (x3 CpS for an hour, once an ascension) near the end of a run, when two hours of CpS beat the best building level.",
+        display: ["Sugar Frenzy OFF", "Sugar Frenzy ON"],
         default: 0,
     },
     autoGS: {
@@ -308,7 +300,7 @@ FrozenCookies.preferenceValues = {
         default: 0,
     },
     petDragon: {
-        hint: "Auto-pet dragon for drops.",
+        hint: "Pet the dragon for its drops, only while this quarter hour's drop is missing (needs Pet the dragon).",
         display: ["Dragon Petting OFF", "Dragon Petting ON"],
         default: 0,
     },
