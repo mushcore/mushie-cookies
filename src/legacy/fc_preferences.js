@@ -247,6 +247,11 @@ FrozenCookies.preferenceValues = {
         default: 0,
         extras: '<a class="option" id="manaMax" onclick="updateManaMax(\'manaMax\');">${manaMax} max Mana</a>',
     },
+    autoGods: {
+        hint: "Slot Pantheon gods and pick dragon auras by what they add to income (needs the worship, Cyclius and aura options below OFF).",
+        display: ["Auto Gods & Auras OFF", "Auto Gods & Auras ON"],
+        default: 0,
+    },
     autoMarket: {
         hint: "Trade the stock market with prices derived by simulating the game's own price model; spends only cookies the buyer is not holding.",
         display: ["Auto Trading OFF", "Auto Trading ON"],

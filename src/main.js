@@ -32,6 +32,7 @@ export let lumps = null;
 export let grimoire = null;
 export let garden = null;
 export let market = null;
+export let gods = null;
 
 const guards = createGuard({
     maxFailures: 5,
@@ -78,6 +79,7 @@ const runtime = {
         grimoire = systems.grimoire;
         garden = systems.garden;
         market = systems.market;
+        gods = systems.gods;
     },
     save: () => window.saveFCData(),
     load: (data) => window.setOverrides(data),

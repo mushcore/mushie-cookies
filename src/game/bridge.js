@@ -6,6 +6,7 @@ import { createLumps } from '../systems/lumps.js';
 import { createGrimoire } from '../systems/grimoire.js';
 import { createGarden } from '../systems/garden.js';
 import { createMarket } from '../systems/market.js';
+import { createGods } from '../systems/gods.js';
 
 const CHAIN_REACH = 15;
 
@@ -59,5 +60,6 @@ export function startSystems({ game, loop, legacy, log }) {
     const grimoire = createGrimoire({ game, settings, loop, log });
     const garden = createGarden({ game, settings, loop, log });
     const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
-    return { buyer, ascension, lumps, grimoire, garden, market };
+    const gods = createGods({ game, settings, loop, log, buyer });
+    return { buyer, ascension, lumps, grimoire, garden, market, gods };
 }
