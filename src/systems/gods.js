@@ -6,7 +6,7 @@
 // aura), and only when it is clearly worth what it costs: a swap, or a building sacrificed.
 import { simulate } from '../core/sim.js';
 import { estimateIncome } from '../core/income.js';
-import { chooseAura, inheritedGodsOn, inheritedAurasOn } from '../core/gods.js';
+import { chooseAura, inheritedGodsOn, inheritedAurasOn, lindyHorizon, auraHorizon, RETURN_BLOCK_SECONDS } from '../core/gods.js';
 import { readState } from '../game/measure.js';
 
 const DECIDE_EVERY = 30 * 60 * 5; // five minutes of frames between decisions
@@ -24,9 +24,13 @@ const SKIP_GODS = new Set(['asceticism', 'ruin', 'ages', 'order']);
 const SKIP_AURAS = new Set(['Earth Shatterer', 'Master of the Armory', 'Fierce Hoarder', 'Mind Over Matter', "Dragon's Curve", 'Supreme Intellect', 'Dragon Orbs']);
 
 export function createGods({ game, settings, loop, buyer = null, log = () => {} }) {
-    // An aura switch must repay the building it sacrifices within this many seconds of the income
-    // it adds (see chooseAura in src/core/gods.js).
-    const options = { auraPaybackSeconds: 60 * 60 };
+    // See chooseAura in src/core/gods.js.
+    //  - auraHorizon: an aura switch must repay the building it sacrifices within this many
+    //    seconds of the income it adds: a number, or a function of the run's age in seconds.
+    //    By default, as long as the run has lasted, and at least an hour.
+    //  - returnBlockSeconds: how long after a switch the aura it left is not taken back.
+    const options = { auraHorizon: lindyHorizon, returnBlockSeconds: RETURN_BLOCK_SECONDS };
+    const runSeconds = () => Math.max(0, (Date.now() - game.startDate) / 1000);
     const invalidate = () => buyer && buyer.invalidate();
     const state = { swaps: 0, auraChanges: 0, last: null, dueAt: DECIDE_EVERY, recent: {} };
     const income = () => estimateIncome(readState(game, settings)).total;
@@ -175,7 +179,14 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
     function auras(frame) {
         const t = frame / game.fps;
         const { now, moves } = measureAuras();
-        const best = chooseAura({ now, moves, paybackSeconds: options.auraPaybackSeconds, t, recent: state.recent });
+        const best = chooseAura({
+            now,
+            moves,
+            horizonSeconds: auraHorizon(options.auraHorizon, runSeconds()),
+            returnBlockSeconds: options.returnBlockSeconds,
+            t,
+            recent: state.recent,
+        });
         if (!best) return;
         const left = best.slot === 0 ? game.dragonAura : game.dragonAura2;
         game.SetDragonAura(best.id, best.slot);

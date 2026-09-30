@@ -320,6 +320,51 @@ test('picks the dragon aura that adds the most income and pays the game\'s price
     }
 });
 
+test('an aura switch must repay its building within the time the run is expected to last', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        const start = await game.eval(() => {
+            Game.Earn(1e15);
+            for (const name of ['Cursor', 'Grandma', 'Farm', 'Mine', 'Factory', 'Bank']) Game.Objects[name].buy(60);
+            Game.Objects['Shipment'].buy(10);
+            // The highest building is a single Alchemy lab, a large share of income: Radiant
+            // Appetite repays it in about two hours.
+            Game.Objects['Alchemy lab'].buy(1);
+            Game.dragonLevel = 20;
+            Game.dragonAura = 0;
+            Game.CalculateGains();
+            FrozenCookies.autoGods = 1;
+            FrozenCookies.autoDragonToggle = 0;
+            return {
+                appetite: MushieCookies.gods.plan().auras.find((m) => m.name === 'Radiant Appetite'),
+                run: (Date.now() - Game.startDate) / 1000,
+                owned: Game.BuildingsOwned,
+            };
+        });
+        const { appetite } = start;
+        assert.ok(appetite.gain > 0.02 && appetite.payback > 3600 && appetite.payback < 3 * 3600, JSON.stringify(appetite));
+        assert.ok(start.run < 60, 'the run has just begun');
+
+        // A run minutes old is expected to last about an hour more (at least): too short.
+        await game.advanceSeconds(6 * 60);
+        const fresh = await game.eval(() => ({ aura: Game.dragonAura, owned: Game.BuildingsOwned, report: MushieCookies.gods.report() }));
+        assert.equal(fresh.aura, 0, `switched: ${fresh.report.last}`);
+        assert.equal(fresh.owned, start.owned);
+
+        // The same bakery three hours into the run is expected to last about three hours more.
+        await game.eval(() => {
+            Game.startDate -= 3 * 60 * 60 * 1000;
+        });
+        await game.advanceSeconds(5 * 60);
+        const later = await game.eval(() => ({ name: Game.dragonAuras[Game.dragonAura].name, owned: Game.BuildingsOwned, report: MushieCookies.gods.report() }));
+        assert.equal(later.name, 'Radiant Appetite', JSON.stringify(later.report));
+        assert.equal(later.report.auraChanges, 1);
+        assert.equal(later.owned, start.owned - 1, 'the Alchemy lab is sacrificed');
+    } finally {
+        await game.close();
+    }
+});
+
 test('a golden cookie on screen does not make Dragon\'s Fortune look worth a building', { skip }, async () => {
     const game = await launchWithMod();
     try {
