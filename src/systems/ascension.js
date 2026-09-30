@@ -40,7 +40,7 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
     const options = { rule: 'rate', firstTarget: null };
     const state = {
         phase: 'playing', // then 'settling' after collecting, then 'ascending'
-        run: null, // { resets, startDate, start: {t, projected} }
+        run: null, // { resets, startDate, start: {t, projected}, seconds, frame }
         history: [],
         lastSampleAt: -Infinity,
         settle: 0,
@@ -53,7 +53,12 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
 
     const realised = () => game.HowMuchPrestige(game.cookiesReset + game.cookiesEarned);
     const withExtras = () => game.HowMuchPrestige(game.cookiesReset + game.cookiesEarned + extras());
-    const runSeconds = () => Math.max(0, (Date.now() - game.startDate) / 1000);
+    const wallAge = () => Math.max(0, (Date.now() - game.startDate) / 1000);
+    // The run is timed by play. The game makes nothing while the machine sleeps or the loop
+    // stalls (it catches up at most 5 s, main.js:16788), and a rate measured across that gap
+    // reads as a run that stopped growing. The run-length guard reads this clock too; the first
+    // ascension's target is a prestige level and reads no clock.
+    const runSeconds = () => (state.run ? state.run.seconds : wallAge());
 
     function firstTarget() {
         if (options.firstTarget) return options.firstTarget;
@@ -81,13 +86,21 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
         return game.Has('How to bake your dragon') && !game.HasUnlocked('A crumbly egg') && game.cookiesEarned < 1e6;
     }
 
-    /** A run is a stretch between reincarnations; the game counts them and dates their start. */
-    function trackRun() {
+    /**
+     * A run is a stretch between reincarnations; the game counts them and dates their start.
+     * Its clock advances by the logic frames the mod sees, whether Auto Ascend is on or not.
+     */
+    function trackRun(frame) {
         const current = { resets: game.resets, startDate: game.startDate };
-        if (state.run && state.run.resets === current.resets && state.run.startDate === current.startDate) return;
+        if (state.run && state.run.resets === current.resets && state.run.startDate === current.startDate) {
+            state.run.seconds += (frame - state.run.frame) / game.fps;
+            state.run.frame = frame;
+            return;
+        }
         // The run began at the prestige its reset left: measured from there even when the mod
-        // starts mid-run, the average is not understated and the ascension not put off.
-        state.run = { ...current, start: { t: 0, projected: game.HowMuchPrestige(game.cookiesReset) } };
+        // starts mid-run, the average is not understated and the ascension not put off. What came
+        // before the mod saw the run can only be read from the wall clock.
+        state.run = { ...current, start: { t: 0, projected: game.HowMuchPrestige(game.cookiesReset) }, seconds: wallAge(), frame };
         state.history = [];
         state.lastSampleAt = -Infinity;
     }
@@ -176,17 +189,19 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
         if (buyer) buyer.invalidate();
     }
 
-    function tick() {
+    function tick(frame) {
+        trackRun(frame);
+        if (settings.autoAscendToggle != 1) return;
         if (state.phase === 'settling') return ascend();
         if (state.phase === 'ascending') return finish();
         // An ascension the mod did not start is left to the player.
         if (game.OnAscend || game.AscendTimer) return;
-        trackRun();
         sample();
         decide();
     }
 
-    loop.add('ascension', tick, { everyFrames: TICK_EVERY, enabled: () => settings.autoAscendToggle == 1 });
+    // Always ticking: the run clock counts play with Auto Ascend off too.
+    loop.add('ascension', tick, { everyFrames: TICK_EVERY });
 
     return {
         options,

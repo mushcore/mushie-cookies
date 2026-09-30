@@ -173,3 +173,47 @@ test('with auto-ascend off nothing ascends, however much prestige is waiting', {
         await game.close();
     }
 });
+
+test('a machine sleep does not end a run that is still growing', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        // A run an hour old at prestige 100, gaining a tenth of a level a minute: faster than its
+        // average. Golden cookies off, so nothing but the rule moves.
+        await game.eval(() => {
+            Game.shimmerTypes.golden.spawnConditions = () => false;
+            Game.prestige = 100;
+            Game.heavenlyChips = 0;
+            Game.resets = 1;
+            Game.cookiesReset = Game.HowManyCookiesReset(100);
+            Game.startDate = Date.now() - 3600 * 1000;
+            FrozenCookies.autoAscendToggle = 1;
+            FCStart();
+        });
+        const grow = (minute) =>
+            game.eval((m) => {
+                Game.cookiesEarned = Game.HowManyCookiesReset(100.5 + 0.12 * m) - Game.cookiesReset;
+            }, minute);
+        const read = () =>
+            game.eval(() => {
+                const r = MushieCookies.ascension.report();
+                return { resets: Game.resets, ascending: Game.OnAscend || Game.AscendTimer, phase: r.phase, verdict: r.verdict && r.verdict.reason, runSeconds: r.runSeconds };
+            });
+        for (let minute = 0; minute < 16; minute++) {
+            await grow(minute);
+            await game.advanceSeconds(60);
+        }
+        const awake = await read();
+        assert.match(awake.verdict, /still growing/, 'the premise: awake, the run is growing faster than its average');
+
+        await game.machineSleep(3600);
+        await grow(16);
+        await game.advanceSeconds(10);
+        const woken = await read();
+        assert.deepEqual({ resets: woken.resets, ascending: woken.ascending, phase: woken.phase }, { resets: 1, ascending: 0, phase: 'playing' }, woken.verdict);
+        assert.match(woken.verdict, /still growing/);
+        assert.ok(Math.abs(woken.runSeconds - (3600 + 16 * 60 + 10)) < 5, `the run clock counts play: ${woken.runSeconds}`);
+        assert.deepEqual(game.errors, []);
+    } finally {
+        await game.close();
+    }
+});
