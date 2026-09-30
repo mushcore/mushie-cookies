@@ -1,0 +1,120 @@
+{
+  "seed": "baseline",
+  "settings": {
+    "autoBuy": 1,
+    "autoGC": 1,
+    "autoClick": 1,
+    "cookieClickSpeed": 50
+  },
+  "wallSeconds": 176,
+  "points": [
+    {
+      "minute": 10,
+      "earned": 1635349.926666708,
+      "cps": 3753.8,
+      "unbuffedCps": 3753.8,
+      "buildings": 121,
+      "upgrades": 12,
+      "achievements": 20
+    },
+    {
+      "minute": 20,
+      "earned": 8531265.760714214,
+      "cps": 14600.2,
+      "unbuffedCps": 14600.2,
+      "buildings": 160,
+      "upgrades": 16,
+      "achievements": 21
+    },
+    {
+      "minute": 30,
+      "earned": 48447025.27816643,
+      "cps": 42813.84,
+      "unbuffedCps": 42813.84,
+      "buildings": 192,
+      "upgrades": 19,
+      "achievements": 25
+    },
+    {
+      "minute": 40,
+      "earned": 125323977.86771993,
+      "cps": 97975.55098693335,
+      "unbuffedCps": 97975.55098693335,
+      "buildings": 236,
+      "upgrades": 25,
+      "achievements": 27
+    },
+    {
+      "minute": 50,
+      "earned": 375500492.8817004,
+      "cps": 233887.26819010137,
+      "unbuffedCps": 233887.26819010137,
+      "buildings": 262,
+      "upgrades": 28,
+      "achievements": 27
+    },
+    {
+      "minute": 60,
+      "earned": 619718788.078151,
+      "cps": 255162.1101448534,
+      "unbuffedCps": 255162.1101448534,
+      "buildings": 294,
+      "upgrades": 28,
+      "achievements": 30
+    },
+    {
+      "minute": 70,
+      "earned": 1488648629.3271937,
+      "cps": 505833.5259720768,
+      "unbuffedCps": 505833.5259720768,
+      "buildings": 339,
+      "upgrades": 32,
+      "achievements": 32
+    },
+    {
+      "minute": 80,
+      "earned": 2561405625.7503777,
+      "cps": 554752.1561285614,
+      "unbuffedCps": 554752.1561285614,
+      "buildings": 348,
+      "upgrades": 33,
+      "achievements": 33
+    },
+    {
+      "minute": 90,
+      "earned": 24150680414.52892,
+      "cps": 3870438.303950508,
+      "unbuffedCps": 3870438.303950508,
+      "buildings": 438,
+      "upgrades": 49,
+      "achievements": 37
+    },
+    {
+      "minute": 100,
+      "earned": 37253542812.791885,
+      "cps": 5586278.863336333,
+      "unbuffedCps": 5586278.863336333,
+      "buildings": 442,
+      "upgrades": 50,
+      "achievements": 38
+    },
+    {
+      "minute": 110,
+      "earned": 49429324347.60266,
+      "cps": 7086397.806928371,
+      "unbuffedCps": 7086397.806928371,
+      "buildings": 449,
+      "upgrades": 51,
+      "achievements": 38
+    },
+    {
+      "minute": 120,
+      "earned": 65947433234.11957,
+      "cps": 7456642.560484643,
+      "unbuffedCps": 7456642.560484643,
+      "buildings": 459,
+      "upgrades": 52,
+      "achievements": 38
+    }
+  ]
+}
