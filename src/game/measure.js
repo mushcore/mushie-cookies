@@ -1,6 +1,7 @@
 // Reads the live game into the plain state that src/core/income.js estimates from.
 import { outcomeProbabilities } from '../core/goldenPool.js';
 import { simulateEach } from '../core/sim.js';
+import { devastationState } from './combos.js';
 
 /** The game rejects clicks less than 20 ms apart (main.js:4770), so 50 a second is the most that count. */
 export const MAX_CLICKS_PER_SECOND = 50;
@@ -149,7 +150,7 @@ function wrinklerState(game, settings) {
 
 /**
  * The income state of the game as it is now.
- * @param {object} settings  the mod's settings: autoClick, cookieClickSpeed
+ * @param {object} settings  the mod's settings: autoClick, cookieClickSpeed, autoWrinkler, autoGodzamok
  */
 export function readState(game, settings) {
     return {
@@ -161,6 +162,7 @@ export function readState(game, settings) {
         basket: game.ObjectsById.reduce((sum, b) => sum + b.getPrice(), 0),
         wrinklers: wrinklerState(game, settings),
         golden: goldenState(game),
+        devastation: devastationState(game, settings),
     };
 }
 

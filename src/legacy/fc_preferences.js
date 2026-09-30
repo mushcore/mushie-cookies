@@ -62,13 +62,13 @@ FrozenCookies.preferenceValues = {
         default: 0,
     },
     mineLimit: {
-        hint: "Limit mines for Godzamok combos.",
+        hint: "Cap how many mines the buyer buys.",
         display: ["Mine Limit OFF", "Mine Limit ON"],
         default: 0,
         extras: '<a class="option" id="mineMax" onclick="updateMineMax(\'mineMax\');">${mineMax} Mines</a>',
     },
     factoryLimit: {
-        hint: "Limit factories for Godzamok combos.",
+        hint: "Cap how many factories the buyer buys.",
         display: ["Factory Limit OFF", "Factory Limit ON"],
         default: 0,
         extras: '<a class="option" id="factoryMax" onclick="updateFactoryMax(\'factoryMax\');">${factoryMax} Factories</a>',
@@ -131,12 +131,12 @@ FrozenCookies.preferenceValues = {
         default: 0,
     },
     autoGS: {
-        hint: "Auto-toggle Golden Switch for click buffs.",
+        hint: "Turn the Golden Switch on for a click buff when what it adds beats both toggles and the golden cookies it stops; off at the cheapest moment after.",
         display: ["Auto-Golden Switch OFF", "Auto-Golden Switch ON"],
         default: 0,
     },
     autoGodzamok: {
-        hint: "Auto-sell mines/factories for Godzamok during click buffs.",
+        hint: "With Godzamok slotted, during click buffs sell and buy straight back the buildings that give the most Devastation per cookie lost, while that pays.",
         display: ["Auto-Godzamok OFF", "Auto-Godzamok ON"],
         default: 0,
     },

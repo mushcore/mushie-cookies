@@ -7,6 +7,7 @@ import { createGrimoire } from '../systems/grimoire.js';
 import { createGarden } from '../systems/garden.js';
 import { createMarket } from '../systems/market.js';
 import { createGods } from '../systems/gods.js';
+import { createCombos } from '../systems/combos.js';
 
 const CHAIN_REACH = 15;
 
@@ -46,13 +47,15 @@ export function extraReserveFrom(settings, helpers) {
 /** Starts the new systems once the legacy code has started. Returns them by name. */
 export function startSystems({ game, loop, legacy, log }) {
     const settings = legacy.settings;
+    let combos = null;
     const buyer = createBuyer({
         game,
         settings,
         loop,
         log,
         policy: () => policyFrom(game, settings, legacy.blacklistPresets, legacy.prerequisites),
-        extraReserve: () => extraReserveFrom(settings, legacy),
+        // And what the Golden switch needs held while it is on for a combo (src/systems/combos.js).
+        extraReserve: () => Math.max(extraReserveFrom(settings, legacy), combos ? combos.hold() : 0),
     });
     const ascension = createAscension({
         game,
@@ -68,5 +71,6 @@ export function startSystems({ game, loop, legacy, log }) {
     const garden = createGarden({ game, settings, loop, log, reserve: () => buyer.reserve() });
     const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
     const gods = createGods({ game, settings, loop, log, buyer });
-    return { buyer, ascension, lumps, grimoire, garden, market, gods };
+    combos = createCombos({ game, settings, loop, log, buyer });
+    return { buyer, ascension, lumps, grimoire, garden, market, gods, combos };
 }

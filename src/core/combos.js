@@ -110,37 +110,72 @@ export function saleOptions(buildings) {
  * @returns {{sales: Array<{id: number, units: number, loss: number}>, units: number, loss: number, gain: number}}
  */
 export function planSale({ options, gainPerUnit, budget }) {
+    const choice = chooseSale(options, gainPerUnit, budget);
     const sales = [];
-    let units = 0;
-    let loss = 0;
-    let left = budget;
-    const take = (option, n, l) => {
-        sales.push({ id: option.id, units: n, loss: l });
-        units += n;
-        loss += l;
-        left -= l;
-    };
-    for (const option of options) {
-        if (!(option.perUnit < gainPerUnit)) break;
-        if (option.loss <= left) {
-            take(option, option.sellable, option.loss);
-            continue;
-        }
-        // The largest top part the budget covers; the loss grows with the part.
-        let lo = 0;
-        let hi = option.sellable - 1;
-        while (lo < hi) {
-            const mid = Math.ceil((lo + hi) / 2);
-            if (saleLoss(option.building, mid) <= left) lo = mid;
-            else hi = mid - 1;
-        }
-        if (lo > 0) {
-            const l = saleLoss(option.building, lo);
-            if (lo * gainPerUnit > l) take(option, lo, l);
-        }
-        break;
+    for (let i = 0; i < choice.whole; i++) sales.push({ id: options[i].id, units: options[i].sellable, loss: options[i].loss });
+    if (choice.part > 0) sales.push({ id: options[choice.whole].id, units: choice.part, loss: choice.partLoss });
+    return { sales, units: choice.units, loss: choice.loss, gain: choice.units * gainPerUnit };
+}
+
+// Running totals of units and losses over the options, cheapest first: the income model plans a
+// sale for every cycle of every click buff of every what-if, so a plan is two binary searches.
+const prefixes = new WeakMap();
+function prefixOf(options) {
+    let p = prefixes.get(options);
+    if (p && p.n === options.length) return p;
+    p = { n: options.length, units: [0], loss: [0] };
+    for (let i = 0; i < options.length; i++) {
+        p.units.push(p.units[i] + options[i].sellable);
+        p.loss.push(p.loss[i] + options[i].loss);
     }
-    return { sales, units, loss, gain: units * gainPerUnit };
+    prefixes.set(options, p);
+    return p;
+}
+
+/** How many options are sold whole, and how many top units of the next, for planSale. */
+function chooseSale(options, gainPerUnit, budget) {
+    const p = prefixOf(options);
+    // Options worth selling: a prefix, since they are sorted by loss per unit.
+    let lo = 0;
+    let hi = options.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (options[mid].perUnit < gainPerUnit) lo = mid + 1;
+        else hi = mid;
+    }
+    const worth = lo;
+    // Of those, the prefix the budget covers whole.
+    lo = 0;
+    hi = worth;
+    while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (p.loss[mid] <= budget) lo = mid;
+        else hi = mid - 1;
+    }
+    const whole = lo;
+    const out = { whole, part: 0, partLoss: 0, units: p.units[whole], loss: p.loss[whole] };
+    if (whole < worth) {
+        // The largest top part of the next that the rest covers; the loss grows with the part.
+        const option = options[whole];
+        const left = budget - p.loss[whole];
+        let a = 0;
+        let b = option.sellable - 1;
+        while (a < b) {
+            const mid = Math.ceil((a + b) / 2);
+            if (saleLoss(option.building, mid) <= left) a = mid;
+            else b = mid - 1;
+        }
+        if (a > 0) {
+            const l = saleLoss(option.building, a);
+            if (a * gainPerUnit > l) {
+                out.part = a;
+                out.partLoss = l;
+                out.units += a;
+                out.loss += l;
+            }
+        }
+    }
+    return out;
 }
 
 /**
@@ -172,14 +207,15 @@ export function comboOverBuff({ options, perBuilding, clickRate, seconds, cycleS
         const end = fresh ? t + windowSeconds : devEnd;
         const overlap = Math.min(end, seconds) - t;
         if (overlap > 0) {
-            const plan = planSale({ options, gainPerUnit: perBuilding * clickRate * overlap, budget: left });
+            const gainPerUnit = perBuilding * clickRate * overlap;
+            const plan = chooseSale(options, gainPerUnit, left);
             if (plan.units > 0) {
                 if (fresh) {
                     devEnd = end;
                     devAdd = 0;
                 }
                 devAdd += perBuilding * plan.units;
-                out.gain += plan.gain;
+                out.gain += plan.units * gainPerUnit;
                 out.loss += plan.loss;
                 out.units += plan.units;
                 out.cycles++;
