@@ -40,9 +40,9 @@ export { optimizeLayout } from './core/garden.js';
 export { tickMarket, restingValue, tradeDecision } from './core/market.js';
 export { levelCost, rebuyCost, trainableChain, chooseTarget, magicCap } from './core/dragon.js';
 export { gardenOf, plotTiles, chanceFunction, findRecipe, findRecipes } from './game/garden.js';
-export { rankHeavenly, planChips } from './core/heavenly.js';
+export { planChips, planTree, rankSlots } from './core/heavenly.js';
 export { AUTOPILOT, applyAutopilot, isAutopilotSetting } from './core/autopilot.js';
-export { heavenlyCandidates, planHeavenly, slotCandidates, fillPermanentSlots, rankPermanentSlots, assignPermanentSlots } from './game/prestige.js';
+export { planHeavenly, slotCandidates, fillPermanentSlots, rankPermanentSlots, assignPermanentSlots } from './game/prestige.js';
 export { payoutOf as wrinklerPayout, heldValue as wrinklerHeld } from './game/wrinklers.js';
 
 export const version = __MUSHIE_VERSION__;
@@ -58,6 +58,7 @@ export let grimoire = null;
 export let garden = null;
 export let market = null;
 export let gods = null;
+export let heavenly = null;
 export let dragon = null;
 export let shimmers = null;
 export let clicker = null;
@@ -111,6 +112,7 @@ const runtime = {
         garden = systems.garden;
         market = systems.market;
         gods = systems.gods;
+        heavenly = systems.heavenly;
         dragon = systems.dragon;
         shimmers = systems.shimmers;
         clicker = systems.clicker;

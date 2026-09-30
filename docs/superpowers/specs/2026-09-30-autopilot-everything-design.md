@@ -29,8 +29,8 @@ Every option starts off. One switch, **Autopilot**, automates every part of the 
 | Seasons, Santa, seasonal drops | seasons | nothing buys seasons or levels Santa; to build (4.4) |
 | Dragon training and petting | dragon | rebuilt on branch w1/dragon: trains toward the level whose aura repays the chain's sacrifices within the run's expected length, holds Wizard tower levels for mana, pets with a private forecast; measured level with the inherited rule on income (4.5) |
 | Dragon auras, pantheon | gods | done (M8), thrash fixed in review |
-| Heavenly upgrades, permanent slots | ascension | done (M3); planner misses unlock-only upgrades; to fix (4.6) |
-| Ascension timing and the steps before it | ascension | done (M3); pre-ascension routine runs only for the mod's own ascension, wrinklers paid before the egg (branch w1/wrinklers); the rest of 4.7 to rebuild |
+| Heavenly upgrades, permanent slots | ascension, heavenly | rebuilt in wave one (4.6): unlock-only upgrades bought for what they lead to, parents first; permanent slots by the income lost until the buyer rebuys the upgrade. Luck-free, 8 game hours, one run per start: projected prestige ×1.00, ×2.96 and ×46.2 from starts of 10^3, 10^6 and 10^9, heavenly upgrades owned 15/15, 25→41 and 27→63 |
+| Ascension timing and the steps before it | ascension | done (M3); pre-ascension routine runs only for the mod's own ascension, wrinklers paid before the egg; the rest of 4.7 to rebuild |
 | Sugar lumps: harvest, spend, Sugar frenzy | lumps | done (wave one): harvest, golden-lump timing and Sugar frenzy moved into the lump system, inherited harvest and Rigidel/Dragon's Curve steps removed, every target holds for Sugar baking once it is owned. Luck-free harness: 1.043 harvests a game day, as the inherited click (1.000 left to fall); a golden lump paid 2.9× to 4.9× the ripe harvest over three bakery stages, cookies over 3.5 h ×1.03 to ×1.19; Sugar frenzy timed to the rate rule gave ×1.09 and ×1.12 log-prestige per second of run (×1.13 and ×1.26 prestige per run, from starting prestiges of 1 and 3 million; it fired 1.2 h before the rule's ascension), while one switched on at the start of the run inflated the run average and the rule ascended after 1.3 h and 5.3 h (×0.35 and ×0.81); on a save with Sugar baking and 100 lumps the inherited order spent 99 (CpS ×0.51), the hold none |
 | Grimoire | grimoire | done (M5); double-cast and holding the forced cookie to add (4.9) |
 | Garden | garden | done (M6), reserve fixed in review; harvest-combo mode to add (4.10) |
@@ -92,6 +92,22 @@ The two rules are level on income: every difference is inside the few percent th
 Value unlock-only upgrades by what they unlock (Synergies Vol. I and II, Pet the dragon, Fortune cookies, Season switcher, the cookie boxes, Stevia Caelestis leading to Sugar baking, the season prestige upgrades), by simulating the store upgrades and drops they open at current building counts. Choose permanent slots by the income lost until the buyer would buy the upgrade again, not by the share lost at the end of the run.
 
 Measure: prestige per day over several ascensions against the current planner.
+
+Built (w1/heavenly): the planner ranks bundles, an upgrade with every ancestor it still needs, by the share they add together per chip, so any depth of worthless parents is walked (the angels to Kitten angels, Heralds to Season switcher, Golden switch and Residual luck to Pet the dragon). What an upgrade opens is simulated at current building counts: cookies that require it, the synergy tiers, the dragon's drops, fortunes and seasonal drops, each counted only when the run bakes ten times its price and only while the system that uses it is on (season planner, petting, fortunes, Sugar frenzy). Lump upgrades are worth their extra lumps a day times a lump's value, averaged over the next run; Sugar craving two hours of CpS a run; the season boosts and Keepsakes part of the drops they speed up. Fixed shares remain only for what no what-if can show (the dragon, offline production, discounts, research speed, the Golden switch itself). Permanent slots: share times the cookies the run had baked when the buyer bought the upgrade, recorded by the heavenly system on the loop (src/systems/heavenly.js).
+
+Measured with tools/dev/heavenly-ab.mjs against the planner it replaces (commit 1ca4dc0), same seed and start, 8 game hours. Each run starts just after a first ascension at the start prestige, with the starter upgrades owned and a bank that doubles its prestige; buying, clicking and ascension on. The candidate build was ab9e453 (later commits add only a cache and tests).
+
+| Start prestige | Projected prestige after 8 h | Heavenly upgrades owned | Ascensions in the 8 h |
+|---|---|---|---|
+| 10^3, golden cookies off | 2,570 vs 2,570 (×1.00) | 15 vs 15 | 1 vs 1 |
+| 10^6, golden cookies off | 3.68e6 vs 1.09e7 (×2.96) | 25 vs 41 | 2 vs 4 |
+| 10^9, golden cookies off | 2.04e9 vs 9.45e10 (×46.2) | 27 vs 63 | 1 vs 10 |
+| 10^9, golden cookies on, seed g1 | 4.23e9 vs 3.81e12 (×902) | 30 vs 73 | 9 vs 11 |
+| 10^9, golden cookies on, seed g2 | 3.16e9 vs 3.53e12 (×1118) | 29 vs 73 | 10 vs 12 |
+
+At 10^3 the chips cover only the upgrades both planners buy first. At 10^9 the old planner stopped at 27 upgrades and left 1.60e9 of its 2e9 chips unspent after the first ascension (CpS an hour in: 4.2e31 against 1.3e37); the new one bought the angels, Synergies Vol. I and II, Kitten angels, the Stevia line to Sugar baking and the lump upgrades, and the Unshackled upgrades. The golden-cookie rows are two seeds at one start; the runs at 10^6 with golden cookies on did not finish (a browser launch timeout, and a run cut off at 7 h). After merging m2-buying (dragon, lumps and buff classifier; commit 36502db against m2-buying at 2c42063), a 3-hour luck-free re-run gave the same numbers as the runs above at 3 h: ×1.54 at 10^6 and ×15.2 at 10^9.
+
+Not measured: the A/B leaves petting, fortunes and Sugar frenzy off, so what Pet the dragon, Fortune cookies and Sugar craving open is covered by the unit and game tests only; with no season planner on this branch, Season switcher and the season boosts are worth nothing to the planner yet.
 
 ### 4.7 Pre-ascension routine
 

@@ -32,9 +32,10 @@ const FIRST_SHOPPING_LIST = [
  * @param {() => void} [deps.collect]  pops the wrinklers, a tick before prepare: they pay on later logic frames
  * @param {() => void} deps.prepare    the rest: sells stock, harvests, sells buildings into the chocolate egg
  * @param {{invalidate(): void}} [deps.buyer]
+ * @param {{plan: Function, rankSlots: Function}} [deps.heavenly]  plans chips and slots from what it saw of the run
  * @param {(what: string) => void} [deps.log]
  */
-export function createAscension({ game, settings, loop, extras = () => 0, collect = () => {}, prepare = () => {}, buyer = null, log = () => {} }) {
+export function createAscension({ game, settings, loop, extras = () => 0, collect = () => {}, prepare = () => {}, buyer = null, heavenly = null, log = () => {} }) {
     // 'rate' is the rule this system is built on; 'double' (ascend once prestige would double,
     // the inherited rule) is kept so the two can be compared in the harness. `firstTarget`
     // overrides the first ascension's prestige target (null: the starter set's price).
@@ -125,8 +126,10 @@ export function createAscension({ game, settings, loop, extras = () => 0, collec
         // Plan while the bakery still stands: the chocolate egg routine sells every building.
         const prestigeAfter = Math.floor(projected);
         const chips = game.heavenlyChips + prestigeAfter - game.prestige;
-        state.plan = planHeavenly(game, settings, chips, prestigeAfter);
-        state.slotRanking = rankPermanentSlots(game, settings);
+        // Slots first: the plan values a permanent slot by the upgrade it would hold.
+        state.slotRanking = heavenly ? heavenly.rankSlots() : rankPermanentSlots(game, settings);
+        const planOptions = { slotRanking: state.slotRanking, runSeconds: runSeconds() };
+        state.plan = heavenly ? heavenly.plan(chips, prestigeAfter, planOptions) : planHeavenly(game, settings, chips, prestigeAfter, planOptions);
         log(
             `ascending: ${state.verdict.reason}. Plan: ${state.plan.buy.map((b) => b.name).join(', ') || 'nothing'}` +
                 (state.plan.saving ? `; saving for ${state.plan.saving.name}` : '')
