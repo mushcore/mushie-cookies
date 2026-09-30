@@ -65,7 +65,7 @@ export function startSystems({ game, loop, legacy, log }) {
     });
     const lumps = createLumps({ game, settings, loop, log });
     const grimoire = createGrimoire({ game, settings, loop, log });
-    const garden = createGarden({ game, settings, loop, log });
+    const garden = createGarden({ game, settings, loop, log, reserve: () => buyer.reserve() });
     const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
     const gods = createGods({ game, settings, loop, log, buyer });
     return { buyer, ascension, lumps, grimoire, garden, market, gods };
