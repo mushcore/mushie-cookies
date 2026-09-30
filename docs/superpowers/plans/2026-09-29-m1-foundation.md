@@ -2123,3 +2123,23 @@ In the spec, under `### M1 — Foundation`, add the line `Status: done <date>.`
 git add -A
 git commit -m "Add acceptance tests and README; M1 complete"
 ```
+
+---
+
+## What changed during execution
+
+The plan above is kept as written. These are the places where the work departed from it, and why.
+
+| Plan | What was done | Why |
+|---|---|---|
+| Task 1: legacy files concatenated into `main.js`, with `fc_boot.js` polling for the game | Legacy files are carried as text by the new bundle and evaluated one second after the game is ready; `fc_boot.js` is gone | Steam evaluates mod files before the game has created anything, and the legacy files read game state as soon as they are evaluated |
+| Task 2: mods injected into the page after the game is running | The harness loads mods at the point where Steam loads them | The original harness would have passed a mod that fails on Steam |
+| Task 2: pending real timers cancelled at takeover | Pending real timers are moved onto virtual time under the same id | Cancelling them would also cancel timers the mod had already started |
+| Task 2: real frames allowed before takeover | No real frame may run; the harness fails if one does | The number of real frames depended on machine speed, which made runs with one seed diverge |
+| Task 4: the loop driven by `Game.T` | The loop is driven by the mod's own frame counter | `Game.T` restarts when a save is loaded |
+| Task 5: snapshots as arrays of rows | Snapshots as flat arrays over cached member lists | A ranking pass takes hundreds of snapshots; the first form cost a third of the run time |
+| Task 5: `showAchievements` removed from the preferences file | It was an internal flag in `fc_main.js`, removed there | The plan misread where it lived |
+| Task 6, fix 2: each season's switcher blocked when that season is complete | All switchers blocked in a free base season when every season is complete | That is what the setting's own description says |
+| Task 7, fix 6: rename `countAntiMatter` | The block that used it is deleted | The count was never set and that building is never sold, so the block could not run |
+| Task 9: live smoke test in the Steam game | A test inside the Electron runtime copied from the install | It checks the same Chrome 87 without touching Steam or a real save |
+| Not planned | `tools/dev/profile.mjs` | Needed to find why the harness slowed from 1,000 to 25 times real time with the mod buying |

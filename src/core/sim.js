@@ -9,33 +9,54 @@ const SCALARS = [
 ];
 
 // The game keeps buildings in an array, and upgrades and achievements in objects keyed by id.
-// Reading every collection by key covers both.
+// `count` names the game's own counter for the collection, used to notice when it has grown.
 const GROUPS = [
-    { name: 'building', from: 'ObjectsById', fields: ['amount', 'bought'] },
-    { name: 'upgrade', from: 'UpgradesById', fields: ['bought', 'unlocked'] },
-    { name: 'achievement', from: 'AchievementsById', fields: ['won'] },
+    { name: 'building', from: 'ObjectsById', count: 'ObjectsN', fields: ['amount', 'bought'] },
+    { name: 'upgrade', from: 'UpgradesById', count: 'UpgradesN', fields: ['bought', 'unlocked'] },
+    { name: 'achievement', from: 'AchievementsById', count: 'AchievementsN', fields: ['won'] },
 ];
+
+// A ranking pass takes hundreds of snapshots, so the member lists are built once per collection
+// and reused until the collection grows.
+const lists = new WeakMap();
+
+function listOf(game, group) {
+    const collection = game[group.from];
+    const size = game[group.count];
+    const cached = lists.get(collection);
+    if (cached && size !== undefined && cached.size === size) return cached;
+    const keys = Object.keys(collection);
+    const list = { size, keys, items: keys.map((key) => collection[key]) };
+    lists.set(collection, list);
+    return list;
+}
 
 /** Everything a what-if is allowed to disturb. */
 export function takeSnapshot(game) {
-    const snap = {};
+    const snap = { groups: [] };
     for (const group of GROUPS) {
-        const items = game[group.from];
-        snap[group.name] = Object.keys(items).map((key) => [key, ...group.fields.map((f) => items[key][f])]);
+        const list = listOf(game, group);
+        const { items } = list;
+        const width = group.fields.length;
+        const values = new Array(items.length * width);
+        for (let i = 0; i < items.length; i++) {
+            for (let f = 0; f < width; f++) values[i * width + f] = items[i][group.fields[f]];
+        }
+        snap.groups.push({ list, values });
     }
     for (const key of SCALARS) snap[key] = game[key];
     return snap;
 }
 
 export function restoreSnapshot(game, snap) {
-    for (const group of GROUPS) {
-        const items = game[group.from];
-        for (const [key, ...values] of snap[group.name]) {
-            group.fields.forEach((f, i) => {
-                items[key][f] = values[i];
-            });
+    GROUPS.forEach((group, g) => {
+        const { list, values } = snap.groups[g];
+        const { items } = list;
+        const width = group.fields.length;
+        for (let i = 0; i < items.length; i++) {
+            for (let f = 0; f < width; f++) items[i][group.fields[f]] = values[i * width + f];
         }
-    }
+    });
     for (const key of SCALARS) game[key] = snap[key];
 }
 
@@ -43,15 +64,20 @@ export function restoreSnapshot(game, snap) {
 export function diffSnapshots(a, b) {
     const out = [];
     for (const key of SCALARS) if (a[key] !== b[key]) out.push(key);
-    for (const group of GROUPS) {
-        const other = new Map(b[group.name].map(([key, ...values]) => [key, values]));
-        for (const [key, ...values] of a[group.name]) {
-            const theirs = other.get(key);
-            group.fields.forEach((f, i) => {
-                if (!theirs || theirs[i] !== values[i]) out.push(`${group.name} ${key} ${f}`);
-            });
-        }
-    }
+    GROUPS.forEach((group, g) => {
+        const mine = a.groups[g];
+        const theirs = b.groups[g];
+        const width = group.fields.length;
+        const position = new Map(theirs.list.keys.map((key, i) => [key, i]));
+        mine.list.keys.forEach((key, i) => {
+            const j = position.get(key);
+            for (let f = 0; f < width; f++) {
+                if (j === undefined || theirs.values[j * width + f] !== mine.values[i * width + f]) {
+                    out.push(`${group.name} ${key} ${group.fields[f]}`);
+                }
+            }
+        });
+    });
     return out;
 }
 

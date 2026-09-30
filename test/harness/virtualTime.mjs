@@ -101,7 +101,14 @@ export function installVirtualTime({ epoch, modUrls }) {
     // Same order as Steam: mod files first, then the game launches.
     window.__harnessLoadMods = (launch) => {
         const loadNext = (i) => {
-            if (i >= modUrls.length) return launch();
+            if (i >= modUrls.length) {
+                launch();
+                // The game has now defined its frame loop and will start it when it finishes
+                // initialising. Not one real frame may run: how many would depend on how fast
+                // this machine is, and every run has to start from the same frame.
+                window.Game.Loop = function () {};
+                return;
+            }
             window.Game.LoadMod(modUrls[i], () => loadNext(i + 1), () => {
                 console.error('harness: failed to load mod file ' + modUrls[i]);
                 loadNext(i + 1);
@@ -111,19 +118,16 @@ export function installVirtualTime({ epoch, modUrls }) {
     };
 
     vt.takeover = (seed) => {
-        const frameLoop = window.Game.Loop;
         vt.start = epoch + 10 * 60 * 1000; // fixed, and later than any real boot
         vt.now = vt.start;
         vt.frames = 0;
         vt.active = true;
-        window.Game.Loop = function () {}; // the real frame loop is replaced by advance()
 
         // Whatever was waiting on a real timer now waits on virtual time, under the same id,
-        // so code that kept the id can still clear it. The real frame loop is dropped.
+        // so code that kept the id can still clear it.
         for (const [id, t] of pending) {
             real.clearTimeout(id);
             real.clearInterval(id);
-            if (t.fn === frameLoop) continue;
             schedule(id, t.fn, t.ms, t.args, t.kind === 'interval' ? Math.max(1, Number(t.ms) || 0) : 0);
         }
         pending.clear();

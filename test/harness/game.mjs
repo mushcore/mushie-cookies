@@ -52,7 +52,15 @@ export async function launchGame({ seed = 'mushie', headless = true, mods = [] }
         } catch (e) {}
     });
     await page.goto(server.origin + '/src/index.html');
-    await page.waitForFunction(() => window.Game && window.Game.ready && window.Game.T > 0, null, { timeout: 60000 });
+    // The game sets its ready flag as it begins to initialise and initialises in one go,
+    // so by the time this poll sees the flag the game is fully built.
+    await page.waitForFunction(() => window.Game && window.Game.ready, null, { timeout: 60000 });
+    const framesBeforeTakeover = await page.evaluate(() => window.Game.T);
+    if (framesBeforeTakeover !== 0) {
+        await browser.close();
+        await server.close();
+        throw new Error(`harness: ${framesBeforeTakeover} real frames ran before virtual time began`);
+    }
     // The game's own web-mode boot asks for things that do not exist locally. Uncaught exceptions
     // and anything the mod or the harness reports are what matter.
     const bootErrors = errors.filter(

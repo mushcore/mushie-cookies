@@ -94,7 +94,11 @@ Language: JavaScript ES modules with JSDoc types. Bundler: esbuild. Tests: Node'
 
 ### 5.3 Build and load
 
-The Steam loader runs exactly one file, `main.js`, from the mod folder. The build produces that one file by concatenating, in order: vendored libraries, the legacy files as plain global scripts, then the bundled new modules. `tools/deploy` copies `dist/MushieCookies/` into the game's `mods/local/` folder.
+The Steam loader runs exactly one file, `main.js`, from the mod folder, and it runs it before the game has created its buildings, upgrades or interface. The legacy files read game state as soon as they are evaluated, so they cannot simply be concatenated into that file.
+
+The build therefore produces `main.js` from two parts: the vendored libraries, and the bundled new modules, which carry the legacy files as text. At load the new code registers through the game's mod API and does nothing else. One second after the game is ready, which is safely after Steam has loaded the save, it evaluates the legacy text as a single global script and starts it.
+
+`tools/deploy` copies `dist/MushieCookies/` into the game's `mods/local/` folder.
 
 Mod identity: name `Mushie Cookies`, id `mushie_cookies`. A separate id means its settings never collide with a Frozen Cookies install.
 
@@ -126,6 +130,10 @@ Ordered by when each matters in a run that starts from nothing. Each milestone i
 - Test harness skeleton (section 7).
 
 Verified by: the game loads the mod with the network disconnected; a ten-minute run logs no errors; with autobuy off, nothing is bought.
+
+Status: done 2026-09-29. 43 logic tests and 25 game tests pass, including two hours of unattended buying with no error, identical purchases across two runs of one seed, and a run inside the game's own runtime.
+
+Carried into M2: with the mod buying, the harness runs at about 25 times real time, against about 1,000 for the bare game. Ranking upgrades accounts for four fifths of that: each pass runs a what-if for some 400 upgrades, most of them far out of reach. M2 has to cut that before multi-day comparisons are practical.
 
 ### M2 — Buying
 
@@ -198,16 +206,17 @@ Verified by: income per day in the harness against static slotting.
 | Unit | Pure logic in `src/core` | Node test runner, recorded snapshots |
 | Cross-check | Forecasts and formulas | Run the prediction and the real game code side by side and compare |
 | Time-lapse harness | Whole strategies over days of game time | The game's own code in a headless browser with a controllable clock |
-| Live smoke test | Loading and behaviour in the real Steam game | A separate test save; the player's save is backed up first |
+| Runtime test | Loading and buying on the Chrome the game ships with | The Electron runtime copied from the install, without the game's own code, driven over the DevTools protocol |
 
 The time-lapse harness is the piece no other mod has, and it is what makes criterion 4 checkable.
 
 Feasibility was confirmed by a spike on 2026-09-29. The installed v2.053 game booted in headless Chrome in about 0.3 seconds with no errors, and ran at roughly 30,000 logic frames per second: about 1,000 times real time, or one game day in under two minutes. Cookies earned over a simulated hour matched CpS × 3,600 exactly.
 
-Two rules follow from how the harness works:
+Three rules follow from how the harness works:
 
 - New code is driven by the game's `logic` hook and counts frames. It never uses wall-clock timers, so it behaves identically at any playback speed.
 - The harness replaces timers, the clock and the random seed with virtual ones, so legacy code that still uses timers runs in virtual time and every run is reproducible.
+- The harness loads mods at the point where Steam loads them, so a mod that touches the game too early fails in tests as it would in the game.
 
 Game files are read from the local install at test time. They are never copied into the repository.
 
@@ -219,7 +228,7 @@ Game files are read from the local install at test time. They are never copied i
 | Game updates change mechanics | Read pools, recipes and formulas from the live game wherever possible; generated tables are rebuilt by a tool |
 | The seam between legacy and new code leaks | One bridge file owns every global the legacy code still needs |
 | Conflict with other mods | Upstream has a known conflict with Cookie Monster; the README will say so |
-| Bot damages a save | Test save for all live runs; backup before first use |
+| Bot damages a save | Every automation is off until switched on; tests never touch a real save |
 
 ## 9. Out of scope
 

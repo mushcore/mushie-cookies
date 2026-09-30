@@ -159,3 +159,16 @@ test('nested what-ifs restore to their own starting points', () => {
     assert.deepEqual(diffSnapshots(before, takeSnapshot(game)), []);
     assert.deepEqual(game.wins, []);
 });
+
+test('a collection that grows after a snapshot is picked up by the next one', () => {
+    const game = fakeGame();
+    game.UpgradesN = 2;
+    takeSnapshot(game);
+    game.UpgradesById[2] = { bought: 0, unlocked: 0 };
+    game.UpgradesN = 3;
+    const before = takeSnapshot(game);
+    game.UpgradesById[2].bought = 1;
+    assert.deepEqual(diffSnapshots(before, takeSnapshot(game)), ['upgrade 2 bought']);
+    restoreSnapshot(game, before);
+    assert.equal(game.UpgradesById[2].bought, 0);
+});
