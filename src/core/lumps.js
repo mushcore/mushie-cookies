@@ -38,14 +38,16 @@ export function nextLevelUp({ buildings, lumps, sugarBaking }) {
         if (b && b.amount > 0 && b.level < target) return levelUp(b, `towards level ${target}`);
     }
 
+    // The best level per lump is waited for, not traded for whatever is affordable now: spending
+    // on cheap low-value levels leaves the lumps spread thin.
     const hold = sugarBaking ? SUGAR_BAKING_HOLD : 0;
     let best = null;
     for (const b of buildings) {
         if (!(b.amount > 0) || !(b.share > 0)) continue;
         const cost = b.level + 1;
-        if (lumps - cost < hold) continue;
         const valuePerLump = (b.share * 0.01) / cost;
-        if (!best || valuePerLump > best.valuePerLump) best = { name: b.name, cost, valuePerLump };
+        if (!best || valuePerLump > best.valuePerLump) best = { name: b.name, cost, valuePerLump, share: b.share };
     }
-    return best ? { name: best.name, cost: best.cost, reason: `+1% of a ${(best.valuePerLump * 100 * best.cost * 100).toFixed(1)}% share of CpS` } : null;
+    if (!best || lumps - best.cost < hold) return null;
+    return { name: best.name, cost: best.cost, reason: `+1% of a ${(best.share * 100).toFixed(1)}% share of CpS` };
 }

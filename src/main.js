@@ -6,6 +6,16 @@ import { startSystems } from './game/bridge.js';
 
 export { simulate, simulateEach, takeSnapshot, diffSnapshots } from './core/sim.js';
 export { readState, measureCandidates } from './game/measure.js';
+import { readState as readStateNow } from './game/measure.js';
+import { estimateIncome as estimateNow } from './core/income.js';
+
+/** Income now, with the wrinkler count or the bank overridden: for the legacy popping logic. */
+export function incomeWith({ wrinklerCount, bank } = {}) {
+    const state = readStateNow(window.Game, window.FrozenCookies);
+    if (wrinklerCount !== undefined && wrinklerCount !== null) state.wrinklers = { ...state.wrinklers, count: wrinklerCount };
+    if (bank !== undefined && bank !== null) state.bank = bank;
+    return estimateNow(state).total;
+}
 export { awardForBuildings, awardForUpgrades } from './game/awards.js';
 export { listCandidates, NEVER_BUY } from './game/candidates.js';
 export { estimateIncome } from './core/income.js';
@@ -18,7 +28,7 @@ export { optimizeLayout } from './core/garden.js';
 export { tickMarket, restingValue, tradeDecision } from './core/market.js';
 export { gardenOf, plotTiles, chanceFunction, findRecipe } from './game/garden.js';
 export { rankHeavenly, planChips } from './core/heavenly.js';
-export { heavenlyCandidates, planHeavenly, slotCandidates, fillPermanentSlots } from './game/prestige.js';
+export { heavenlyCandidates, planHeavenly, slotCandidates, fillPermanentSlots, rankPermanentSlots, assignPermanentSlots } from './game/prestige.js';
 
 export const version = __MUSHIE_VERSION__;
 
@@ -70,6 +80,7 @@ const runtime = {
                 harvestBank: () => window.harvestBank(),
                 manualBank: () => window.manualBank(),
                 wrinklerValue: () => window.wrinklerValue(),
+                prepareForAscension: () => window.prepareForAscension(),
                 chocolateValue: () => window.chocolateValue(),
             },
         });

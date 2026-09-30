@@ -27,7 +27,7 @@ function share(probability, seconds, golden) {
     return Math.min(1, (probability * seconds * golden.durationMult) / golden.meanInterval);
 }
 
-/** Expected cookies per second from one-off payouts (lucky, ruin, chain, storm). */
+/** Expected cookies per second from one-off payouts (lucky, ruin, chain, storm), sized from real CpS. */
 function payoutsPerSecond(state, passive) {
     const { golden, bank } = state;
     const p = golden.probabilities;
@@ -54,11 +54,14 @@ export function estimateIncome(state) {
     const { cps, clickPower, clicksPerSecond, wrinklers, golden } = state;
     const p = golden.probabilities || {};
 
-    // Wrinklers: each sucking wrinkler withers 5% and stores the whole withered amount, so n
-    // wrinklers hand back n × 0.05n × CpS × returnMult when popped (main.js:14393, 14467-14479).
+    // Wrinklers: each sucking wrinkler withers suckRate of CpS (5% base) and stores the whole
+    // withered amount, so n of them hand back n × n·suckRate × CpS × returnMult when popped
+    // (main.js:5116-5128, 14393, 14467-14479). returnMult is 0 when nothing pops them.
     const n = wrinklers ? wrinklers.count : 0;
     const returnMult = wrinklers ? wrinklers.returnMult : 1;
-    const wrinklerMultiplier = 1 - 0.05 * n + 0.05 * n * n * returnMult;
+    const suck = wrinklers && wrinklers.suckRate !== undefined ? wrinklers.suckRate : 0.05;
+    const withered = Math.min(1, n * suck);
+    const wrinklerMultiplier = 1 - withered + n * withered * returnMult;
     const passive = cps * wrinklerMultiplier;
     const click = clicksPerSecond * clickPower;
 
@@ -69,6 +72,8 @@ export function estimateIncome(state) {
     if (golden.buildingSpecialMean > 0) {
         const mult = 1 + golden.buildingSpecialMean / 10;
         cpsFactor *= 1 + (mult - 1) * share(p['building special'], BUILDING_SPECIAL_SECONDS, golden);
+        // 30% of a wrath cookie's building specials divide instead (main.js:5506-5508).
+        cpsFactor *= 1 + (1 / mult - 1) * share(p['building debuff'], BUILDING_SPECIAL_SECONDS, golden);
     }
 
     let clickFactor = 1;
@@ -77,11 +82,11 @@ export function estimateIncome(state) {
     }
     // Cursed finger: CpS stops and each click pays the whole duration's CpS (main.js:5556).
     const cursed = share(p['cursed finger'], CURSED_FINGER_SECONDS, golden);
-    const cursedClicks = cursed * clicksPerSecond * passive * CURSED_FINGER_SECONDS * golden.durationMult;
+    const cursedClicks = cursed * clicksPerSecond * cps * CURSED_FINGER_SECONDS * golden.durationMult;
 
     const passiveTotal = passive * cpsFactor * (1 - cursed);
     const clickTotal = click * clickFactor * cpsFactor + cursedClicks;
-    const payouts = payoutsPerSecond(state, passive);
+    const payouts = payoutsPerSecond(state, cps);
 
     return {
         total: passiveTotal + clickTotal + payouts.total,

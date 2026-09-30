@@ -12,6 +12,8 @@ const SCALARS = [
     'pledgeT',
     'researchT',
     'nextResearch',
+    'upgradesToRebuild',
+    'storeToRefresh',
 ];
 
 // The game keeps buildings in an array, and upgrades and achievements in objects keyed by id.

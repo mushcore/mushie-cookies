@@ -56,19 +56,17 @@ test('an exception halfway through ranking leaves no phantom state', { skip }, a
             Game.CalculateGains();
             const before = MushieCookies.takeSnapshot(Game);
             const win = Game.Win;
-            const real = window.effectiveCps;
-            let calls = 0;
-            window.effectiveCps = function () {
-                if (++calls === 7) throw new Error('injected mid-simulation');
-                return real.apply(this, arguments);
-            };
+            // The buyer's own path: every candidate measured in one what-if session, with the
+            // seventh one throwing after it has changed the game.
+            const policy = { excludedBuildings: new Set(), excludedUpgrades: new Set(), chainReach: 15, prerequisites: upgradeJson };
+            const candidates = MushieCookies.listCandidates(Game, policy);
+            const trials = candidates.map((c, i) => (i === 6 ? { apply() { c.apply(); throw new Error('injected mid-simulation'); } } : c));
             let thrown = null;
             try {
-                recommendationList(true);
+                MushieCookies.measureCandidates(Game, FrozenCookies, trials);
             } catch (e) {
                 thrown = e.message;
             }
-            window.effectiveCps = real;
             return {
                 thrown,
                 diff: MushieCookies.diffSnapshots(before, MushieCookies.takeSnapshot(Game)),

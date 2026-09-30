@@ -141,10 +141,15 @@ export function listCandidates(game, policy) {
             out.push(upgradeCandidate(game, upgrade));
         }
         if (policy.excludedBuildings !== 'all') {
+            const limits = policy.limits || {};
             for (const { upgrade, needs } of chainTargets(game, policy.prerequisites, policy.excludedBuildings)) {
                 if (!STORE_POOLS.has(upgrade.pool) || NEVER_BUY.has(upgrade.id) || policy.excludedUpgrades.has(upgrade.id)) continue;
+                // Fortunes come from the news ticker, whatever the building counts say.
+                if (upgrade.tier === 'fortune') continue;
                 const chain = chainCandidate(game, upgrade, needs);
-                if (chain && chain.missing <= policy.chainReach) out.push(chain);
+                if (!chain || chain.missing > policy.chainReach) continue;
+                if (chain.steps.some((s) => limits[s.building.id] !== undefined && s.building.amount + s.missing > limits[s.building.id])) continue;
+                out.push(chain);
             }
         }
     }

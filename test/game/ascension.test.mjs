@@ -61,16 +61,18 @@ test('a permanent slot takes the owned upgrade whose loss would cost the most', 
             Game.Upgrades['Kitten helpers'].earn();
             Game.Upgrades['Permanent upgrade slot I'].earn();
             Game.CalculateGains();
-            const first = MushieCookies.fillPermanentSlots(Game, FrozenCookies);
-            const again = MushieCookies.fillPermanentSlots(Game, FrozenCookies);
+            const ranking = MushieCookies.rankPermanentSlots(Game, FrozenCookies);
+            const first = MushieCookies.assignPermanentSlots(Game, ranking);
+            const again = MushieCookies.assignPermanentSlots(Game, ranking);
             // A weak upgrade forced into the slot is replaced.
-            const weak = Object.values(Game.UpgradesById).find((u) => u.bought && u.pool === '' && !u.noPerm && u.name !== first[0].name);
+            const weak = Object.values(Game.UpgradesById).find((u) => u.bought && u.pool === '' && !u.noPerm && u.id !== first[0].id);
             Game.permanentUpgrades[0] = weak.id;
-            const replaced = MushieCookies.fillPermanentSlots(Game, FrozenCookies);
-            return { first, again, replaced, slot: Game.permanentUpgrades[0], weak: weak.name };
+            const replaced = MushieCookies.assignPermanentSlots(Game, ranking);
+            return { first, again, replaced, slot: Game.permanentUpgrades[0], topShare: ranking[0].share, topId: ranking[0].id };
         });
         assert.equal(out.first.length, 1);
-        assert.ok(out.first[0].share > 0.05, `the pick should matter: share ${out.first[0].share}`);
+        assert.equal(out.first[0].id, out.topId, 'the slot takes the top of the ranking');
+        assert.ok(out.topShare > 0.05, `the pick should matter: share ${out.topShare}`);
         assert.deepEqual(out.again, [], 'a slot holding the best pick is left alone');
         assert.equal(out.replaced.length, 1);
         assert.equal(out.slot, out.first[0].id);

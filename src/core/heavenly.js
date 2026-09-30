@@ -18,6 +18,18 @@ export const ENABLER_SHARE = {
     'Permanent upgrade slot III': 0.3,
     'Permanent upgrade slot IV': 0.3,
     'Permanent upgrade slot V': 0.3,
+    // Cookie boxes open more cookie upgrades to buy; starter kits and discounts save rebuilding.
+    'Box of brand biscuits': 0.05,
+    'Box of macarons': 0.03,
+    'Tin of british tea biscuits': 0.03,
+    'Tin of butter cookies': 0.03,
+    'Starter kit': 0.02,
+    'Starter kitchen': 0.02,
+    'Divine discount': 0.02,
+    'Divine sales': 0.02,
+    'Divine bakeries': 0.02,
+    'Five-finger discount': 0.02,
+    'Unholy bait': 0.01,
     // Offline production: worth something to a player who closes the game.
     'Twin Gates of Transcendence': 0.02,
     Belphegor: 0.02,

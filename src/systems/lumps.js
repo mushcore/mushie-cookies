@@ -29,7 +29,9 @@ export function createLumps({ game, settings, loop, log = () => {} }) {
         const choice = nextLevelUp({
             buildings: buildingsNow(),
             lumps: game.lumps,
-            sugarBaking: !!game.Has('Sugar baking'),
+            // Ownership, not Has(): Has() is false for heavenly upgrades in Born again mode, and
+            // the Sugar Baking Guard setting asks for the same hold.
+            sugarBaking: !!(game.Upgrades['Sugar baking'] && game.Upgrades['Sugar baking'].bought) || settings.sugarBakingGuard == 1,
         });
         if (!choice) return;
         const building = game.Objects[choice.name];

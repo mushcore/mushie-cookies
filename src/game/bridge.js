@@ -17,15 +17,21 @@ export function policyFrom(game, settings, presets, prerequisites) {
     if (preset.buildings === true) return { excludedBuildings: 'all', excludedUpgrades, chainReach: CHAIN_REACH, prerequisites };
 
     const excludedBuildings = new Set(preset.buildings);
-    const exclude = (name) => excludedBuildings.add(game.Objects[name].id);
+    // limits: building id -> the most the settings allow. At the limit the building is excluded;
+    // below it, bulk buys and chains are capped to the room left.
+    const limits = {};
+    const limit = (name, max) => {
+        const id = game.Objects[name].id;
+        limits[id] = Math.min(limits[id] === undefined ? Infinity : limits[id], max);
+        if (game.Objects[name].amount >= limits[id]) excludedBuildings.add(id);
+    };
     const grimoire = game.Objects['Wizard tower'].minigame;
-    const you = game.Objects['You'];
-    if (grimoire && settings.autoCasting == 5 && you.amount >= 399) exclude('You');
-    if (grimoire && settings.towerLimit && grimoire.magicM >= settings.manaMax) exclude('Wizard tower');
-    if (settings.mineLimit && game.Objects['Mine'].amount >= settings.mineMax) exclude('Mine');
-    if (settings.factoryLimit && game.Objects['Factory'].amount >= settings.factoryMax) exclude('Factory');
-    if (settings.autoDragonOrbs && settings.orbLimit && you.amount >= settings.orbMax) exclude('You');
-    return { excludedBuildings, excludedUpgrades, chainReach: CHAIN_REACH, prerequisites };
+    if (grimoire && settings.autoCasting == 5) limit('You', 399);
+    if (grimoire && settings.towerLimit && grimoire.magicM >= settings.manaMax) excludedBuildings.add(game.Objects['Wizard tower'].id);
+    if (settings.mineLimit) limit('Mine', settings.mineMax);
+    if (settings.factoryLimit) limit('Factory', settings.factoryMax);
+    if (settings.autoDragonOrbs && settings.orbLimit) limit('You', settings.orbMax);
+    return { excludedBuildings, excludedUpgrades, chainReach: CHAIN_REACH, prerequisites, limits };
 }
 
 /** Bank the settings ask to hold beyond the golden cookie reserve, from the legacy helpers. */
@@ -55,6 +61,7 @@ export function startSystems({ game, loop, legacy, log }) {
         log,
         buyer,
         extras: () => legacy.wrinklerValue() + legacy.chocolateValue(),
+        prepare: () => legacy.prepareForAscension(),
     });
     const lumps = createLumps({ game, settings, loop, log });
     const grimoire = createGrimoire({ game, settings, loop, log });

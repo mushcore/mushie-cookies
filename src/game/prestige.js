@@ -8,18 +8,28 @@ import { readState } from './measure.js';
 import { rankHeavenly, planChips } from '../core/heavenly.js';
 
 const MAX_PLAN_STEPS = 60;
+const SLOT_UPGRADES = ['Permanent upgrade slot I', 'Permanent upgrade slot II', 'Permanent upgrade slot III', 'Permanent upgrade slot IV', 'Permanent upgrade slot V'];
 
-/** Prestige upgrades that could be bought once everything in `planned` is bought. */
-export function heavenlyCandidates(game, planned = new Set()) {
-    const out = [];
-    for (const upgrade of game.PrestigeUpgrades) {
-        if (upgrade.bought || planned.has(upgrade)) continue;
-        if (upgrade.showIf && !upgrade.showIf()) continue;
-        const parentsMet = (upgrade.parents || []).every((p) => p === -1 || p.bought || planned.has(p));
-        if (!parentsMet) continue;
-        out.push({ id: upgrade.id, name: upgrade.name, price: upgrade.getPrice(), upgrade });
+/**
+ * Prestige upgrades that could be bought once everything in `planned` is bought, as shown at
+ * `prestige`: some are only shown at certain prestige levels (Lucky digit and its line).
+ */
+export function heavenlyCandidates(game, planned = new Set(), prestige = game.prestige) {
+    const saved = game.prestige;
+    game.prestige = prestige;
+    try {
+        const out = [];
+        for (const upgrade of game.PrestigeUpgrades) {
+            if (upgrade.bought || planned.has(upgrade)) continue;
+            if (upgrade.showIf && !upgrade.showIf()) continue;
+            const parentsMet = (upgrade.parents || []).every((p) => p === -1 || p.bought || planned.has(p));
+            if (!parentsMet) continue;
+            out.push({ id: upgrade.id, name: upgrade.name, price: upgrade.getPrice(), upgrade });
+        }
+        return out;
+    } finally {
+        game.prestige = saved;
     }
-    return out;
 }
 
 /**
@@ -44,7 +54,7 @@ export function planHeavenly(game, settings, chips, prestigeAfter = game.prestig
         }
     };
     for (let step = 0; step < MAX_PLAN_STEPS; step++) {
-        const candidates = heavenlyCandidates(game, planned);
+        const candidates = heavenlyCandidates(game, planned, prestigeAfter);
         if (!candidates.length) break;
         const trials = [
             { apply: applyPlanned },
@@ -70,53 +80,55 @@ export function planHeavenly(game, settings, chips, prestigeAfter = game.prestig
     return { buy, saving, left };
 }
 
-/** Owned upgrades a permanent slot may hold, not already slotted (main.js:10543-10547). */
+/** Owned upgrades a permanent slot may hold (main.js:10543-10547). */
 export function slotCandidates(game) {
-    const slotted = new Set(game.permanentUpgrades);
     return Object.values(game.UpgradesById).filter(
-        (u) => u.bought && u.unlocked && !u.noPerm && (u.pool === '' || u.pool === 'cookie') && !slotted.has(u.id)
+        (u) => u.bought && u.unlocked && !u.noPerm && (u.pool === '' || u.pool === 'cookie')
     );
 }
 
 /**
- * Fills the permanent slots the player owns with the upgrades whose loss would cost the most
- * income, measured on the current bakery. A slot already holding something better is left.
- * @returns {Array<{slot: number, id: number, name: string, share: number}>} what was assigned
+ * Every upgrade a permanent slot could hold, ranked by the share of income its loss would
+ * cost, measured on the bakery as it stands. Measured before ascending; used on the ascension
+ * screen, where the upgrades are still owned until the reset.
+ * @returns {Array<{id: number, name: string, share: number}>} best first
  */
-export function fillPermanentSlots(game, settings) {
+export function rankPermanentSlots(game, settings) {
+    const upgrades = slotCandidates(game);
+    const trials = [{ apply() {} }, ...upgrades.map((u) => ({ apply: () => { u.bought = 0; } }))];
+    const measured = simulateEach(game, trials, () => estimateIncome(readState(game, settings)).total);
+    const now = measured[0];
+    return upgrades
+        .map((u, i) => ({ id: u.id, name: u.name, share: now > 0 ? (now - measured[i + 1]) / now : 0 }))
+        .filter((c) => c.share > 0)
+        .sort((a, b) => b.share - a.share);
+}
+
+/**
+ * Fills the permanent slots the player owns from a ranking, best first, the way the slot dialog
+ * does (main.js:10572). A slot already holding one of the chosen upgrades keeps it.
+ * @returns {Array<{slot: number, id: number, name: string}>} what was assigned
+ */
+export function assignPermanentSlots(game, ranking) {
     const slots = [];
-    for (let i = 0; i < 5; i++) {
-        if (game.Has(['Permanent upgrade slot I', 'Permanent upgrade slot II', 'Permanent upgrade slot III', 'Permanent upgrade slot IV', 'Permanent upgrade slot V'][i])) {
-            slots.push(i);
-        }
-    }
-    if (!slots.length) return [];
-
-    const shareOf = (upgrades) => {
-        const trials = [{ apply() {} }, ...upgrades.map((u) => ({ apply: () => { u.bought = 0; } }))];
-        const measured = simulateEach(game, trials, () => estimateIncome(readState(game, settings)).total);
-        const now = measured[0];
-        return upgrades.map((u, i) => ({ upgrade: u, share: now > 0 ? (now - measured[i + 1]) / now : 0 }));
-    };
-
-    const candidates = shareOf(slotCandidates(game)).sort((a, b) => b.share - a.share);
-    const current = shareOf(slots.map((i) => game.UpgradesById[game.permanentUpgrades[i]]).filter(Boolean));
-    const currentShare = new Map(current.map((c) => [c.upgrade.id, c.share]));
-
+    SLOT_UPGRADES.forEach((name, i) => {
+        if (game.Upgrades[name] && game.Upgrades[name].bought) slots.push(i);
+    });
+    const chosen = ranking.slice(0, slots.length).map((c) => c.id);
     const assigned = [];
-    let next = 0;
+    // Keep what is already in place, then fill the rest.
+    const missing = chosen.filter((id) => !slots.some((s) => game.permanentUpgrades[s] === id));
     for (const slot of slots) {
-        const holding = game.permanentUpgrades[slot];
-        const held = holding === -1 ? -1 : currentShare.get(holding) || 0;
-        while (next < candidates.length) {
-            const pick = candidates[next];
-            if (pick.share <= held) break; // what is there is at least as good
-            next++;
-            if (pick.share <= 0) break;
-            game.permanentUpgrades[slot] = pick.upgrade.id;
-            assigned.push({ slot, id: pick.upgrade.id, name: pick.upgrade.name, share: pick.share });
-            break;
-        }
+        if (chosen.includes(game.permanentUpgrades[slot])) continue;
+        const id = missing.shift();
+        if (id === undefined) break;
+        game.permanentUpgrades[slot] = id;
+        assigned.push({ slot, id, name: game.UpgradesById[id].name });
     }
     return assigned;
+}
+
+/** Ranks and assigns in one go, on the living bakery. */
+export function fillPermanentSlots(game, settings) {
+    return assignPermanentSlots(game, rankPermanentSlots(game, settings));
 }

@@ -6,20 +6,19 @@ Mushie Cookies is a fork of [Frozen Cookies](https://github.com/erbkaiser/Frozen
 
 It is built for Cookie Clicker v2.053, the Steam build. It loads nothing from the network.
 
-## Status
+## What it does
 
-Work in progress. The goal is a mod that plays from a fresh save onward with no input, and makes each decision by expected value.
+Each part is a separate switch in the **Mushie Cookies** menu, and each is measured in a time-lapse harness that runs the game's own code.
 
-| # | Milestone | State |
+| Part | What it does | Setting |
 |---|---|---|
-| 1 | Foundation: offline, crash-proof, audited bugs fixed, test harness | Done |
-| 2 | Buying by measured income: clicks, golden cookies, achievements, chains, a priced reserve | Done |
-| 3 | Ascension and heavenly upgrades | In progress |
-| 4 | Sugar lumps | Planned |
-| 5 | Combos | Planned |
-| 6 | Garden | Planned |
-| 7 | Stock market | Planned |
-| 8 | Pantheon and dragon | Planned |
+| Buying | Ranks every building, upgrade and "a few more buildings unlock an upgrade" chain by the income it adds, measured against the game's own calculation: clicks at the game's real cap, golden cookies from the game's live rules, achievements a purchase would earn. Keeps a Lucky reserve only when it pays. | Autobuy |
+| Spell casting | Forecasts Force the Hand of Fate from the game's seeded generator (matched 200 of 200 real casts), burns bad outcomes with a cheap spell, and lands good ones on a running buff. | Forecast Casting |
+| Ascension | Ends a run when its prestige growth drops below the run's average, collects wrinklers and sells stock first so they count, buys heavenly upgrades by income per chip, fills permanent slots, and reincarnates. Only ever finishes an ascension it started. | Auto Ascend |
+| Sugar lumps | Unlocks the four minigames, takes the Farm to 9 and the Cursor to 12, then levels the building with the best gain per lump, keeping 100 when Sugar baking is owned. | Spend Lumps |
+| Garden | Breeds every seed by asking the game which neighbours produce which plant, then sacrifices the garden for 10 sugar lumps and starts again. | Auto Garden |
+| Stock market | Trades with buy and sell prices derived by simulating the game's exact price model (the port matches the game bit for bit); spends only what the buyer is not holding. | Auto Trading |
+| Pantheon and dragon | Slots gods and picks auras by what they add to income, the way a player drags a god or confirms an aura. | Auto Gods & Auras |
 
 ## What it will and will not do
 
@@ -30,6 +29,19 @@ Work in progress. The goal is a mod that plays from a fresh save onward with no 
 | Time an action to a known outcome | Grant achievements directly |
 
 Steam achievements stay enabled. To turn that off, set `AllowSteamAchievs` to `0` in the installed `info.txt`.
+
+## Measured results
+
+From the harness, against the inherited Frozen Cookies logic or against doing nothing. Full numbers and caveats are in the [design document](docs/superpowers/specs/2026-09-29-mushie-cookies-design.md).
+
+| Part | Result |
+|---|---|
+| Spell casting | 6.0× the cookies of not casting over three game hours (geometric mean of six seeds, range 0.43× to 103×); the inherited "smart" casting managed 1.04× |
+| Stock market | 1.92× the profit of the published "buy at 50%, sell at 125% of resting value" rule, on a price history the search never saw |
+| Buying | On par with the inherited logic for pure purchase order (0.96× to 1.03×, luck removed); the gains are correctness and a four times faster simulation |
+| Garden | 7 of 34 seeds in the first six game hours from a fresh seed log |
+
+A single run is dominated by golden cookie luck, so strategies are compared with golden cookies switched off (which makes runs deterministic) or across several seeds.
 
 ## Install
 
@@ -55,23 +67,19 @@ You need [Node.js](https://nodejs.org) 22 or later.
    npm run deploy
    ```
 
-4. Start Cookie Clicker. The mod is on by default, with every automation switched off. Open the **Mushie Cookies** button at the top right to switch automations on.
+4. Start Cookie Clicker. The mod is on by default, with every automation switched off. Open the **Mushie Cookies** button at the top right and switch on the parts you want. For fully unattended play, turn on Autobuy, Autoclick, Autoclick GC, Forecast Casting, Auto Ascend, Spend Lumps, Auto Garden, Auto Trading and Auto Gods & Auras.
 
 To switch the mod off, open **Options**, then **Manage mods**.
+
+Some inherited options do the same job as a new part and would fight it (the old casting modes, worship slots, dragon auras). The new part stands aside while its inherited counterpart is on.
 
 ## Known conflict
 
 Cookie Monster and Frozen Cookies are known to interfere with each other, and Mushie Cookies inherits that. Disable Cookie Monster while Mushie Cookies is on.
 
-## What the buyer does
-
-Every building, every upgrade in the store and every "a few more buildings unlock a tier upgrade" chain is measured by a what-if against the game's own calculation: the income it would add, counting clicks at the game's real cap of 50 a second, golden cookies from the game's live rules, and the achievements the purchase would earn. Purchases are ranked by payback (time to afford plus time to repay), and a reserve for Lucky golden cookies is kept only once the best purchase repays more slowly than the reserve does.
-
-Over two game hours from nothing, this reached 2 to 35 times the cookies of the inherited logic on the same seed. The harness runs about 100 times real time with the mod buying, against about 25 before.
-
 ## If something goes wrong
 
-Each part of the mod is isolated. A part that fails five times in a row is switched off and the rest keep running.
+Each part is isolated. A part that fails five times in a row is switched off and the rest keep running.
 
 In the game's console:
 
@@ -79,6 +87,7 @@ In the game's console:
 |---|---|
 | `MushieCookies.status()` | Every part, its failure count and its last error |
 | `MushieCookies.revive("name")` | Switches a part back on |
+| `MushieCookies.buyer.report()` | What the buyer wants next and why |
 
 ## Tests
 
@@ -88,13 +97,14 @@ npm run test:game   # runs the installed game headless; needs Chrome and the gam
 npm run test:all
 ```
 
-The game tests run the game's own code in a headless browser on a virtual clock, so hours of play take minutes and every run is reproducible. No game files are copied into this repository.
+The game tests run the game's own code in a headless browser on a virtual clock, so hours of play take minutes and every run is reproducible. One test also runs the mod on the Electron runtime the game ships with. No game files are copied into this repository.
 
 ## Design
 
 | Document | Contents |
 |---|---|
-| [Design](docs/superpowers/specs/2026-09-29-mushie-cookies-design.md) | Goal, architecture, milestones |
-| [Audit of Frozen Cookies](docs/research/frozen-cookies-audit.md) | What the base does and where it is wrong |
+| [Design](docs/superpowers/specs/2026-09-29-mushie-cookies-design.md) | Goal, architecture, milestones and what each measured |
+| [Plans](docs/superpowers/plans/) | Milestone plans, where execution departed from them, and the independent reviews |
+| [Audit of Frozen Cookies](docs/research/frozen-cookies-audit.md) | What the base does and where it was wrong |
 | [Survey of other mods](docs/research/ecosystem-survey.md) | Techniques worth taking from each |
 | [Game mechanics](docs/research/game-mechanics-2.053.md) | Exact mechanics, read from the game's source |

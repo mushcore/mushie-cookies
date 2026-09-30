@@ -45,9 +45,11 @@ test('dragon outcomes need their auras', () => {
     assert.equal(outcomeProbabilities(base)['dragon harvest'] || 0, 0);
     assert.equal(outcomeProbabilities(base)['dragonflight'] || 0, 0);
     const p = outcomeProbabilities({ ...base, reaper: 1 });
-    assert.ok(p['dragon harvest'] > 0.04 && p['dragon harvest'] < 0.06, String(p['dragon harvest']));
+    // The gate is (golden and 15%) or 5% = 19.25%; inside it the list has three entries, about a third each.
+    assert.ok(p['dragon harvest'] > 0.06 && p['dragon harvest'] < 0.065, String(p['dragon harvest']));
     const both = outcomeProbabilities({ ...base, reaper: 1.1, dragonflight: 1.1 });
-    assert.ok(both['dragonflight'] > 0 && both['dragon harvest'] > p['dragon harvest'] * 0.9);
+    // With both auras the two share the gated list, so Dragon Harvest's share falls to about 0.77 of its own.
+    assert.ok(both['dragonflight'] > 0 && both['dragon harvest'] > p['dragon harvest'] * 0.7 && both['dragon harvest'] < p['dragon harvest']);
 });
 
 test('an active dragonflight makes click frenzy rarer', () => {
@@ -66,4 +68,11 @@ test('probabilities never depend on the order flags are given', () => {
     const a = outcomeProbabilities({ ...base, buildingSpecial: true, chainEligible: true, lumps: true });
     const b = outcomeProbabilities({ lumps: true, chainEligible: true, buildingSpecial: true, ...base, buildingSpecial: true, chainEligible: true, lumps: true });
     assert.deepEqual(a, b);
+});
+
+test('a wrath cookie still rolls for chain and storm when the 30% roll fails', () => {
+    const eligible = outcomeProbabilities({ ...base, wrath: 1, chainEligible: true });
+    const not = outcomeProbabilities({ ...base, wrath: 1, chainEligible: false });
+    assert.ok(eligible['chain cookie'] > not['chain cookie']);
+    assert.equal(eligible['blood frenzy'] > 0, true);
 });

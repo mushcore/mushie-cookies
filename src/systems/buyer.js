@@ -7,7 +7,8 @@ import { listCandidates } from '../game/candidates.js';
 
 const RERANK_FRAMES = 150; // five seconds
 const PURCHASES_PER_TICK = 2; // each purchase re-ranks; two keep a tick well inside a frame
-const BULK_WHEN_BANK_EXCEEDS = 100; // times the price: then ten at once is safe
+const BULK = 10;
+const FAILED_COOLDOWN_FRAMES = 30 * 60; // a purchase the game refused is not tried again for a minute
 
 /** Upgrades whose worth the income model cannot see; bought when they cost under a minute of income. */
 const ENABLERS = new Set([
@@ -38,13 +39,19 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         stamp: '',
         last: null, // the last decision, for the menu
         purchases: 0,
+        failed: new Map(), // candidate key -> frame it may be tried again
+        frame: 0,
     };
+
+    // A CpS buff inflates click power in a way the model cannot fully divide out (mouse upgrades
+    // add a share of the buffed CpS, main.js:4692-4708), so rankings are made between buffs and
+    // the last one is kept while a buff runs.
+    const cpsBuffRunning = () => Object.values(game.buffs).some((b) => b.multCpS && b.multCpS !== 1);
 
     // Anything here changing means the ranking may be wrong.
     const stampOf = () =>
         [
             game.UpgradesInStore.length,
-            Object.keys(game.buffs).join(','),
             game.elderWrath,
             game.AchievementsOwned,
             game.BuildingsOwned,
@@ -53,7 +60,8 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         ].join('|');
 
     function rank(frame) {
-        const candidates = listCandidates(game, policy());
+        const pol = policy();
+        const candidates = listCandidates(game, pol).filter((c) => !((state.failed.get(c.key) || 0) > frame));
         const now = readState(game, settings);
         const income = estimateIncome(now);
         const measured = measureCandidates(game, settings, candidates).map(estimateIncome);
@@ -69,30 +77,49 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         state.reserve = Math.max(held, extraReserve() || 0);
         state.ranked = ranked;
         state.income = income;
+        state.limits = pol.limits || {};
         state.rankedAt = frame;
         state.stale = false;
         state.stamp = stampOf();
     }
 
     function refreshIfStale(frame) {
-        if (state.stale || !state.income || frame - state.rankedAt >= RERANK_FRAMES || state.stamp !== stampOf()) rank(frame);
+        const due = state.stale || !state.income || frame - state.rankedAt >= RERANK_FRAMES || state.stamp !== stampOf();
+        if (!due) return;
+        if (state.income && cpsBuffRunning() && !state.stale) return;
+        rank(frame);
     }
+
+    /** How many more of a building the settings allow. */
+    const room = (building) => {
+        const max = state.limits && state.limits[building.id];
+        return max === undefined ? Infinity : Math.max(0, max - building.amount);
+    };
 
     function buy(candidate) {
         const before = game.cookies;
         if (candidate.kind === 'building') {
-            const bulk = game.cookies > BULK_WHEN_BANK_EXCEEDS * candidate.price ? 10 : 1;
-            buyBuilding(candidate.building, bulk);
+            // Ten at once only when the bank covers all ten above the reserve and the limit allows.
+            const ten = candidate.building.getSumPrice(BULK);
+            const n = game.cookies - ten >= state.reserve && room(candidate.building) >= BULK ? BULK : 1;
+            if (room(candidate.building) >= 1) buyBuilding(candidate.building, n);
         } else if (candidate.kind === 'upgrade') {
-            candidate.upgrade.buy();
+            // bypass: the game's confirmation prompt ("One mind", ...) is the player saying yes.
+            candidate.upgrade.buy(1);
         } else if (candidate.kind === 'chain') {
-            for (const step of candidate.steps) buyBuilding(step.building, step.missing);
-            if (candidate.upgrade.unlocked && !candidate.upgrade.bought) candidate.upgrade.buy();
+            if (candidate.steps.every((s) => room(s.building) >= s.missing)) {
+                for (const step of candidate.steps) buyBuilding(step.building, step.missing);
+                if (candidate.upgrade.unlocked && !candidate.upgrade.bought) candidate.upgrade.buy(1);
+            }
         }
         const spent = before - game.cookies;
         if (spent > 0) {
             state.purchases++;
-            log(`bought ${candidate.name} for ${game.cookies < 1e21 ? Math.round(spent).toLocaleString() : spent.toExponential(2)}`);
+            log(`bought ${candidate.name} for ${spent < 1e21 ? Math.round(spent).toLocaleString() : spent.toExponential(2)}`);
+        } else {
+            // The game refused: do not keep choosing it.
+            state.failed.set(candidate.key, state.frame + FAILED_COOLDOWN_FRAMES);
+            state.stale = true;
         }
         return spent > 0;
     }
@@ -110,18 +137,21 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
 
     function enablers() {
         if (!state.income) return;
+        const excluded = policy().excludedUpgrades;
+        if (excluded === 'all') return;
         const minute = state.income.total * 60;
         for (const upgrade of game.UpgradesInStore) {
-            if (!ENABLERS.has(upgrade.name) || upgrade.bought) continue;
+            if (!ENABLERS.has(upgrade.name) || upgrade.bought || excluded.has(upgrade.id)) continue;
             const price = upgrade.getPrice();
             if (price <= minute && game.cookies - price >= state.reserve) {
-                upgrade.buy();
+                upgrade.buy(1);
                 log(`bought ${upgrade.name} (enabler)`);
             }
         }
     }
 
     function tick(frame) {
+        state.frame = frame;
         refreshIfStale(frame);
         for (let i = 0; i < PURCHASES_PER_TICK; i++) {
             const choice = decide({ ranked: state.ranked, reserve: state.reserve, bank: game.cookies });
@@ -133,7 +163,8 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         enablers();
     }
 
-    loop.add('buyer', tick, { everyFrames: 3, enabled: () => !!settings.autoBuy });
+    // No store while ascending: the animation and the heavenly screen come first.
+    loop.add('buyer', tick, { everyFrames: 3, enabled: () => !!settings.autoBuy && !game.OnAscend && !game.AscendTimer });
 
     return {
         options,
@@ -152,12 +183,12 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         },
         /** What the next purchase is, or null; ranks first if the ranking is stale. */
         next() {
-            refreshIfStale(state.rankedAt);
+            refreshIfStale(state.frame);
             return state.ranked.find((c) => Number.isFinite(c.payback)) || null;
         },
         /** A plain summary for the menu. */
         report() {
-            refreshIfStale(state.rankedAt);
+            refreshIfStale(state.frame);
             const top = state.ranked.slice(0, 8).map((c) => ({
                 name: c.name,
                 kind: c.kind,

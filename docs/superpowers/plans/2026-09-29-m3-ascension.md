@@ -138,3 +138,26 @@ The rule, on `u = ln(1 + projected)`:
 - [ ] Compare in the harness, 24 game hours, same seed: the rate rule against the upstream "prestige doubles" rule (kept reachable by an option for the comparison), on prestige reached and CpS at the end. Record the result in the spec.
 - [ ] README status (M3 done, M4 next), spec status line, `npm run deploy`.
 - [ ] Commit: `git commit -m "M3 complete"`.
+
+---
+
+## Review of milestones 2 to 4
+
+An independent reviewer went over milestones 2, 3 and 4 against the game's source and verified one blocker and seven major defects by running them. All are fixed, each with a regression test in `test/game/review2.test.mjs` or a unit test.
+
+| Finding | Severity | Fix |
+|---|---|---|
+| The buyer froze for good at "One mind": the game asks for confirmation, `buy()` only opens the prompt, and the same candidate was chosen every tick | Blocker | Buy with the game's own bypass (what "Yes" does); a purchase the game refuses is set aside for a minute instead of retried |
+| The pre-ascension routine ran at reincarnation, after the game had granted chips, and wrinklers were wiped before paying out | Major | Collect before ascending, wait for the pops to land, then ascend; the plan is made before collecting, while the bakery still stands |
+| Heavenly upgrades hidden at the new prestige were bought | Major | Visibility is checked at the prestige being reached, and buying checks the game's own `canBePurchased` |
+| Bulk buys and chains went past building limits | Major | Limits are passed to the buyer and chains; bulk needs the bank to cover all ten above the reserve |
+| The legacy wrinkler popping compared two identical incomes after the adapter dropped its arguments | Major | The adapter honours the wrinkler count again |
+| Wrinklers were credited at the maximum return even with nothing popping them | Major | Returns only when auto-popping is on; withering at the game's real rate otherwise |
+| A running CpS buff inflated the measured click power | Major | Rankings are made between buffs and kept while one runs |
+| A manual reincarnation was not seen as a new run | Major | Runs are tracked by the game's reset count and start date; the run's start is kept apart from the sample buffer |
+| Golden payouts were sized from the wrinkler-inflated income | Minor | Sized from real CpS |
+| Golden pool details: the dragon gate is 19.25%, not 15%; a wrath cookie still rolls for chain and storm; 30% of wrath building specials are debuffs | Minor | All three modelled |
+| The buyer kept buying during the ascend animation | Minor | Disabled while ascending |
+| Lumps were spread over whatever was affordable; Born again mode spent the Sugar baking hold | Minor | The best level is waited for; the hold reads ownership and honours the Sugar Baking Guard |
+| What-ifs left the store-rebuild flag set | Minor | Added to the snapshot |
+| Suspected: fortune chains, heavenly upgrades the model cannot see, permanent slots filled before their own slot was bought, dead settings | Minor | Fortune upgrades are not chained; cookie boxes, starter kits and discounts get small fixed shares; slots are assigned on the ascension screen after buying; three dead settings removed |

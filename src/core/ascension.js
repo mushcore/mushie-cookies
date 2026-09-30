@@ -16,6 +16,7 @@ const u = (projected) => Math.log(1 + Math.max(0, projected));
  * @param {number} args.prestige         prestige level now
  * @param {number} args.projected        prestige level after ascending now
  * @param {Array<{t: number, projected: number}>} args.history  samples over this run, seconds since it began, oldest first
+ * @param {{t: number, projected: number}} [args.start]  the run's first sample, if the history no longer holds it
  * @param {number} args.runSeconds       seconds since reincarnation
  * @param {number} [args.overheadSeconds=300]  what an ascension costs: the animation and the rebuild lag
  * @param {number} [args.windowSeconds=900]    how far back the current yield looks
@@ -27,6 +28,7 @@ export function shouldAscend({
     prestige,
     projected,
     history,
+    start: startSample,
     runSeconds,
     overheadSeconds = 300,
     windowSeconds = 900,
@@ -35,7 +37,8 @@ export function shouldAscend({
 }) {
     const gain = Math.floor(projected) - prestige;
     const now = u(projected);
-    const start = history.length ? u(history[0].projected) : now;
+    const first = startSample || history[0];
+    const start = first ? u(first.projected) : now;
     const averageRate = (now - start) / Math.max(1, runSeconds + overheadSeconds);
 
     // The sample at or before the window's edge; with a short history, the oldest there is.

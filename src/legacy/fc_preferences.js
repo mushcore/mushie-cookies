@@ -40,11 +40,6 @@ FrozenCookies.preferenceValues = {
         display: ["AutoBuy OFF", "AutoBuy ON"],
         default: 0,
     },
-    otherUpgrades: {
-        hint: "Buy upgrades that don't boost CpS directly.",
-        display: ["Other Upgrades OFF", "Other Upgrades ON"],
-        default: 1,
-    },
     autoBlacklistOff: {
         hint: "Turn off blacklist when goal is met.",
         display: ["Auto Blacklist OFF", "Auto Blacklist ON"],
@@ -73,11 +68,6 @@ FrozenCookies.preferenceValues = {
         default: 0,
         extras: '<a class="option" id="factoryMax" onclick="updateFactoryMax(\'factoryMax\');">${factoryMax} Factories</a>',
     },
-    pastemode: {
-        hint: "Buy least efficient option (⚠️ not recommended).",
-        display: ["Pastemode OFF", "Pastemode ON"],
-        default: 0,
-    },
 
     // other auto options
     autoOtherOptions: {
@@ -86,11 +76,6 @@ FrozenCookies.preferenceValues = {
     autoBulk: {
         hint: "Set bulk buy after ascension.",
         display: ["Auto Bulkbuy OFF", "Auto Bulkbuy x10", "Auto Bulkbuy x100"],
-        default: 0,
-    },
-    autoBuyAll: {
-        hint: "Auto-buy all upgrades until a chip is earned.",
-        display: ["Auto Buy All Upgrades OFF", "Auto Buy All Upgrades ON"],
         default: 0,
     },
     autoAscendToggle: {

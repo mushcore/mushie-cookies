@@ -339,7 +339,10 @@ function fcDraw(from, text, origin) {
 }
 
 function fcReset(hard) {
-    if (!hard) prepareForAscension();
+    // Run for an ascension the player started; the mod's own ascension collects beforehand,
+    // while it still counts (the game grants chips before this reset).
+    if (!hard && !FrozenCookies.preparedForAscension) prepareForAscension();
+    FrozenCookies.preparedForAscension = false;
     Game.oldReset(hard);
     FrozenCookies.frenzyTimes = {};
     FrozenCookies.last_gc_state =
@@ -716,7 +719,6 @@ function recommendedSettingsAction() {
         FrozenCookies.autoFortune = 1;
         // autobuy options
         FrozenCookies.autoBuy = 1;
-        FrozenCookies.otherUpgrades = 1;
         FrozenCookies.autoBlacklistOff = 0;
         FrozenCookies.blacklist = 0;
         FrozenCookies.mineLimit = 1;
@@ -1273,9 +1275,9 @@ function baseCps() {
     return Game.unbuffedCps;
 }
 
-function effectiveCps() {
-    var income = MushieCookies.buyer ? MushieCookies.buyer.income() : null;
-    return income ? income.total : Game.unbuffedCps;
+// delay: the bank to assume; wrinklerCount: how many wrinklers to assume attached.
+function effectiveCps(delay, wrathValue, wrinklerCount) {
+    return MushieCookies.incomeWith({ wrinklerCount: wrinklerCount, bank: delay });
 }
 
 function delayAmount() {

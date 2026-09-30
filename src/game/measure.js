@@ -84,7 +84,15 @@ function mixedProbabilities(game) {
     const w = wrathChance(game);
     const out = {};
     if (w < 1) for (const [k, v] of Object.entries(outcomeProbabilities(poolRules(game, 0)))) out[k] = (out[k] || 0) + v * (1 - w);
-    if (w > 0) for (const [k, v] of Object.entries(outcomeProbabilities(poolRules(game, 1)))) out[k] = (out[k] || 0) + v * w;
+    if (w > 0) {
+        for (const [k, v] of Object.entries(outcomeProbabilities(poolRules(game, 1)))) {
+            if (k === 'building special') {
+                // 30% of a wrath cookie's building specials are debuffs (main.js:5506-5508).
+                out[k] = (out[k] || 0) + v * w * 0.7;
+                out['building debuff'] = (out['building debuff'] || 0) + v * w * 0.3;
+            } else out[k] = (out[k] || 0) + v * w;
+        }
+    }
     return out;
 }
 
@@ -128,6 +136,18 @@ function wrinklerReturnMult(game) {
 }
 
 /**
+ * Wrinklers attach only during the grandmapocalypse. What they give back depends on who pops
+ * them: nothing if nobody does, and next to nothing if they are popped as soon as they arrive.
+ */
+function wrinklerState(game, settings) {
+    const count = game.elderWrath > 0 ? game.getWrinklersMax() : 0;
+    const suckRate = 0.05 * game.eff('wrinklerEat') * (1 + 0.2 * game.auraMult('Dragon Guts'));
+    const popping = Number(settings.autoWrinkler) || 0; // 0 off, 1 when worth it, 2 at once
+    if (popping === 2) return { count: 0, returnMult: 0, suckRate };
+    return { count, returnMult: popping === 1 ? wrinklerReturnMult(game) : 0, suckRate };
+}
+
+/**
  * The income state of the game as it is now.
  * @param {object} settings  the mod's settings: autoClick, cookieClickSpeed
  */
@@ -139,10 +159,7 @@ export function readState(game, settings) {
         bank: game.cookies,
         // What every building costs right now; a discount upgrade lowers it inside a what-if.
         basket: game.ObjectsById.reduce((sum, b) => sum + b.getPrice(), 0),
-        wrinklers: {
-            count: game.elderWrath > 0 ? game.getWrinklersMax() : 0,
-            returnMult: wrinklerReturnMult(game),
-        },
+        wrinklers: wrinklerState(game, settings),
         golden: goldenState(game),
     };
 }

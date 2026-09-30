@@ -79,3 +79,18 @@ test('no golden cookies at all is handled without division by zero', () => {
     assert.equal(out.total, 1000);
     assert.ok(Object.values(out.byOutcome).every((v) => v === 0));
 });
+
+test('wrinklers give nothing back when nobody pops them, and wither at the real rate', () => {
+    const popped = estimateIncome({ ...quiet, wrinklers: { count: 10, returnMult: 1.1, suckRate: 0.05 } });
+    const kept = estimateIncome({ ...quiet, wrinklers: { count: 10, returnMult: 0, suckRate: 0.05 } });
+    const guts = estimateIncome({ ...quiet, wrinklers: { count: 10, returnMult: 0, suckRate: 0.06 } });
+    assert.ok(Math.abs(popped.passive - 6000) < 1e-9);
+    assert.ok(Math.abs(kept.passive - 500) < 1e-9, String(kept.passive));
+    assert.ok(Math.abs(guts.passive - 400) < 1e-9);
+});
+
+test('golden payouts are sized from real CpS, not the wrinkler-inflated figure', () => {
+    const g = golden({ meanInterval: 300, probabilities: { 'multiply cookies': 1 } });
+    const with10 = estimateIncome({ ...quiet, bank: 1e12, golden: g, wrinklers: { count: 10, returnMult: 1.1, suckRate: 0.05 } });
+    assert.ok(Math.abs(with10.golden - (900 * 1000 + 13) / 300) < 1e-9);
+});
