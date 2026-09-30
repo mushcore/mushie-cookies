@@ -60,6 +60,84 @@ test('a running click frenzy is divided out of the click power', { skip }, () =>
         assert.equal(out.cps[0], out.cps[1]);
     }));
 
+// Each mouse upgrade adds 1% of Game.cookiesPs to a click (main.js:4692-4706), and cookiesPs
+// already carries every CpS buff (5159-5167): under a Frenzy that part of a click is 7x bigger.
+const MICE = ['Thousand fingers', 'Plastic mouse', 'Iron mouse', 'Titanium mouse'];
+
+test('no CpS buff is counted in the click power, alone or beside a click buff', { skip }, () =>
+    withGame(async (game) => {
+        const out = await game.eval((mice) => {
+            for (const name of mice) Game.Upgrades[name].earn();
+            Game.CalculateGains();
+            const read = () => MushieCookies.readState(Game, { autoClick: 1, cookieClickSpeed: 50 });
+            const calm = read();
+            const buffs = [
+                [['frenzy', 77, 7]],
+                [['blood frenzy', 6, 666]],
+                [['dragon harvest', 60, 15]],
+                [['building buff', 30, 4, 2]],
+                [['clot', 66, 0.5]],
+                [['sugar frenzy', 3600, 3]],
+                [['cursed finger', 10, 1e9]],
+                [['frenzy', 77, 7], ['click frenzy', 13, 777]],
+            ];
+            const rows = buffs.map((list) => {
+                Game.killBuffs();
+                for (const b of list) Game.gainBuff(...b);
+                Game.CalculateGains();
+                const cps = Game.cookiesPs;
+                const hasBuff = Game.hasBuff;
+                const s = read();
+                return {
+                    buffs: list.map((b) => b[0]).join(' + '),
+                    click: s.clickPower,
+                    // readState leaves the game as it found it
+                    kept: Game.cookiesPs === cps && Game.hasBuff === hasBuff,
+                };
+            });
+            Game.killBuffs();
+            Game.CalculateGains();
+            return { calm: calm.clickPower, gameCalm: Game.computedMouseCps, cps: calm.cps, rows };
+        }, MICE);
+        assert.equal(out.calm, out.gameCalm);
+        assert.ok(out.calm > 0.03 * out.cps, 'the mice make a share of CpS part of every click');
+        for (const row of out.rows) {
+            assert.ok(Math.abs(row.click - out.calm) <= 1e-9 * out.calm, `${row.buffs}: click power ${row.click} is not ${out.calm}`);
+            assert.ok(row.kept, `${row.buffs}: the game was left changed`);
+        }
+    }));
+
+test('a ranking made during a Frenzy is the ranking made without one', { skip }, () =>
+    withGame(async (game) => {
+        const out = await game.eval((mice) => {
+            for (const name of mice) Game.Upgrades[name].earn();
+            Game.CalculateGains();
+            // Clicks are counted (at the speed setting; the clicker itself is not started).
+            FrozenCookies.autoClick = 1;
+            FrozenCookies.cookieClickSpeed = 50;
+            const rankNow = () => {
+                MushieCookies.buyer.invalidate();
+                const r = MushieCookies.buyer.report();
+                return { reserve: r.reserve, income: r.income.total, top: r.top.map((c) => [c.name, c.payback]) };
+            };
+            const calm = rankNow();
+            Game.gainBuff('frenzy', 77, 7);
+            Game.CalculateGains();
+            const frenzy = rankNow();
+            Game.killBuffs();
+            Game.CalculateGains();
+            return { calm, frenzy };
+        }, MICE);
+        assert.ok(out.calm.top.length >= 3, 'something to rank');
+        const near = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
+        assert.ok(near(out.frenzy.income, out.calm.income), `income ${out.frenzy.income} under a Frenzy, ${out.calm.income} without`);
+        assert.deepEqual(out.frenzy.top.map((c) => c[0]), out.calm.top.map((c) => c[0]));
+        out.calm.top.forEach(([name, payback], i) =>
+            assert.ok(near(out.frenzy.top[i][1], payback), `${name}: payback ${out.frenzy.top[i][1]} under a Frenzy, ${payback} without`)
+        );
+        assert.equal(out.frenzy.reserve, out.calm.reserve);
+    }));
+
 test('Lucky day halves the expected wait for a golden cookie', { skip }, () =>
     withGame(async (game) => {
         const out = await game.eval(() => {
@@ -120,4 +198,16 @@ test('no golden cookie income is expected while golden cookies cannot spawn', { 
         assert.ok(Number.isFinite(out.on));
         assert.equal(out.spawns, false);
         assert.equal(out.off, Infinity);
+    }));
+
+test('storm drops are counted at the game frame rate, all of them when the shimmer system clicks', { skip }, () =>
+    withGame(async (game) => {
+        const out = await game.eval(() => ({
+            on: MushieCookies.readState(Game, { autoGC: 1 }).golden,
+            off: MushieCookies.readState(Game, { autoGC: 0 }).golden,
+            fps: Game.fps,
+        }));
+        assert.equal(out.on.fps, out.fps);
+        assert.equal(out.on.stormReach, 1);
+        assert.equal(out.off.stormReach, 0.5, 'by hand, the inherited guess of half');
     }));

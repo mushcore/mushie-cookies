@@ -12,6 +12,29 @@ test('runs systems on their own cadence', () => {
     assert.deepEqual(ran, { every: 9, third: 3 });
 });
 
+test('a system added with `first` runs before those added earlier', () => {
+    const loop = createLoop(createGuard());
+    const order = [];
+    loop.add('a', () => order.push('a'));
+    loop.add('b', () => order.push('b'));
+    loop.add('front', () => order.push('front'), { first: true });
+    loop.run(1);
+    assert.deepEqual(order, ['front', 'a', 'b']);
+});
+
+test('a system added by a tick, first or not, starts on the next run and nothing runs twice', () => {
+    const loop = createLoop(createGuard());
+    const order = [];
+    loop.add('adder', (frame) => {
+        order.push(`adder ${frame}`);
+        if (frame === 1) loop.add('front', (f) => order.push(`front ${f}`), { first: true });
+    });
+    loop.add('last', (frame) => order.push(`last ${frame}`));
+    loop.run(1);
+    loop.run(2);
+    assert.deepEqual(order, ['adder 1', 'last 1', 'front 2', 'adder 2', 'last 2']);
+});
+
 test('passes the frame number to the tick', () => {
     const loop = createLoop(createGuard());
     const seen = [];

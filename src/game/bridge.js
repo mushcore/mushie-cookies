@@ -8,6 +8,11 @@ import { createGarden } from '../systems/garden.js';
 import { createMarket } from '../systems/market.js';
 import { createGods } from '../systems/gods.js';
 import { createCombos } from '../systems/combos.js';
+import { createHeavenly } from '../systems/heavenly.js';
+import { createDragon } from '../systems/dragon.js';
+import { createShimmers } from '../systems/shimmers.js';
+import { createClicker } from '../systems/clicker.js';
+import { createWrinklers } from '../systems/wrinklers.js';
 
 const CHAIN_REACH = 15;
 
@@ -45,32 +50,63 @@ export function extraReserveFrom(settings, helpers) {
 }
 
 /** Starts the new systems once the legacy code has started. Returns them by name. */
-export function startSystems({ game, loop, legacy, log }) {
+export function startSystems({ game, loop, legacy, log, guard }) {
     const settings = legacy.settings;
-    let combos = null;
+    // First on the loop: a shimmer is popped in the frame it appears, before any system reads the
+    // screen (see src/systems/shimmers.js).
+    const shimmers = createShimmers({
+        game,
+        settings,
+        loop,
+        log,
+        // Asked from the loop only, once `ascension` below exists.
+        ascensionImminent: () => {
+            if (settings.autoAscendToggle != 1) return false;
+            const verdict = ascension.verdict();
+            return ascension.phase() !== 'playing' || !!(verdict && verdict.ascend);
+        },
+    });
+    const clicker = createClicker({ game, settings, loop, log, guard });
+    let lumps = null; // created below; the buyer keeps the bank a golden lump is timed to pay on
+    let combos = null; // created below; holds what the Golden switch needs while it is on for a combo
     const buyer = createBuyer({
         game,
         settings,
         loop,
         log,
         policy: () => policyFrom(game, settings, legacy.blacklistPresets, legacy.prerequisites),
-        // And what the Golden switch needs held while it is on for a combo (src/systems/combos.js).
-        extraReserve: () => Math.max(extraReserveFrom(settings, legacy), combos ? combos.hold() : 0),
+        extraReserve: () => Math.max(extraReserveFrom(settings, legacy), lumps ? lumps.hold() : 0, combos ? combos.hold() : 0),
     });
+    const wrinklers = createWrinklers({ game, settings, loop, log, buyer });
+    const heavenly = createHeavenly({ game, settings, loop });
     const ascension = createAscension({
         game,
         settings,
         loop,
         log,
         buyer,
-        extras: () => legacy.wrinklerValue() + legacy.chocolateValue(),
+        extras: () => wrinklers.held() + legacy.chocolateValue(),
+        collect: () => wrinklers.collect(),
+        heavenly,
         prepare: () => legacy.prepareForAscension(),
     });
-    const lumps = createLumps({ game, settings, loop, log });
+    lumps = createLumps({
+        game,
+        settings,
+        loop,
+        log,
+        buyer,
+        // The ascension's growth verdict times Sugar frenzy; while its verdict is not yet known the
+        // growth reads as unknown, and with it off nothing ends the run.
+        run: () => (settings.autoAscendToggle == 1 ? ascension.verdict() || { instantRate: Infinity, averageRate: 0, rated: false } : null),
+        ascending: () => settings.autoAscendToggle == 1 && ascension.phase() === 'settling',
+    });
     const grimoire = createGrimoire({ game, settings, loop, log });
     const garden = createGarden({ game, settings, loop, log, reserve: () => buyer.reserve() });
     const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
-    const gods = createGods({ game, settings, loop, log, buyer });
+    // The dragon trains before the gods pick auras; `dragon` tells them when a level is gained.
+    const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve() });
+    const gods = createGods({ game, settings, loop, log, buyer, dragon });
     combos = createCombos({ game, settings, loop, log, buyer });
-    return { buyer, ascension, lumps, grimoire, garden, market, gods, combos };
+    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, shimmers, clicker, wrinklers, heavenly, combos };
 }

@@ -424,202 +424,11 @@ function autoCycliusAction() {
     }
 }
 
-function lumpIn(mins) {
-    //For debugging, set minutes until next lump is *ripe*
-    Game.lumpT = Date.now() - Game.lumpRipeAge + 60000 * mins;
-}
+// The Rigidel and Dragon's Curve harvest steps were removed with the inherited lump harvest: the
+// lump system (src/systems/lumps.js) harvests, and those steps belong to the gods system, which
+// owns the pantheon swaps and the aura slots they spent.
 
-function rigiSell() {
-    //Sell enough of the cheapest building to enable Rigidels effect
-    if (Game.BuildingsOwned % 10) {
-        var cheapest;
-        Game.ObjectsById.forEach(function (b) {
-            if (!cheapest || b.price < cheapest.price) {
-                cheapest = b;
-            }
-        });
-        cheapest.sell(Game.BuildingsOwned % 10);
-    }
-    return;
-}
-
-function autoRigidel() {
-    if (!T) return; // Exit if Pantheon doesn't exist
-
-    const started = Game.lumpT;
-    const timeToRipe =
-        (Math.ceil(Game.lumpRipeAge) - (Date.now() - started)) / 60000; // Minutes until sugar lump ripens
-    const orderLvl = Game.hasGod("order") ? Game.hasGod("order") : 0;
-    let prevGod = -1;
-    let tryHarvest = false;
-
-    // Only proceed if we have swaps available
-    if (T.swaps < 1 && orderLvl === 0) return;
-
-    // Determine if Rigidel is in a slot and act accordingly
-    if (orderLvl === 0) {
-        // Rigidel isn't in a slot
-        if (T.swaps < (T.slot[0] === -1 ? 1 : 2)) return; // Not enough swaps to proceed
-        if (timeToRipe < 60) {
-            prevGod = T.slot[0]; // Cache current god in diamond slot
-            swapIn(10, 0); // Swap in Rigidel to diamond slot
-            tryHarvest = true;
-        }
-    } else if (orderLvl === 1) {
-        // Rigidel is in diamond slot
-        if (timeToRipe < 55) tryHarvest = true;
-    } else if (orderLvl === 2) {
-        // Rigidel is in ruby slot
-        if (timeToRipe < 35) tryHarvest = true;
-    } else if (orderLvl === 3) {
-        // Rigidel is in jade slot
-        if (timeToRipe < 15) tryHarvest = true;
-    }
-
-    if (tryHarvest) {
-        rigiSell();
-        Game.computeLumpTimes();
-        // Use a variable for ripe check for clarity
-        const lumpIsRipe = Date.now() - started >= Math.ceil(Game.lumpRipeAge);
-        if (lumpIsRipe) {
-            if (Game.dragonLevel >= 21 && FrozenCookies.dragonsCurve) {
-                autoDragonsCurve();
-            } else {
-                Game.clickLump();
-            }
-            logEvent("autoRigidel", "Sugar lump harvested early");
-        } else {
-            logEvent(
-                "autoRigidel",
-                "Suppressed early harvest of unripe sugar lump"
-            );
-        }
-    }
-
-    // Restore previous god if we swapped Rigidel in
-    if (prevGod !== -1) swapIn(prevGod, 0);
-}
-
-function autoDragonsCurve() {
-    //Swap dragon auras to try for unusual lumps
-    if (Game.dragonLevel < 21 || FrozenCookies.dragonsCurve < 1) return;
-
-    if (FrozenCookies.autoDragonToggle == 1) {
-        autoDragonsCurve.autodragonyes = 1;
-        FrozenCookies.autoDragonToggle = 0;
-    } else {
-        autoDragonsCurve.autodragonyes = 0;
-    }
-
-    if (
-        Game.dragonLevel > 26 &&
-        !Game.hasAura("Dragon's Curve")
-    ) {
-	    if (Game.dragonAura == 18) {
-	        Game.SetDragonAura(17, 1);
-	        Game.ConfirmPrompt();
-	    } else {
-            Game.SetDragonAura(17, 0);
-            Game.ConfirmPrompt();
-	    }
-        logEvent(
-            "autoDragonsCurve",
-            "Dragon auras swapped to manipulate new Sugar Lump"
-        );
-    } else if (!Game.hasAura("Dragon's Curve")) {
-        Game.specialTab = "dragon";
-        Game.SetDragonAura(17, 0);
-        Game.ConfirmPrompt();
-        logEvent(
-            "autoDragonsCurve",
-            "Dragon auras swapped to manipulate new Sugar Lump"
-        );
-    }
-
-    if (
-        FrozenCookies.dragonsCurve == 2 &&
-        Game.dragonLevel > 26 &&
-        !Game.hasAura("Reality Bending")
-    ) {
-        if (Game.dragonAura == 17) {
-	        Game.SetDragonAura(18, 1);
-	        Game.ConfirmPrompt();
-	    } else {
-	        Game.SetDragonAura(18, 0);
-	        Game.ConfirmPrompt();
-	    }
-    }
-
-    Game.clickLump();
-
-    if (autoDragonsCurve.autodragonyes == 1) {
-        FrozenCookies.autoDragonToggle = 1;
-        autoDragonsCurve.autodragonyes = 0;
-    }
-    return;
-}
-
-function autoDragonAction() {
-    if (
-        !Game.HasUnlocked("A crumbly egg") ||
-        Game.dragonLevel > 26 ||
-        hasClickBuff()
-    ) {
-        return;
-    }
-
-    if (Game.HasUnlocked("A crumbly egg") && !Game.Has("A crumbly egg")) {
-        Game.Upgrades["A crumbly egg"].buy();
-        logEvent("autoDragon", "Bought an egg");
-    }
-
-    if (
-        Game.dragonLevel < Game.dragonLevels.length - 1 &&
-        Game.dragonLevels[Game.dragonLevel].cost()
-    ) {
-        Game.specialTab = "dragon";
-        Game.UpgradeDragon();
-        if (Game.dragonLevel + 1 >= Game.dragonLevels.length)
-            Game.ToggleSpecialMenu();
-        logEvent(
-            "autoDragon",
-            "Upgraded the dragon to level " + Game.dragonLevel
-        );
-    }
-}
-
-function petDragonAction() {
-    if (
-        !Game.Has("A crumbly egg") ||
-        Game.dragonLevel < 4 ||
-        !Game.Has("Pet the dragon") ||
-        hasClickBuff()
-    ) {
-        return;
-    }
-
-    //Calculate current pet drop and if we have it
-    Math.seedrandom(Game.seed + "/dragonTime");
-    let drops = [
-        "Dragon scale",
-        "Dragon claw",
-        "Dragon fang",
-        "Dragon teddy bear",
-    ];
-    drops = shuffle(drops);
-    Math.seedrandom();
-    let currentDrop =
-        drops[Math.floor((new Date().getMinutes() / 60) * drops.length)];
-
-    //Pet the dragon
-    if (!Game.Has(currentDrop) && !Game.HasUnlocked(currentDrop)) {
-        Game.specialTab = "dragon";
-        Game.ToggleSpecialMenu(1);
-        Game.ClickSpecialPic();
-        Game.ToggleSpecialMenu(0);
-        //logEvent("autoDragon", "Who's a good dragon? You are!");
-    }
-}
+// Training and petting the dragon (autoDragon, petDragon) belong to src/systems/dragon.js.
 
 function autoDragonAura0Action() {
     if (
@@ -695,15 +504,16 @@ function autoDragonAura1Action() {
 }
 
 function autoDragonOrbsAction() {
-    if (!T) return;
+    // The interval outlives the setting (only FCStart clears it), so the setting is read each tick.
+    if (!T || FrozenCookies.autoDragonOrbs != 1) return;
     if (
-        FrozenCookies.autoDragonOrbs == 1 &&
-        (!Game.hasAura("Dragon Orbs") ||
-            Game.hasGod("ruin") ||
-            Game.Objects["You"].amount < 1)
+        !Game.hasAura("Dragon Orbs") ||
+        Game.hasGod("ruin") ||
+        Game.Objects["You"].amount < 1
     ) {
         FrozenCookies.autoDragonOrbs = 0;
         logEvent("autoDragonOrbs", "Not currently possible to use Dragon Orbs");
+        return;
     }
 
     var buffsN = 0;

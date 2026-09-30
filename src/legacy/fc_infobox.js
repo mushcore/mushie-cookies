@@ -12,9 +12,9 @@ function scientificNotation(value) {
     return value;
 }
 
-// Implemented much better in base mod so just call that for raw, long, and short
-// Used by FrozenCookies.numberDisplay in fcBeautify
-var numberFormatters = [
+// The number styles FrozenCookies.numberDisplay chooses from in fcBeautify. Named apart from the
+// game's own numberFormatters (main.js:216), which the game's Beautify picks from.
+var fcNumberFormatters = [
     rawFormatter,
     formatEveryThirdPower(formatLong), // 1: long: millions, billions etc.
     formatEveryThirdPower(formatShort), // 2: short: M, B, T etc.
@@ -34,23 +34,33 @@ var numberFormatters = [
     scientificNotation, // 4: scientific: 6.3e12 etc.
 ];
 
-function fcBeautify(value) {
+// The game's Beautify, kept when the legacy code is first evaluated, before setOverrides
+// replaces the global with fcBeautify.
+var fcGameBeautify = typeof fcGameBeautify == "function" ? fcGameBeautify : Beautify;
+
+// Replaces the game's Beautify. At the default style (1, the game's own) the game formats, so its
+// Short numbers option keeps working. Another style formats alike otherwise: whole numbers,
+// with `floats` decimals below 1000 (main.js:222-237).
+function fcBeautify(value, floats) {
+    var formatter = fcNumberFormatters[FrozenCookies.numberDisplay];
+    value = Number(value);
+    if (FrozenCookies.numberDisplay == 1 || !formatter) return fcGameBeautify(value, floats);
     var negative = value < 0;
-    value = Math.abs(value);
+    var decimal = "";
+    var fixed = value.toFixed(floats);
+    if (floats > 0 && Math.abs(value) < 1000 && Math.floor(fixed) != fixed) {
+        decimal = "." + fixed.toString().split(".")[1];
+    }
+    value = Math.floor(Math.abs(value));
+    if (floats > 0 && fixed == value + 1) value++;
     // There are no SI prefixes larger than 1e30, so we'll use scientific notation
     // The game will show Infinity otherwise, which is not useful
-    if (FrozenCookies.numberDisplay === 3 && value >= 1e33) {
-        // Use scientificNotation (case 4)
-        var output = numberFormatters[4](value)
-            .toString()
-            .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        return negative ? "-" + output : output;
-    }
-    var formatter = numberFormatters[FrozenCookies.numberDisplay];
+    if (FrozenCookies.numberDisplay === 3 && value >= 1e33) formatter = fcNumberFormatters[4];
     var output = formatter(value)
         .toString()
         .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    return negative ? "-" + output : output;
+    if (output == "0") negative = false;
+    return negative ? "-" + output : output + decimal;
 }
 
 // Runs numbers in upgrades and achievements through our beautify function
@@ -94,8 +104,32 @@ function timeDisplay(seconds) {
     return (years + days + hours + minutes + seconds).trim();
 }
 
+// The size of the infobox's text block: its widest label, and all its lines. Measured when the
+// infobox is computed, not on every draw; only the text styles (odd fancyui) show text.
+function measureInfoboxText(t_d) {
+    var c = $("#backgroundLeftCanvas");
+    if (FrozenCookies.fancyui % 2 != 1 || typeof c.measureText != "function") {
+        return { width: 0, height: 0 };
+    }
+    var maxText = _.max(
+        t_d.map(function (o) {
+            return o.name ? o.name + (o.display ? ": " + o.display : "") : "";
+        }),
+        function (str) {
+            return str.length;
+        }
+    );
+    var maxMeasure = c.measureText({
+        fontSize: "12px",
+        fontFamily: "Arial",
+        maxWidth: c.width,
+        text: maxText,
+    });
+    return { width: maxMeasure.width, height: maxMeasure.height * t_d.length };
+}
+
 // functionality for the infobox
-function drawCircles(t_d, x, y) {
+function drawCircles(t_d, x, y, textSize) {
     var maxRadius,
         heightOffset,
         i_c,
@@ -105,7 +139,7 @@ function drawCircles(t_d, x, y) {
         maxHeight,
         s_t,
         c = $("#backgroundLeftCanvas");
-    if (typeof c.measureText != "function") {
+    if (typeof c.drawArc != "function") {
         return;
     }
     maxRadius =
@@ -125,22 +159,8 @@ function drawCircles(t_d, x, y) {
         "rgba(238, 238, 238, 1)",
         "rgba(255, 255, 255, 1)",
     ];
-    var maxText = _.max(
-        t_d.map(function (o) {
-            return o.name ? o.name + (o.display ? ": " + o.display : "") : "";
-        }),
-        function (str) {
-            return str.length;
-        }
-    );
-    var maxMeasure = c.measureText({
-        fontSize: "12px",
-        fontFamily: "Arial",
-        maxWidth: c.width,
-        text: maxText,
-    });
-    maxWidth = maxMeasure.width;
-    maxHeight = maxMeasure.height * t_d.length;
+    maxWidth = textSize.width;
+    maxHeight = textSize.height;
     if (FrozenCookies.fancyui % 2 == 1)
         c.drawRect({
             fillStyle: "rgba(153, 153, 153, 0.6)",
@@ -229,8 +249,10 @@ function buffDuration(buffName) {
     return buff ? buff.time : 0;
 }
 
-// Works out what the infobox shows. Runs on the loop a few times a second; drawInfobox draws it.
+// Works out what the infobox shows. Runs on the loop a few times a second while the infobox is
+// on; drawInfobox draws it.
 function updateTimers() {
+    if (!FrozenCookies.fancyui) return;
     var chainPurchase,
         bankPercent,
         purchasePercent,
@@ -275,8 +297,9 @@ function updateTimers() {
         Math.min(Game.cookies, bankTotal) / (bankTotal + purchaseTotal);
     purchasePercent = purchaseTotal / (purchaseTotal + bankTotal);
     bankMax = bankTotal / (purchaseTotal + bankTotal);
+    // Clicks at the rate the clicker measures, 0 with Autoclick off.
     actualCps =
-        Game.cookiesPs + Game.mouseCps() * FrozenCookies.cookieClickSpeed;
+        Game.cookiesPs + Game.mouseCps() * MushieCookies.clicksPerSecond(FrozenCookies);
 
     t_draw = [];
 
@@ -448,6 +471,7 @@ function updateTimers() {
     }
     FrozenCookies.infoboxFrame = {
         t_draw: t_draw,
+        textSize: measureInfoboxText(t_draw),
         frenzy: cpsBonus() * clickBuffBonus(),
     };
 }
@@ -455,20 +479,23 @@ function updateTimers() {
 // Draws the last computed infobox. Runs from the game's draw hook, which comes after the game
 // has cleared the left canvas; drawing any earlier is erased before the frame is shown.
 function drawInfobox() {
+    if (!FrozenCookies.fancyui) {
+        // Off (the default): nothing to draw, and nothing stale to show when it is switched back on.
+        FrozenCookies.infoboxFrame = null;
+        return;
+    }
     var frame = FrozenCookies.infoboxFrame;
     if (!frame) return;
     var c = $("#backgroundLeftCanvas");
     var height = c.height() - 140;
-    drawCircles(frame.t_draw, 20, height);
+    drawCircles(frame.t_draw, 20, height, frame.textSize);
 
     // Calculate currentFrenzy before drawing it
     var currentFrenzy = frame.frenzy;
-    // Draw the current frenzy at the bottom of the canvas
-    if (FrozenCookies.fancyui && typeof c.drawText === "function") {
-        c.removeLayer && c.removeLayer("fcCurrentFrenzyText");
+    // Draw the current frenzy at the bottom of the canvas. A plain draw: the game clears the
+    // canvas every frame, and a jCanvas layer only added a text measurement to each draw.
+    if (typeof c.drawText === "function") {
         c.drawText({
-            layer: true,
-            name: "fcCurrentFrenzyText",
             fontSize: "14px",
             fontFamily: "Arial",
             fillStyle: "#fff",

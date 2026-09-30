@@ -125,3 +125,14 @@ test('golden payouts are sized from real CpS, not the wrinkler-inflated figure',
     const with10 = estimateIncome({ ...quiet, bank: 1e12, golden: g, wrinklers: { count: 10, returnMult: 1.1, suckRate: 0.05 } });
     assert.ok(Math.abs(with10.golden - (900 * 1000 + 13) / 300) < 1e-9);
 });
+
+test('a cookie storm pays every drop it makes at the frame rate, with the gain multiplier', () => {
+    // A drop on half the frames for 7 s × duration, each 1 to 7 minutes of CpS × gain (main.js:5257-5261, 5597-5599).
+    const g = golden({ meanInterval: 100, probabilities: { 'cookie storm': 1 }, gainMult: 1.5, fps: 30, stormReach: 1 });
+    const out = estimateIncome({ ...quiet, golden: g });
+    assert.ok(close(out.byOutcome['cookie storm'], (7 * 30 * 0.5 * 4 * 60 * 1000 * 1.5) / 100), String(out.byOutcome['cookie storm']));
+    const fast = estimateIncome({ ...quiet, golden: { ...g, fps: 60 } });
+    assert.ok(close(fast.byOutcome['cookie storm'], 2 * out.byOutcome['cookie storm']), 'drops are rolled per frame');
+    const half = estimateIncome({ ...quiet, golden: { ...g, stormReach: 0.5 } });
+    assert.ok(close(half.byOutcome['cookie storm'], 0.5 * out.byOutcome['cookie storm']), 'only the drops reached pay');
+});

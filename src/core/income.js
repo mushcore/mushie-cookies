@@ -40,9 +40,13 @@ function payoutsPerSecond(state, passive) {
     byOutcome['ruin cookies'] = -(p['ruin cookies'] || 0) * (Math.min(0.05 * bank, 600 * passive) + 13);
     // Chain: capped at min(6 hours of CpS, half the bank); it usually ends near halfway. Approximate.
     byOutcome['chain cookie'] = (p['chain cookie'] || 0) * Math.min(6 * 3600 * passive, 0.5 * bank) * golden.gainMult * 0.5;
-    // Storm: 7 s × 30 frames × 50% drop chance × a mean of 4 minutes of CpS per drop, halved
-    // because drops must be reached before they fade. Approximate.
-    byOutcome['cookie storm'] = (p['cookie storm'] || 0) * 7 * 30 * 0.5 * 4 * 60 * passive * golden.durationMult * 0.5;
+    // Storm: a drop on half the frames for 7 s × the duration multiplier, each paying 1 to 7
+    // minutes of CpS (4 on average) × the gain multiplier (main.js:5257-5261, 5595-5599).
+    // `stormReach` is the share of drops clicked before they fade in 2 to 5 s: all of them when
+    // the shimmer system clicks on sight.
+    const fps = golden.fps || 30;
+    const reach = golden.stormReach === undefined ? 1 : golden.stormReach;
+    byOutcome['cookie storm'] = (p['cookie storm'] || 0) * 7 * golden.durationMult * fps * 0.5 * 4 * 60 * passive * golden.gainMult * reach;
     let total = 0;
     for (const name of Object.keys(byOutcome)) {
         byOutcome[name] /= golden.meanInterval;

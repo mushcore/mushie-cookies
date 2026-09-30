@@ -12,7 +12,7 @@ export const NEVER_BUY = new Set([
     333, // Milk selector
     361, // Golden cookie sound selector
     414, // Background selector
-    452, // Sugar frenzy
+    452, // Sugar frenzy: costs a lump, switched on by the lump system (src/systems/lumps.js)
     563, 564, // Shimmering veil
     806, // Jukebox
 ]);
