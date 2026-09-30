@@ -3,6 +3,7 @@ import path from 'node:path';
 import { gameAppDir, NOT_CONFIGURED } from '../../tools/localConfig.mjs';
 import { startServer } from './server.mjs';
 import { installVirtualTime } from './virtualTime.mjs';
+import { takeSlot } from './slots.mjs';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 // Mid-June: no seasonal event is active, so a run does not depend on the day it is executed.
@@ -29,8 +30,18 @@ export function skipReason() {
 export async function launchGame({ seed = 'mushie', headless = true, mods = [], autopilot = false } = {}) {
     const appDir = gameAppDir(root);
     if (!appDir) return null;
-    const server = await startServer(appDir, mods);
-    const browser = await chromium.launch({ channel: process.env.MUSHIE_BROWSER || 'chrome', headless });
+    const releaseSlot = await takeSlot();
+    let server;
+    let browser;
+    try {
+        server = await startServer(appDir, mods);
+        browser = await chromium.launch({ channel: process.env.MUSHIE_BROWSER || 'chrome', headless });
+    } catch (error) {
+        if (server) await server.close();
+        releaseSlot();
+        throw error;
+    }
+    browser.on('disconnected', releaseSlot);
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const blocked = [];
     const errors = [];
