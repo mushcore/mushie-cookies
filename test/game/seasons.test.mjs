@@ -164,7 +164,7 @@ test('a Valentine visit collects the hearts that pay, then settles in Christmas'
         assert.deepEqual(failures(out.status), []);
     }));
 
-test('stays in the calendar season while it still has drops to give', { skip }, () =>
+test('rests in the calendar season while it still has drops to give, visiting Christmas only for the hat', { skip }, () =>
     withMod(async (game) => {
         // Four hours in: the first egg, over an hour away at this golden cookie rate, is expected
         // before the run ends.
@@ -176,20 +176,56 @@ test('stays in the calendar season while it still has drops to give', { skip }, 
             Game.shimmerTypes.golden.spawnConditions = () => true;
             FrozenCookies.autoGC = 1;
         });
-        await game.advanceSeconds(120);
+        const seen = new Set();
+        for (let i = 0; i < 18; i++) {
+            await game.advanceSeconds(10);
+            seen.add(await game.eval(() => Game.season));
+        }
         const out = await game.eval(() => ({
             season: Game.season,
             uses: Game.seasonUses,
-            hat: Game.Upgrades['A festive hat'].unlocked,
+            hat: Game.Has('A festive hat'),
+            santa: Game.santaLevel,
             hearts: Game.heartDrops.filter((n) => Game.Has(n)).length,
             plan: MushieCookies.seasons.report().plan,
+            status: MushieCookies.status(),
         }));
+        // A festive hat unlocks within seconds of Christmas and opens Santa in every season: worth a
+        // switch, and the way back to Easter is a free cancel. Only Easter is rested in.
+        assert.equal(out.hat, 1, `A festive hat: plan ${JSON.stringify(out.plan)}`);
+        assert.ok(out.santa > 0, `Santa level ${out.santa}`);
         assert.equal(out.season, 'easter', JSON.stringify(out.plan));
-        // A Valentine's visit that comes back to Easter for free is allowed; resting anywhere else is
-        // not: Christmas, even for five seconds, would have unlocked the hat.
-        assert.ok(out.uses <= 1, `${out.uses} switches`);
-        assert.equal(out.hat, 0, 'Christmas was entered');
-        if (out.uses === 1) assert.ok(out.hearts > 0, 'a switch was paid for without the hearts it was for');
+        assert.ok(seen.has('christmas'), [...seen].join());
+        // One switch to Christmas, and at most one to Valentine's for hearts; both came back for free.
+        assert.ok(out.uses >= 1 && out.uses <= 2, `${out.uses} switches`);
+        if (out.uses === 2) assert.ok(out.hearts > 0, 'a switch was paid for without the hearts it was for');
+        assert.deepEqual(failures(out.status), []);
+    }));
+
+test('with Valentine\'s as the calendar season, hearts are visited for from Christmas for free, then Christmas at the next price', { skip }, () =>
+    withMod(async (game) => {
+        await bakery(game, { hoursIn: 4 });
+        await game.eval(() => {
+            // Fixture: the calendar says Valentine's, and the run rests in Christmas, as a switch
+            // made earlier left it.
+            Game.baseSeason = 'valentines';
+            Game.season = 'valentines';
+            Game.Upgrades['Festive biscuit'].buy();
+        });
+        const before = await game.eval(() => ({ season: Game.season, uses: Game.seasonUses }));
+        assert.deepEqual(before, { season: 'christmas', uses: 1 }, 'fixture');
+        await game.advanceSeconds(180);
+        const out = await game.eval(() => ({
+            season: Game.season,
+            uses: Game.seasonUses,
+            hearts: Game.heartDrops.filter((n) => Game.Has(n)).length,
+            report: MushieCookies.seasons.report(),
+            status: MushieCookies.status(),
+        }));
+        assert.ok(out.hearts >= 2, `${out.hearts} hearts bought; plan ${JSON.stringify(out.report.plan)}`);
+        assert.equal(out.season, 'christmas', JSON.stringify(out.report.plan));
+        assert.equal(out.uses, 2, 'the cancel to Valentine\'s is not a use; Christmas after it is one');
+        assert.deepEqual(failures(out.status), []);
     }));
 
 test('the last Santa level is taken for Santa\'s dominion once every drop is out', { skip }, () =>
@@ -349,8 +385,10 @@ test('a drop is worth the same in any season, and while a hunt runs', { skip }, 
         await bakery(game);
         await game.eval(() => {
             // Fixture: a grandmapocalypse whose wrinklers are popped for their cookies, in Christmas.
+            // Unholy bait, not the Wrinkler doormat: a slot the hunt empties stays empty for
+            // minutes, as it does in a real grandmapocalypse.
             Game.elderWrath = 3;
-            Game.Upgrades['Wrinkler doormat'].earn();
+            Game.Upgrades['Unholy bait'].earn();
             Game.baseSeason = 'christmas';
             Game.season = 'christmas';
             Game.CalculateGains();
@@ -358,7 +396,8 @@ test('a drop is worth the same in any season, and while a hunt runs', { skip }, 
             FrozenCookies.autoBuy = 0; // the bakery stays as it is between the two measurements
             FrozenCookies.autoSeasons = 0; // the test moves the season
         });
-        await game.advanceSeconds(60);
+        // Half an hour: every slot spawns (about 222 s a slot) and attaches.
+        await game.advanceSeconds(1800);
         const measure = () =>
             game.eval(() => {
                 const s = MushieCookies.readState(Game, FrozenCookies);
@@ -366,11 +405,13 @@ test('a drop is worth the same in any season, and while a hunt runs', { skip }, 
                 return {
                     reindeer: !!s.reindeer,
                     hunting: MushieCookies.wrinklers.report().hunting,
+                    inPlay: Game.wrinklers.filter((w) => w.phase > 0).length,
                     gains: { santa: g.santa, christmas: g.christmas, halloween: g.halloween, heart: g.heart, egg: g.egg },
                 };
             });
         const christmas = await measure();
         assert.equal(christmas.reindeer, true, 'the fixture has reindeer to click');
+        assert.equal(christmas.inPlay, 10, 'fixture: every slot is in play before the hunt');
         await game.eval(() => {
             Game.baseSeason = 'halloween'; // fixture: the calendar turns to Halloween
             Game.season = 'halloween';
@@ -380,6 +421,7 @@ test('a drop is worth the same in any season, and while a hunt runs', { skip }, 
         await game.advanceSeconds(5);
         const halloween = await measure();
         assert.equal(halloween.hunting, true, 'the fixture hunts');
+        assert.ok(halloween.inPlay < 3, `fixture: the hunt emptied the slots (${halloween.inPlay} in play)`);
         for (const [name, gain] of Object.entries(christmas.gains)) {
             assert.ok(gain > 0, `${name} is worth something`);
             const other = halloween.gains[name];

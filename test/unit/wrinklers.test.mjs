@@ -9,6 +9,7 @@ import {
     gapCost,
     decidePops,
     expectedAttached,
+    attachedAfter,
     halloweenFailRate,
     halloweenDrops,
     easterFailRate,
@@ -163,6 +164,20 @@ test('the expected attached count follows the popping and the refill', () => {
     // No spawning at all: what is attached is all there is.
     assert.equal(expectedAttached({ max: 10, now: 4, popRate: 0, spawnPerSecond: 0 }), 4);
     assert.equal(expectedAttached({ max: 10, now: 0, popRate: 1, spawnPerSecond: lambda, horizon: Infinity }), 0, 'never negative');
+});
+
+test('the attached count some seconds on follows the refill that the expected count averages', () => {
+    const lambda = 1 / 1111;
+    const steady = expectedAttached({ max: 10, now: 10, popRate: 3 / 3600, spawnPerSecond: lambda, horizon: Infinity });
+    assert.equal(attachedAfter({ max: 10, now: 4, popRate: 3 / 3600, spawnPerSecond: lambda, seconds: 0 }), 4);
+    const later = attachedAfter({ max: 10, now: 4, popRate: 3 / 3600, spawnPerSecond: lambda, seconds: 1111 });
+    assert.ok(close(later, steady + (4 - steady) * Math.exp(-1), 1e-9), `${later}`);
+    assert.ok(close(attachedAfter({ max: 10, now: 4, popRate: 3 / 3600, spawnPerSecond: lambda, seconds: 1e9 }), steady, 1e-9));
+    // Averaged over an hour, the refill it follows is expectedAttached's.
+    let sum = 0;
+    for (let t = 0.5; t < 3600; t += 1) sum += attachedAfter({ max: 10, now: 0, spawnPerSecond: lambda, seconds: t });
+    assert.ok(close(sum / 3600, expectedAttached({ max: 10, now: 0, spawnPerSecond: lambda, horizon: 3600 }), 1e-4));
+    assert.equal(attachedAfter({ max: 10, now: 4, spawnPerSecond: 0, seconds: 3600 }), 4, 'no spawning: nothing refills');
 });
 
 test('Halloween drops: the game fail rate and one of seven cookies per success', () => {

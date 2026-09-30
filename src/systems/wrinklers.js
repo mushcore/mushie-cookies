@@ -4,7 +4,7 @@
 // season system asked for pays. Popping sets a wrinkler's hp to 0, the state change the game's own
 // Game.CollectWrinklers makes (main.js:14285-14291) and the result of clicking it (main.js:14430);
 // the game's pop code pays it on the next logic frame.
-import { decidePops, huntDecision, incomeMultiplier, expectedAttached, halloweenFailRate, halloweenDrops, easterFailRate, easterDrops } from '../core/wrinklers.js';
+import { decidePops, huntDecision, incomeMultiplier, expectedAttached, attachedAfter, halloweenFailRate, halloweenDrops, easterFailRate, easterDrops } from '../core/wrinklers.js';
 import { estimateIncome } from '../core/income.js';
 import { readState } from '../game/measure.js';
 import { telemetry, wrinklerParams, heldValue } from '../game/wrinklers.js';
@@ -40,10 +40,17 @@ export function createWrinklers({ game, settings, loop, buyer = null, log = () =
         for (const w of game.wrinklers) if (ids.includes(w.id)) w.hp = 0;
     }
 
+    /** Returns the seconds since the last tick. */
     function decayPopRate(frame) {
         const seconds = state.lastFrame === null ? 0 : (frame - state.lastFrame) / game.fps;
         state.lastFrame = frame;
         telemetry.popRate *= Math.exp(-seconds / POP_RATE_SECONDS);
+        return seconds;
+    }
+
+    function stopHunting() {
+        telemetry.hunting = false;
+        telemetry.kept = null;
     }
 
     function purchaseTick() {
@@ -130,19 +137,27 @@ export function createWrinklers({ game, settings, loop, buyer = null, log = () =
     }
 
     /** Pops for drops while the season system's hunt pays; true while hunting. */
-    function huntTick() {
+    function huntTick(seconds) {
         const request = state.hunt;
         if (!request || game.season !== request.season) {
             state.huntVerdict = null;
-            telemetry.hunting = false;
+            stopHunting();
             return false;
         }
         const verdict = valueHunt(request);
         state.huntVerdict = verdict;
         telemetry.hunting = verdict.hunt;
+        // What the income model keeps without the hunt (src/game/wrinklers.js wrinklerModel): the
+        // wrinklers in play when it began, and the refill the slots would have had since, for as
+        // long as the season system asks, a pause included.
+        const p = wrinklerParams(game);
+        if (telemetry.kept !== null) {
+            const refilled = attachedAfter({ max: p.max, now: telemetry.kept, popRate: telemetry.popRate, spawnPerSecond: p.spawnPerSecond, crawl: p.crawl, seconds });
+            telemetry.kept = Math.max(p.inPlay, refilled);
+        } else if (verdict.hunt) telemetry.kept = p.inPlay;
         if (!verdict.hunt) return false;
         // A drop needs a payout above half a cookie (main.js:14480). Shinies are kept.
-        const ids = wrinklerParams(game).candidates.filter((c) => !c.shiny && c.payout > 0.5).map((c) => c.id);
+        const ids = p.candidates.filter((c) => !c.shiny && c.payout > 0.5).map((c) => c.id);
         if (ids.length) {
             pop(ids);
             state.huntPops += ids.length;
@@ -151,9 +166,12 @@ export function createWrinklers({ game, settings, loop, buyer = null, log = () =
     }
 
     function tick(frame) {
-        decayPopRate(frame);
-        if (game.OnAscend || game.AscendTimer) return;
-        if (huntTick()) return;
+        const seconds = decayPopRate(frame);
+        if (game.OnAscend || game.AscendTimer) {
+            telemetry.kept = null; // the reset empties every slot (main.js:3532)
+            return;
+        }
+        if (huntTick(seconds)) return;
         // Buying sooner is the only reason to pop; with no buyer buying, nothing is bought sooner.
         if (!settings.autoBuy) {
             state.last = { pop: [], reason: 'the buyer is off' };
@@ -213,7 +231,7 @@ export function createWrinklers({ game, settings, loop, buyer = null, log = () =
          */
         hunt(request) {
             state.hunt = request && HUNT_SEASONS.includes(request.season) ? { season: request.season, value: request.value } : null;
-            if (!state.hunt) telemetry.hunting = false;
+            if (!state.hunt) stopHunting();
         },
         /** The same valuation without acting: {hunt, gain, cost, perPop, popsPerSecond}. */
         valueHunt,

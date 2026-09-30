@@ -128,7 +128,9 @@ export function heartVisit({ hearts, earned, gain, horizon, budget, income }) {
  * @param {number} s.horizon                seconds left in the run
  * @param {object} s.values                 by season: {standing: cookies a second while it runs,
  *        collection: cookies its missing drops are worth within the horizon, nextDrop: seconds,
- *        seconds: until the last of those drops is expected in; given, the season is visited}
+ *        seconds: until the last of those drops is expected in; given, the season is visited,
+ *        quick: {value, seconds} what a visit that short collects for good (A festive hat, which
+ *        opens Santa in every season), part of the collection}
  * @param {{value, locked, seconds}|null} s.visit  what a Valentine's visit would collect now
  * @param {string[]} [s.blocked]            seasons not to switch into
  * @param {number} s.secondsInSeason        how long the current season has run
@@ -144,8 +146,11 @@ export function planSeason(s) {
     const visit = s.visit && s.visit.locked > 0 ? s.visit : null;
     if (s.season === 'valentines' && visit && s.secondsInSeason < MAX_VISIT_SECONDS) return stay('hearts are still unlocking');
     // While the calendar's season has drops to give, no other season is rested in: a visit comes
-    // back to it, and from anywhere else it is returned to (both for free, by cancelling).
-    const keep = !!s.baseSeason && value(s.baseSeason).nextDrop < H;
+    // back to it, and from anywhere else it is returned to (both for free, by cancelling). Hearts
+    // are not such drops: they come on a visit (s.visit), and Valentine's pays nothing to rest in.
+    const keep = !!s.baseSeason && s.baseSeason !== 'valentines' && value(s.baseSeason).nextDrop < H;
+    // Kept, any other season is only visited: once what it was visited for is in, it is left.
+    const visiting = keep && s.season !== s.baseSeason;
 
     const blocked = new Set(s.blocked || []);
     const free = (to) => !!s.baseSeason && to === s.baseSeason && s.season !== s.baseSeason;
@@ -164,7 +169,14 @@ export function planSeason(s) {
         return v.collection > 0 && v.seconds > 0 && v.seconds < H ? v.seconds : null;
     };
     const visitWorth = (season, rest) => value(season).collection + value(season).standing * span(season) + worth(rest, H - span(season));
-    let now = worth(s.season);
+    // A short visit from a kept calendar season, for what it collects in seconds, then back for free.
+    const quick = (season) => {
+        const q = value(season).quick;
+        return keep && q && q.value > 0 ? q : null;
+    };
+    const quickWorth = (season) => quick(season).value + value(season).standing * quick(season).seconds + worth(s.baseSeason, H - quick(season).seconds);
+    // Visiting, staying is worth only finishing the visit; going back is the alternative.
+    let now = visiting ? worth(s.baseSeason) : worth(s.season);
     let finishing = null;
     if (span(s.season) !== null) {
         for (const rest of restAfter(s.season)) {
@@ -174,6 +186,10 @@ export function planSeason(s) {
                 finishing = rest;
             }
         }
+    }
+    if (visiting && quick(s.season) && quickWorth(s.season) > now) {
+        now = quickWorth(s.season);
+        finishing = s.baseSeason;
     }
 
     for (const to of targets) {
@@ -185,6 +201,10 @@ export function planSeason(s) {
             const back = rest === s.baseSeason && s.baseSeason ? 0 : price > 0 ? p1 : p0;
             plans.push({ to, rest, price, net: visitWorth(to, rest) - price - back, reason: `visit ${to} for its drops, then ${rest}` });
         }
+    }
+    for (const to of Object.keys(s.values)) {
+        if (to === s.season || to === s.baseSeason || blocked.has(to) || !quick(to)) continue;
+        plans.push({ to, rest: s.baseSeason, price: p0, net: quickWorth(to) - p0, reason: `visit ${to} for ${quick(to).seconds} s, then ${s.baseSeason}` });
     }
     if (visit && s.season !== 'valentines' && !blocked.has('valentines')) {
         // Valentine's first, then the season to rest in: going there first saves a switch. When
@@ -201,6 +221,12 @@ export function planSeason(s) {
 
     let best = null;
     for (const plan of plans) if (!best || plan.net > best.net) best = plan;
+    if (visiting && finishing === null) {
+        // Nothing left to visit for: back to the calendar's season, unless going on to another
+        // visit from here pays more.
+        const on = best && best.to !== s.baseSeason && best.net - now > SWITCH_MARGIN * best.price ? best : null;
+        if (!on) return { action: 'cancel', to: s.baseSeason, price: 0, gain: 0, reason: `back to ${s.baseSeason}, which still has drops to give` };
+    }
     if (!best) return stay(keep ? 'the calendar season still has drops to give' : 'nowhere to go');
     const gain = best.net - now;
     if (!(gain > SWITCH_MARGIN * best.price) || !(gain > 0)) {

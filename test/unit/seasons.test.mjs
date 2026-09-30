@@ -222,21 +222,68 @@ test('in a calendar season with drops to give, a visit that comes back to it for
 
 test('when the calendar season is Valentine\'s, a visit to it is a free cancel and the next switch is the first', () => {
     const visit = { value: 5e9, locked: 3, seconds: 60 };
-    // Hearts to unlock make Valentine's the calendar season with drops to give, as the system reports it.
-    const valentines = { standing: 0, collection: 0, nextDrop: 0 };
-    const kept = planSeason(base({ season: 'christmas', baseSeason: 'valentines', visit, values: { ...base().values, valentines } }));
-    assert.equal(kept.action, 'cancel', JSON.stringify(kept));
-    assert.equal(kept.to, 'valentines');
-    assert.equal(kept.price, 0);
-    assert.ok(close(kept.gain, 5e9 - 1e6 * 3600));
-    // Read without the drops flag, the visit is still free, and Christmas after it costs the first
-    // price (a cancel is not a use), not the second.
+    // The visit is free, and Christmas after it costs the first price (a cancel is not a use), not
+    // the second: the hearts are set against the reindeer missed during the visit and one switch.
     const out = planSeason(base({ season: 'christmas', baseSeason: 'valentines', visit }));
     assert.equal(out.action, 'cancel', JSON.stringify(out));
     assert.equal(out.to, 'valentines');
     assert.equal(out.rest, 'christmas');
     assert.equal(out.price, 0);
     assert.ok(close(out.gain, 5e9 + 1e6 * 3540 - 1e9 - 1e6 * 3600));
+    // Hearts to unlock do not make Valentine's a calendar season to rest in: they come on the visit.
+    // Flagged as drops to give, the visit was charged a whole run of reindeer, and hearts worth 2%
+    // of income each never beat reindeer worth a fifth of it.
+    const income = 1e12;
+    const H = 4 * 3600;
+    const R = 0.2 * income;
+    const hearts = { value: 3 * 0.02 * income * H, locked: 3, seconds: 40 };
+    const flagged = { standing: 0, collection: 0, nextDrop: 0 };
+    const big = planSeason({
+        ...base({ season: 'christmas', baseSeason: 'valentines', visit: hearts, horizon: H, prices: [3e14, 4.5e14] }),
+        values: { ...base().values, christmas: { standing: R, collection: 0, nextDrop: Infinity }, valentines: flagged },
+    });
+    assert.equal(big.action, 'cancel', JSON.stringify(big));
+    assert.equal(big.rest, 'christmas');
+    assert.ok(close(big.gain, hearts.value - R * hearts.seconds - 3e14), `${big.gain}`);
+});
+
+test('in a calendar Valentine\'s, stays while hearts unlock, then rests in Christmas', () => {
+    const visit = { value: 5e9, locked: 3, seconds: 60 };
+    const stay = planSeason(base({ season: 'valentines', baseSeason: 'valentines', visit, secondsInSeason: 30 }));
+    assert.equal(stay.action, 'stay', JSON.stringify(stay));
+    const done = planSeason(base({ season: 'valentines', baseSeason: 'valentines', visit: null, secondsInSeason: 30 }));
+    assert.equal(done.action, 'switch', JSON.stringify(done));
+    assert.equal(done.to, 'christmas');
+    const stuck = planSeason(base({ season: 'valentines', baseSeason: 'valentines', visit, secondsInSeason: MAX_VISIT_SECONDS + 1 }));
+    assert.equal(stuck.to, 'christmas', 'a visit that stalls is given up');
+});
+
+test('a calendar season with drops to give is left for a short Christmas visit for the hat, then gone back to', () => {
+    // A festive hat unlocks within seconds of Christmas and opens Santa in every season
+    // (main.js:16451, 14698); cancelling returns to the calendar season for free (main.js:12476-12490).
+    const H = 4 * 3600;
+    const christmas = { standing: 2.7e7, collection: 7.13e11, nextDrop: 5, quick: { value: 7.1e11, seconds: 10 } };
+    for (const calendar of ['easter', 'halloween']) {
+        const drops = { standing: 0, collection: 1e9, nextDrop: 3000, seconds: 12000 };
+        const values = { ...base().values, christmas, [calendar]: drops };
+        const go = planSeason(base({ season: calendar, baseSeason: calendar, horizon: H, values }));
+        assert.equal(go.action, 'switch', `${calendar}: ${JSON.stringify(go)}`);
+        assert.equal(go.to, 'christmas');
+        assert.equal(go.rest, calendar);
+        assert.ok(close(go.gain, 7.1e11 + 2.7e7 * 10 - 1e9), `${go.gain}`);
+        // In Christmas, it waits for the hat to unlock...
+        const wait = planSeason(base({ season: 'christmas', baseSeason: calendar, horizon: H, values }));
+        assert.equal(wait.action, 'stay', `${calendar}: ${JSON.stringify(wait)}`);
+        // ...then goes back, though the reindeer alone are worth more than the calendar's drops:
+        // Christmas was visited, not rested in.
+        const back = planSeason(base({ season: 'christmas', baseSeason: calendar, horizon: H, values: { ...values, christmas: { ...christmas, collection: 0, quick: null } } }));
+        assert.equal(back.action, 'cancel', `${calendar}: ${JSON.stringify(back)}`);
+        assert.equal(back.to, calendar);
+    }
+    // A hat that is not worth the switch is not visited for.
+    const small = { ...christmas, collection: 5e8, quick: { value: 5e8, seconds: 10 } };
+    const stay = planSeason(base({ season: 'easter', baseSeason: 'easter', horizon: H, values: { ...base().values, christmas: small, easter: { standing: 0, collection: 1e9, nextDrop: 3000, seconds: 12000 } } }));
+    assert.equal(stay.action, 'stay', JSON.stringify(stay));
 });
 
 test('collecting drops takes the waits of those that come before the run ends', () => {

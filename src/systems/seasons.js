@@ -45,7 +45,9 @@ export function createSeasons({ game, settings, loop, buyer = null, wrinklers = 
         measuredAt: -Infinity,
         stamp: '',
         offers: [],
-        season: game.season,
+        // Unknown until the first tick, which starts the clock: a calendar Valentine's the run
+        // loads into gets its visit's time to unlock hearts, as one switched into does.
+        season: null,
         enteredAt: 0,
         pops: [],
         hunting: null,
@@ -63,14 +65,15 @@ export function createSeasons({ game, settings, loop, buyer = null, wrinklers = 
     const missing = (names) => names.filter((n) => !game.HasUnlocked(n) && !game.Has(n));
     // A drop is kept for the rest of the run, so it is valued on the income the run keeps, not on
     // what the running season or a hunt makes of it for a while: reindeer as where the run rests
-    // (Christmas, once a switcher can take it there), and wrinklers as kept when no hunt is on.
+    // (Christmas, once a switcher can take it there), and wrinklers as kept without a hunt: during
+    // one, those it popped count as still there (src/game/wrinklers.js wrinklerModel).
     // Valued on the income of the moment, a Halloween cookie was worth the reindeer's share more
     // from Christmas than from Halloween, and the planner switched in and straight back out.
     const income = () =>
         estimateIncome({
             ...readState(game, settings),
             reindeer: reindeerState(game, settings, { season: canSwitch() ? 'christmas' : game.season }),
-            wrinklers: wrinklerModel(game, settings, { hunting: false }),
+            wrinklers: wrinklerModel(game, settings, { kept: true }),
         }).total;
     // One bank: with Autobuy on or off, only what the buyer is not holding is spent.
     const reserve = () => (buyer ? buyer.reserve() : 0);
@@ -214,14 +217,17 @@ export function createSeasons({ game, settings, loop, buyer = null, wrinklers = 
         let christmas = collectionValue({ waits: cookieWaits, gain: gains.christmas, horizon: H });
         let christmasNext = cookieWaits.length ? cookieWaits[0] : Infinity;
         const hat = game.Upgrades['A festive hat'];
+        let hatValue = 0;
         if (!hat.bought && !hat.unlocked) {
             // Being in Christmas unlocks the hat within a 5 s check (main.js:16451), and the hat
-            // opens Santa: the levels that repay themselves within the horizon.
+            // opens Santa in every season (main.js:14698): the levels that repay themselves within
+            // the horizon. A visit of two ticks collects it.
             for (let level = game.santaLevel; level < 14; level++) {
                 const net = gains.santa * H - santaPrice(level);
                 if (!(net > 0)) break;
-                christmas += net;
+                hatValue += net;
             }
+            christmas += hatValue;
             christmasNext = 5;
         }
         // In Halloween and Easter the wrinkler system hunts when that pays: pops then come at its
@@ -244,7 +250,7 @@ export function createSeasons({ game, settings, loop, buyer = null, wrinklers = 
             chances: c,
             pops,
             values: {
-                christmas: { standing, collection: christmas, nextDrop: christmasNext },
+                christmas: { standing, collection: christmas, nextDrop: christmasNext, quick: hatValue > 0 ? { value: hatValue, seconds: (2 * TICK_EVERY) / game.fps } : null },
                 halloween: {
                     standing: 0,
                     collection: collectionValue({ waits: spookyWaits, gain: gains.halloween, horizon: H }) - huntCost(spookyHunt, spookySeconds),
@@ -377,7 +383,6 @@ export function createSeasons({ game, settings, loop, buyer = null, wrinklers = 
         const gains = state.gains;
         const { values } = seasonValues(gains, H);
         const visit = heartsVisit(gains, H);
-        values.valentines.nextDrop = visit.locked > 0 ? 0 : Infinity;
         const plan = planSeason({
             season: game.season,
             baseSeason: game.baseSeason,

@@ -4,10 +4,12 @@ import { popMultiplier, suckRate, spawnChance, expectedAttached, CRAWL_SECONDS }
 
 /**
  * What the wrinkler system reports about its own popping, for the income model: the rate of its
- * purchase pops (per second, smoothed over about an hour) and whether a season hunt is popping
- * every wrinkler. Written only by src/systems/wrinklers.js.
+ * purchase pops (per second, smoothed over about an hour), whether a season hunt is popping
+ * every wrinkler, and, from a hunt's first pop until the season system stops asking for it, how
+ * many would be in play without it (`kept`: those in play when it began, refilled since; null
+ * otherwise). Written only by src/systems/wrinklers.js.
  */
-export const telemetry = { popRate: 0, hunting: false };
+export const telemetry = { popRate: 0, hunting: false, kept: null };
 
 /** The income model looks this far ahead when wrinklers are still refilling their slots. */
 export const MODEL_HORIZON_SECONDS = 3600;
@@ -80,18 +82,21 @@ export function wrinklerParams(game) {
  * - Popping on (autoWrinkler 1): the count the policy keeps attached on average (its measured pop
  *   rate and the spawn gap, with the refill still to come when slots are empty), and the pop
  *   multiplier, since everything stored reaches the bank when it is popped.
- * - During a season hunt every wrinkler is popped as it arrives: none are counted. `hunting`
- *   asks for the state without the hunt (a permanent drop is valued on the income the run keeps).
+ * - During a season hunt every wrinkler is popped as it arrives: none are counted.
+ * - `kept` asks instead for the state the run keeps without a hunt (a permanent drop is valued
+ *   on it): while a hunt runs, or pauses, that starts from the wrinklers it would have left in
+ *   play, not from the slots it emptied.
  * - Popping off: slots fill and stay full, and what they store is not spendable until an
  *   ascension collects it, so they only wither.
  */
-export function wrinklerModel(game, settings, { hunting = telemetry.hunting } = {}) {
+export function wrinklerModel(game, settings, { kept = false } = {}) {
     const p = wrinklerParams(game);
     const popping = Number(settings.autoWrinkler) > 0;
-    if (popping && hunting) return { count: 0, returnMult: 0, suckRate: p.suck };
+    if (popping && telemetry.hunting && !kept) return { count: 0, returnMult: 0, suckRate: p.suck };
+    const unhunted = popping && kept && telemetry.kept !== null ? telemetry.kept : 0;
     const count = expectedAttached({
         max: p.max,
-        now: p.inPlay,
+        now: Math.max(p.inPlay, unhunted),
         popRate: popping ? telemetry.popRate : 0,
         spawnPerSecond: p.spawnPerSecond,
         crawl: p.crawl,
