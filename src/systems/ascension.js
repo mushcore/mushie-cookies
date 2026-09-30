@@ -189,9 +189,23 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
         if (buyer) buyer.invalidate();
     }
 
+    /**
+     * Auto Ascend switched off during the mod's own ascension. While collecting, nothing is started
+     * yet and the run goes on; once Game.Ascend has run, the heavenly screen is the player's.
+     */
+    function release() {
+        if (state.phase === 'settling') settings.preparedForAscension = false;
+        state.phase = 'playing';
+        state.plan = null;
+        state.slotRanking = [];
+    }
+
     function tick(frame) {
         trackRun(frame);
-        if (settings.autoAscendToggle != 1) return;
+        if (settings.autoAscendToggle != 1) {
+            if (state.phase !== 'playing') release();
+            return;
+        }
         if (state.phase === 'settling') return ascend();
         if (state.phase === 'ascending') return finish();
         // An ascension the mod did not start is left to the player.
@@ -200,7 +214,8 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
         decide();
     }
 
-    // Always ticking: the run clock counts play with Auto Ascend off too.
+    // Always ticking: the run clock counts play with Auto Ascend off too, and an ascension of the
+    // mod's own is released when it is switched off.
     loop.add('ascension', tick, { everyFrames: TICK_EVERY });
 
     return {

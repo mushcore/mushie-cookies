@@ -217,3 +217,81 @@ test('a machine sleep does not end a run that is still growing', { skip }, async
         await game.close();
     }
 });
+
+test('Auto Ascend switched off during its own ascension hands it back to the player', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await game.eval(() => {
+            Game.shimmerTypes.golden.spawnConditions = () => false;
+            Game.Earn(1e14);
+            for (const name of ['Cursor', 'Grandma', 'Farm', 'Mine', 'Factory', 'Bank']) Game.Objects[name].buy(60);
+            Game.prestige = 100;
+            Game.heavenlyChips = 0;
+            Game.cookiesReset = Game.HowManyCookiesReset(100);
+            Game.cookiesEarned = Game.HowManyCookiesReset(210) - Game.cookiesReset;
+            Game.resets = 1;
+            Game.CalculateGains();
+            MushieCookies.ascension.options.rule = 'double'; // decides at once
+            FrozenCookies.autoAscendToggle = 1;
+            FCStart();
+        });
+        const read = () =>
+            game.eval(() => ({
+                phase: MushieCookies.ascension.phase(),
+                timer: Game.AscendTimer,
+                onAscend: Game.OnAscend,
+                resets: Game.resets,
+                ascensions: MushieCookies.ascension.report().ascensions,
+                prepared: !!FrozenCookies.preparedForAscension,
+            }));
+        const until = async (phase) => {
+            for (let i = 0; i < 40; i++) {
+                await game.advance(15);
+                const s = await read();
+                if (s.phase === phase && (phase !== 'ascending' || s.timer > 0)) return s;
+            }
+            throw new Error(`the ascension never reached '${phase}'`);
+        };
+        const autoAscend = (on) => game.eval((v) => (FrozenCookies.autoAscendToggle = v), on ? 1 : 0);
+
+        // Off during the ascend animation: the heavenly screen is left to the player.
+        await until('ascending');
+        await autoAscend(false);
+        await game.advanceSeconds(10);
+        const screen = await read();
+        assert.deepEqual(
+            { onAscend: screen.onAscend, phase: screen.phase, ascensions: screen.ascensions },
+            { onAscend: 1, phase: 'playing', ascensions: 0 }
+        );
+        await game.eval(() => {
+            Game.ClosePrompt();
+            Game.Reincarnate(1);
+        });
+        await game.advanceSeconds(3);
+
+        // Off while collecting, before Game.Ascend: nothing is started and the run goes on.
+        await game.eval(() => {
+            Game.cookiesEarned = Game.HowManyCookiesReset(2 * Game.prestige + 50) - Game.cookiesReset;
+        });
+        await autoAscend(true);
+        await until('settling');
+        await autoAscend(false);
+        await game.advanceSeconds(5);
+        assert.deepEqual(await read(), { phase: 'playing', timer: 0, onAscend: 0, resets: 2, ascensions: 0, prepared: false });
+
+        // Back on, it decides afresh and ascends by itself.
+        await autoAscend(true);
+        await game.advanceSeconds(60);
+        const again = await read();
+        assert.deepEqual({ resets: again.resets, ascensions: again.ascensions, onAscend: again.onAscend }, { resets: 3, ascensions: 1, onAscend: 0 });
+
+        // An ascension the player starts is still the player's.
+        await game.eval(() => Game.Ascend(1));
+        await game.advanceSeconds(10);
+        const manual = await read();
+        assert.deepEqual({ onAscend: manual.onAscend, ascensions: manual.ascensions, phase: manual.phase }, { onAscend: 1, ascensions: 1, phase: 'playing' });
+        assert.deepEqual(game.errors, []);
+    } finally {
+        await game.close();
+    }
+});
