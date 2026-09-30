@@ -36,7 +36,7 @@ Every option starts off. One switch, **Autopilot**, automates every part of the 
 | Garden | garden | done (M6), reserve fixed in review; harvest-combo mode to add (4.10) |
 | Stock market trading | market | done (M7) |
 | Bank office, brokers, loans | market | not automated; to build (4.11) |
-| Godzamok, Golden switch | combos | inherited, net-negative as written; to build (4.12) |
+| Godzamok, Golden switch | combos | built in wave two (4.12), on under the Autopilot; the inherited code is removed. Luck-free, one late bakery: cookies netted from a Click frenzy 29x what the inherited code netted (36x on a Frenzy), 2,400x over two hours with a click buff every ten minutes. Golden cookies on, 3 seeds of 3 game hours, buyer, clicker and Pantheon on: 38x, 455x and 31,000x the cookies made without them; the 0 to 4 click buffs a seed drew decide the spread |
 
 ## 4. Systems to build
 
@@ -146,6 +146,24 @@ Measure: market profit per day with and without each.
 Devastation enters the income model (+1% click power per building sold for 10 s, main.js:7885-7901), so the gods system can value Godzamok, and the combo system sells the buildings that give the most units per cookie of rebuy cost during a click buff. The Golden switch is turned on at the start of a click buff only when half the buffed income over the buff beats an hour of CpS for the toggle, and off after.
 
 Measure: cookies per click buff with and without each, across seeds.
+
+Built (src/core/combos.js, src/game/combos.js, src/systems/combos.js). Devastation is in the income model (src/core/income.js), and the gods system values Godzamok only while Auto-Godzamok is on. The combo system reads buffs through the shared classifier and clicks at the clicker's measured rate, so Godzamok is played only with the clicker on. During a click buff, with Godzamok slotted, it sells the buildings with the most Devastation per cookie of rebuy loss (a sale refunds a quarter of the price, main.js:7873-7874) and buys them straight back, every half second, while what a unit's Devastation adds to clicks over its window is worth more than the unit's loss. Sales inside a running window add to it without renewing it (main.js:7885-7901). It spends only above the buyer's reserve and stops under Cursed finger, whose clicks are a fixed amount.
+
+The brief left the rebuy to the buyer. It is not: the buyer stands aside during click buffs, Devastation included, so one sale a window left the bakery short for the rest of the buff. Buying back at once netted 25x as much from a Click frenzy and 132x on a Frenzy. The buyer's way is kept as `MushieCookies.combos.options.rebuy = 'buyer'` for measurement.
+
+The Golden switch (CpS x1.5, golden cookies stop, main.js:5133-5142; each toggle costs an hour of buffed CpS, main.js:10677-10695) goes on for a click buff when what it adds until the best moment to turn it off beats both toggles and the golden cookies missed. It sees the Devastation Godzamok keeps renewing until the click buff ends. It goes on once the bank above the reserve covers turning it on; the way back is then held in the buyer's reserve. It goes off at the best of now and each moment a running buff ends. It is also turned on for good when what it adds repays both toggles within the run's expected length (as long as the run has lasted, by the play clock), and kept on while it out-earns the golden cookies it stops. The inherited autoGSBuy and autoGodzamokAction are removed from fc_main.js, and Godzamok no longer reads mineLimit or factoryLimit.
+
+Measured with `tools/dev/combos.mjs` (seed c1, a bakery of 100 of each of the first twelve buildings with the Golden switch and Get lucky upgrades, buyer and clicker on at 50 a second, Godzamok slotted by hand; the inherited code run on a build of m2-buying at f0c4dcf). Cookies netted are cookies earned less the rebuy losses and the toggles, neither of which lowers cookies earned.
+
+| Run | Neither | Godzamok | Switch | Both | Inherited both | Inherited Godzamok | Inherited switch |
+|---|---|---|---|---|---|---|---|
+| One Click frenzy, minute after it starts, luck-free | 7.35e19 | 1.04e22 | 9.92e19 | 1.67e22 | 5.71e20 | 3.69e20 | 1.02e20 |
+| One Click frenzy on a Frenzy | 5.15e20 | 9.85e22 | 7.36e20 | 1.48e23 | 4.14e21 | 2.80e21 | 7.04e20 |
+| Two hours, a click buff every ten minutes, luck-free | 6.65e21 | 1.78e26 | 1.14e22 | 7.90e26 | 3.26e23 | 1.32e23 | 1.07e22 |
+
+With golden cookies on, three hours, the Pantheon system slotting the gods (it put Godzamok in the diamond slot on every seed once Auto-Godzamok was on), against neither on (seeds n1, n2, n3): both 38x, 31,000x, 455x; Godzamok alone 21x, 670x, 22,000x; the switch alone 1.23x, 1.00x (no click buff in that seed), 1.77x. Godzamok slotted by hand, both against the inherited code: 13x, 760x (the inherited run drew no click buff), 3.4x. Each seed drew 0 to 4 click buffs in the three hours, and which variant drew more decides most of the spread. The switch was never turned on for good in these runs.
+
+Left: the switch alone turns on about two seconds into a plain Click frenzy, once the bank above the Lucky reserve covers it, where the inherited code spent through the reserve: 0.97x the inherited switch on a plain Click frenzy, 1.05x on a Frenzy, 1.07x over two hours. Not measured: Dragonflight, Cursed finger, and a full Autopilot run with ascension on.
 
 ## 5. Order of work
 

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { AUTOPILOT, applyAutopilot, isAutopilotSetting } from '../../src/core/autopilot.js';
+import { godzamokOn, goldenSwitchOn } from '../../src/core/combos.js';
 
 // The preference list is a plain global script; evaluate it against a stand-in namespace.
 const prefsSource = fs.readFileSync(path.resolve(import.meta.dirname, '..', '..', 'src', 'legacy', 'fc_preferences.js'), 'utf8');
@@ -55,6 +56,12 @@ test('the Autopilot never runs two systems that act on the same thing', () => {
         if (!AUTOPILOT[modern]) continue;
         for (const l of legacy) assert.equal(AUTOPILOT[l], 0, `${modern} is on, so ${l} must be off`);
     }
+});
+
+test('the Autopilot plays Godzamok and the Golden switch through the combo system', () => {
+    // Measured against the Autopilot without them (spec 4.12): ahead on every seed.
+    assert.equal(godzamokOn(AUTOPILOT), true, 'Godzamok on, with the clicker he needs');
+    assert.equal(goldenSwitchOn(AUTOPILOT), true);
 });
 
 test('applying the Autopilot sets every value and reports only what changed', () => {
