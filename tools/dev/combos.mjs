@@ -9,7 +9,7 @@
 //            lengths). Deterministic: one run per variant is a fair comparison.
 //   one      luck-free as buffs: one Click frenzy, at 10 minutes, reported as the cookies netted
 //            in the minute after it starts: cookies per click buff, before any compounding.
-//   onefrenzy  the same with the Click frenzy on a Frenzy.
+//   onefrenzy  the same with the Click frenzy on a Frenzy, over 160 s: to 6 s after the Frenzy ends.
 //   natural  golden cookies on, clicked as they appear; compare across seeds.
 // variant: none | godzamok | gs | both | inherited (the Frozen Cookies code: run it on a build
 //          without the combo system, where autoGodzamok and autoGS are that code, named by
@@ -142,7 +142,10 @@ try {
                 Game.gainBuff('click frenzy', 26, 777);
             }, frenzy);
             if (single) {
-                await game.advanceSeconds(60);
+                // Every variant over the same window, long enough for every toggle a switch makes
+                // for the buff: the switch goes off once the last buff it is on for is over, the
+                // Frenzy's 154 s when there is one. Cut at a minute, that run paid only the toggle on.
+                await game.advanceSeconds(frenzy ? 154 + 6 : 60);
                 perBuff.push({ frenzy, net: (await netNow()) - from });
                 break;
             }
@@ -165,6 +168,7 @@ try {
             cps: Game.unbuffedCps,
             buildings: Game.BuildingsOwned,
             golden: Game.goldenClicks,
+            switchOn: !!Game.Has('Golden switch [off]'),
             pantheon: Game.Objects['Temple'].minigame.slot.map((id) => (id === -1 ? null : Game.Objects['Temple'].minigame.godsById[id].name)),
             report: r || window.__legacy,
         };
