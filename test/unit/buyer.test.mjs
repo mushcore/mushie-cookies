@@ -77,6 +77,19 @@ test('decide buys the best when the bank covers it and the reserve', () => {
     assert.equal(decide({ ranked, reserve: 500, bank: 1500 }).key, 'best');
 });
 
+test('income the model cannot see, such as market profit, counts toward a candidate\'s gain', () => {
+    // An office upgrade adds market profit on top of whatever its cursors change in CpS.
+    const candidates = [
+        { key: 'office', kind: 'office', price: 1000, extraIncome: 4 },
+        { key: 'broker', kind: 'broker', price: 1000, extraIncome: 2 },
+        { key: 'building', kind: 'building', price: 1000 },
+    ];
+    const measured = [{ total: 101 }, { total: 100 }, { total: 103 }];
+    const ranked = rankCandidates({ candidates, measured, income, bank: 0 });
+    assert.deepEqual(ranked.map((c) => [c.key, c.deltaIncome]), [['office', 5], ['building', 3], ['broker', 2]]);
+    assert.equal(ranked[0].purePayback, 200);
+});
+
 test('decide skips candidates with no gain', () => {
     const ranked = [
         { key: 'useless', price: 1, payback: Infinity },

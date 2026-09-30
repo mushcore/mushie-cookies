@@ -23,9 +23,12 @@ const ENABLERS = new Set([
  * @param {() => object} deps.policy  builds the candidate policy from the settings
  * @param {object} deps.loop        the mod's loop
  * @param {() => number} [deps.extraReserve]  bank the settings ask to hold beyond the golden cookie reserve
+ * @param {(policy: object) => Array<object>} [deps.extraCandidates]  purchases other systems offer
+ *   (the bank office, brokers), each with `apply` for the what-if, `extraIncome` for what the
+ *   income model cannot see, and `purchase` to make it
  * @param {(what: string) => void} [deps.log]
  */
-export function createBuyer({ game, settings, policy, loop, extraReserve = () => 0, log = () => {} }) {
+export function createBuyer({ game, settings, policy, loop, extraReserve = () => 0, extraCandidates = () => [], log = () => {} }) {
     // The reserve is kept only once the best purchase repays more slowly than this (seconds).
     // Measured over six game hours on two seeds: with 0 the reserve engages around hour four or
     // five and was never behind holding none; with 6000 or more it never engaged in that span.
@@ -61,7 +64,9 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
 
     function rank(frame) {
         const pol = policy();
-        const candidates = listCandidates(game, pol).filter((c) => !((state.failed.get(c.key) || 0) > frame));
+        const candidates = listCandidates(game, pol)
+            .concat(extraCandidates(pol))
+            .filter((c) => !((state.failed.get(c.key) || 0) > frame));
         const now = readState(game, settings);
         const income = estimateIncome(now);
         const measured = measureCandidates(game, settings, candidates).map(estimateIncome);
@@ -111,6 +116,8 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
                 for (const step of candidate.steps) buyBuilding(step.building, step.missing);
                 if (candidate.upgrade.unlocked && !candidate.upgrade.bought) candidate.upgrade.buy(1);
             }
+        } else if (typeof candidate.purchase === 'function') {
+            candidate.purchase({ buyBuilding });
         }
         const spent = before - game.cookies;
         if (spent > 0) {
@@ -180,6 +187,16 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         },
         reserve() {
             return state.reserve;
+        },
+        /**
+         * What the buyer is saving for above its reserve: the price of its next purchase, from the
+         * last ranking. Other spenders keep it (the market's allocator), unless what they would buy
+         * returns more per cookie than that purchase.
+         */
+        committed() {
+            if (!settings.autoBuy) return 0;
+            const next = state.ranked.find((c) => Number.isFinite(c.payback));
+            return next ? next.price : 0;
         },
         /** What the next purchase is, or null; ranks first if the ranking is stale. */
         next() {
