@@ -146,12 +146,15 @@ export function planSeason(s) {
         plans.push({ to, price, net: worth(to) - price, reason: `rest in ${to}` });
     }
     if (visit && s.season !== 'valentines' && !blocked.has('valentines')) {
-        // Valentine's first, then the season to rest in: going there first saves a switch.
+        // Valentine's first, then the season to rest in: going there first saves a switch. When
+        // Valentine's is the calendar's season the visit is a free cancel, which is not a use, so
+        // the switch after it is priced as the next one, not the one after.
+        const visitPrice = free('valentines') ? 0 : p0;
         for (const rest of new Set([...targets, s.season])) {
-            if (rest === 'valentines' || blocked.has(rest) || (keep && rest !== s.baseSeason)) continue;
-            const back = rest === s.baseSeason && s.baseSeason ? 0 : p1;
-            const net = visit.value + worth(rest, H - visit.seconds) - p0 - back;
-            plans.push({ to: 'valentines', rest, price: p0, net, reason: `visit Valentine's for ${visit.locked} heart(s), then ${rest}` });
+            if ((rest === 'valentines' && visitPrice > 0) || blocked.has(rest) || (keep && rest !== s.baseSeason)) continue;
+            const back = rest === s.baseSeason && s.baseSeason ? 0 : visitPrice > 0 ? p1 : p0;
+            const net = visit.value + worth(rest, H - visit.seconds) - visitPrice - back;
+            plans.push({ to: 'valentines', rest, price: visitPrice, net, reason: `visit Valentine's for ${visit.locked} heart(s), then ${rest}` });
         }
     }
 
