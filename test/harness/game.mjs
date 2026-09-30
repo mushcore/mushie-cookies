@@ -73,6 +73,12 @@ export async function launchGame({ seed = 'mushie', headless = true, mods = [], 
     await page.evaluate((s) => window.__vt.takeover(s), seed);
     // Every run starts from the same state and the same timestamps.
     await page.evaluate(() => window.Game.HardReset(2));
+    // Display only: a counted click spends 180 µs drawing particles and a number, which at 50
+    // clicks a second was half of a run's wall time. No game rule reads either.
+    await page.evaluate(() => {
+        window.Game.prefs.particles = 0;
+        window.Game.prefs.numbers = 0;
+    });
 
     const handle = {
         page,
