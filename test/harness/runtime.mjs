@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 const CACHE = path.join(root, 'node_modules', '.cache', 'mushie-cookies', 'runtime');
@@ -60,6 +60,17 @@ export function prepareRuntime(gameAppDir) {
     return path.join(CACHE, exe);
 }
 
+/**
+ * Stops a spawned process and every process it started. On Windows child.kill() ends only the
+ * process itself, and an Electron runtime's renderer (the page, the game) keeps running; taskkill
+ * /T ends the tree. A process that has already exited is left alone, since its id may be reused.
+ */
+export function stopTree(child) {
+    if (!child || child.exitCode !== null || child.signalCode !== null) return;
+    if (process.platform === 'win32') spawnSync('taskkill', ['/T', '/F', '/PID', String(child.pid)], { stdio: 'ignore' });
+    else child.kill();
+}
+
 /** Starts the runtime and returns a handle on its one page. */
 export async function launchRuntime(executable) {
     const port = await freePort();
@@ -84,7 +95,7 @@ export async function launchRuntime(executable) {
         }
     }
     if (!target) {
-        child.kill();
+        stopTree(child);
         throw new Error('the runtime did not open a page');
     }
 
@@ -151,7 +162,7 @@ export async function launchRuntime(executable) {
             try {
                 socket.close();
             } catch (e) {}
-            child.kill();
+            stopTree(child);
             await sleep(200);
         },
     };

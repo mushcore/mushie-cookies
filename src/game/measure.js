@@ -1,9 +1,28 @@
 // Reads the live game into the plain state that src/core/income.js estimates from.
 import { outcomeProbabilities } from '../core/goldenPool.js';
 import { simulateEach } from '../core/sim.js';
+import { modelClickRate } from '../core/clicker.js';
+import { unbuffedFactors } from '../core/buffs.js';
+import { wrinklerModel } from './wrinklers.js';
 
 /** The game rejects clicks less than 20 ms apart (main.js:4770), so 50 a second is the most that count. */
 export const MAX_CLICKS_PER_SECOND = 50;
+
+// Accepted clicks a second as the clicker measures them (src/systems/clicker.js), or null.
+// The real rate is below the cap: in the game's own runtime about 44 a second with the window
+// shown and about 30 (14 to 41) minimized (tools/dev/clicker.mjs, spec section 3); counting 50
+// overstated every click term the buyer, the spell forecast, the aura choice and the heavenly
+// planner weigh.
+let clickRateSource = () => null;
+/** Where the measured click rate comes from. */
+export function useClickRate(source) {
+    clickRateSource = source;
+}
+
+/** Clicks a second the income model counts on under these settings. */
+export function clicksPerSecond(settings) {
+    return modelClickRate({ autoClick: settings.autoClick, speed: settings.cookieClickSpeed, measured: clickRateSource() });
+}
 
 // Expected spawn frame of a golden cookie. Each frame past the shortest wait spawns with
 // probability x^5, where x is the fraction of the way to the longest wait (main.js:5275).
@@ -96,7 +115,7 @@ function mixedProbabilities(game) {
     return out;
 }
 
-function goldenState(game) {
+function goldenState(game, settings) {
     const type = game.shimmerTypes.golden;
     const minFrames = type.getMinTime(type);
     const maxFrames = type.getMaxTime(type);
@@ -112,39 +131,45 @@ function goldenState(game) {
         gainMult: gainMult(game, 0) * (1 - w) + gainMult(game, 1) * w,
         probabilities: mixedProbabilities(game),
         buildingSpecialMean: eligible.length ? eligible.reduce((s, b) => s + b.amount, 0) / eligible.length : 0,
+        // Storm drops are rolled each frame (main.js:5257).
+        fps: game.fps,
+        // Drops live 2 to 5 s (main.js:5260-5261); the shimmer system pops each in the frame it
+        // appears. By hand, the inherited guess of half.
+        stormReach: settings.autoGC == 1 ? 1 : 0.5,
     };
 }
 
-/** Cookies per click with every click buff divided out. */
+/**
+ * Cookies per click as if no buff were running. Click buffs multiply a click (main.js:4732-4735)
+ * and divide back out. CpS buffs do not: each mouse upgrade adds 1% of Game.cookiesPs, which
+ * already carries every CpS buff (4692-4706, 5159-5167), and a Cursed finger replaces the whole
+ * click (4744). So under either the click is recomputed by the game's own Game.mouseCps with
+ * cookiesPs at Game.unbuffedCps and the finger unseen, both put back before returning; nothing
+ * else runs in between. The comment on unbuffedFactors (src/core/buffs.js) says why.
+ */
 function unbuffedClickPower(game) {
-    let mult = 1;
-    for (const buff of Object.values(game.buffs)) if (buff.multClick) mult *= buff.multClick;
-    return game.computedMouseCps / mult;
-}
-
-/** Payout multiplier per wrinkler (main.js:14467-14479). */
-function wrinklerReturnMult(game) {
-    let m = 1.1;
-    if (game.Has('Sacrilegious corruption')) m *= 1.05;
-    if (game.Has('Wrinklerspawn')) m *= 1.05;
-    m *= 1 + game.auraMult('Dragon Guts') * 0.2;
-    const scorn = god(game, 'scorn');
-    if (scorn === 1) m *= 1.15;
-    else if (scorn === 2) m *= 1.1;
-    else if (scorn === 3) m *= 1.05;
-    return m;
+    const { click, fixedClick } = unbuffedFactors(game.buffs);
+    const buffedCps = game.cookiesPs;
+    if (buffedCps === game.unbuffedCps && fixedClick === null) return game.computedMouseCps / click;
+    const hasBuff = game.hasBuff;
+    let power;
+    try {
+        game.cookiesPs = game.unbuffedCps;
+        game.hasBuff = (what) => (what === 'Cursed finger' ? 0 : hasBuff(what));
+        power = game.mouseCps();
+    } finally {
+        game.cookiesPs = buffedCps;
+        game.hasBuff = hasBuff;
+    }
+    return power / click;
 }
 
 /**
- * Wrinklers attach only during the grandmapocalypse. What they give back depends on who pops
- * them: nothing if nobody does, and next to nothing if they are popped as soon as they arrive.
+ * Wrinklers attach only during the grandmapocalypse. How many are counted, and whether what they
+ * store is spendable, follows the wrinkler system's policy (src/game/wrinklers.js).
  */
 function wrinklerState(game, settings) {
-    const count = game.elderWrath > 0 ? game.getWrinklersMax() : 0;
-    const suckRate = 0.05 * game.eff('wrinklerEat') * (1 + 0.2 * game.auraMult('Dragon Guts'));
-    const popping = Number(settings.autoWrinkler) || 0; // 0 off, 1 when worth it, 2 at once
-    if (popping === 2) return { count: 0, returnMult: 0, suckRate };
-    return { count, returnMult: popping === 1 ? wrinklerReturnMult(game) : 0, suckRate };
+    return wrinklerModel(game, settings);
 }
 
 /**
@@ -155,12 +180,12 @@ export function readState(game, settings) {
     return {
         cps: game.unbuffedCps,
         clickPower: unbuffedClickPower(game),
-        clicksPerSecond: settings.autoClick ? Math.min(Number(settings.cookieClickSpeed) || 0, MAX_CLICKS_PER_SECOND) : 0,
+        clicksPerSecond: clicksPerSecond(settings),
         bank: game.cookies,
         // What every building costs right now; a discount upgrade lowers it inside a what-if.
         basket: game.ObjectsById.reduce((sum, b) => sum + b.getPrice(), 0),
         wrinklers: wrinklerState(game, settings),
-        golden: goldenState(game),
+        golden: goldenState(game, settings),
     };
 }
 

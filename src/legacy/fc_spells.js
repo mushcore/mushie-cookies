@@ -3,38 +3,38 @@
 // @author       Random Reddit Guy (SamNosliw, 3pLm1zf1rMD_Xkeo6XHl)
 // @match        http://orteil.dashnet.org/cookieclicker/
 // @source       https://www.reddit.com/r/CookieClicker/comments/6v2lz3/predict_next_hands_of_faith/
-(function () {
-    if (Game.ObjectsById[7].minigameLoaded) {
-        var lookup = setInterval(function () {
-            if (typeof Game.ready !== "undefined" && Game.ready) {
-                var CastSpell = document.getElementById("grimoireSpell1");
-                CastSpell.onmouseover = function () {
-                    Game.tooltip.dynamic = 1;
-                    Game.tooltip.draw(
-                        this,
-                        Game.ObjectsById[7].minigame.spellTooltip(1)() +
-                            '<div class="line"></div><div class="description">' +
-                            "<b>First Spell:</b> " +
-                            nextSpell(0) +
-                            "<br />" +
-                            "<b>Second Spell:</b> " +
-                            nextSpell(1) +
-                            "<br />" +
-                            "<b>Third Spell:</b> " +
-                            nextSpell(2) +
-                            "<br />" +
-                            "<b>Fourth Spell:</b> " +
-                            nextSpell(3) +
-                            "</div>",
-                        "this"
-                    );
-                    Game.tooltip.wobble();
-                };
-                clearInterval(lookup);
-            }
-        }, 1000);
-    }
-})();
+// Force the Hand of Fate's tooltip, with the next four outcomes added.
+function fateTooltip() {
+    Game.tooltip.dynamic = 1;
+    Game.tooltip.draw(
+        this,
+        Game.ObjectsById[7].minigame.spellTooltip(1)() +
+            '<div class="line"></div><div class="description">' +
+            "<b>First Spell:</b> " +
+            nextSpell(0) +
+            "<br />" +
+            "<b>Second Spell:</b> " +
+            nextSpell(1) +
+            "<br />" +
+            "<b>Third Spell:</b> " +
+            nextSpell(2) +
+            "<br />" +
+            "<b>Fourth Spell:</b> " +
+            nextSpell(3) +
+            "</div>",
+        "this"
+    );
+    Game.tooltip.wobble();
+}
+
+// The Grimoire loads after the legacy code starts (on a Steam start, and when the tower first
+// levels up), so this runs every frame (minigameCheckAction) and installs the tooltip once the
+// spell is on the page.
+function installFateTooltip() {
+    if (!Game.ObjectsById[7].minigameLoaded) return;
+    var spell = document.getElementById("grimoireSpell1");
+    if (spell && spell.onmouseover !== fateTooltip) spell.onmouseover = fateTooltip;
+}
 
 var FATE_LABELS = {
     frenzy: '<b style="color:#FFDE5F">Frenzy',
@@ -682,23 +682,26 @@ function autoCast() {
                     return;
                 }
 
-                // If we have over 400 Yous, always going to sell down to 399.
-                // If you don't have half a You's worth of cookies in bank, sell one or more until you do
-                while (
-                    Game.Objects["You"].amount >= 400 ||
-                    Game.cookies < Game.Objects["You"].price / 2
-                ) {
-                    Game.Objects["You"].sell(1);
+                // The spell picks among buildings under 400 costing at most twice the bank
+                // (minigameGrimoire.js:121-133). Sell Yous down to 399, then one at a time
+                // until half a You is banked, but never the last one: a sale at 0 does nothing,
+                // and the loop used to spin on it forever.
+                var you = Game.Objects["You"];
+                var youAimable = function () {
+                    return you.amount < 400 && Game.cookies >= you.price / 2;
+                };
+                while (you.amount > 1 && !youAimable()) {
+                    var owned = you.amount;
+                    you.sell(1);
+                    if (you.amount >= owned) break; // the sale did not go through
                     logEvent(
                         "Store",
                         "Sold 1 You for " +
-                            (Beautify(
-                                Game.Objects["You"].price *
-                                    Game.Objects["You"].getSellMultiplier()
-                            ) +
+                            (Beautify(you.price * you.getSellMultiplier()) +
                                 " cookies")
                     );
                 }
+                if (!youAimable()) return;
                 M.castSpell(M.spellsById[3]);
                 logEvent("autoCasting", "Cast Spontaneous Edifice");
                 return;

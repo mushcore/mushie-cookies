@@ -19,7 +19,6 @@ export function inheritedGodsOn(s) {
     return (
         on(s.autoWorshipToggle) ||
         on(s.autoCyclius) || // 1: ruby and jade, 2: every slot
-        Number(s.autoSL) === 2 || // Auto Rigidel swaps Rigidel in before a lump ripens (fc_gods.js:446-501)
         on(s.autoGodzamok) || // sells buildings for Godzamok's buff, which needs him slotted (fc_main.js:1111-1115)
         combo(s)
     );
@@ -29,7 +28,6 @@ export function inheritedGodsOn(s) {
 export function inheritedAurasOn(s) {
     return (
         on(s.autoDragonToggle) ||
-        on(s.dragonsCurve) || // swaps Dragon's Curve in at each lump harvest (fc_gods.js:503-560)
         on(s.autoDragonOrbs) || // sells a You for a wish; needs Dragon Orbs (fc_gods.js:697-725)
         combo(s)
     );

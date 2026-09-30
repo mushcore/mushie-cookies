@@ -147,8 +147,17 @@ function legacyStart(saveData) {
         function () {
             updateTimers();
         },
-        { everyFrames: 8 }
+        {
+            everyFrames: 8,
+            enabled: function () {
+                return !!FrozenCookies.fancyui;
+            },
+        }
     );
+    // The minigames load after this point, and each minigame script ends by setting the
+    // global M to 0; the handles and the Grimoire tooltip are brought up to date every frame.
+    MushieCookies.loop.add("legacy:minigames", minigameCheckAction);
+    installFCMenu();
     logEvent(
         "Load",
         "Mushie Cookies v " +
@@ -196,10 +205,9 @@ function setOverrides(gameSaveData) {
     // Set `App`, on older version of CC it's not set to anything, so default it to `undefined`
     if (!window.App) window.App = undefined;
 
+    // Game.sayTime is left to the game: its callers rely on `detail` and on '' for no time left.
+    // The mod's own labels use timeDisplay.
     Beautify = fcBeautify;
-    Game.sayTime = function (time, detail) {
-        return timeDisplay(time / Game.fps);
-    };
     if (typeof Game.tooltip.oldDraw != "function") {
         Game.tooltip.oldDraw = Game.tooltip.draw;
         Game.tooltip.draw = fcDraw;
@@ -238,7 +246,12 @@ function setOverrides(gameSaveData) {
         FrozenCookies.manaMax = preferenceParse("manaMax", 0);
         FrozenCookies.orbMax = preferenceParse("orbMax", 0);
 
+        // "Autopop Wrinklers INSTANTLY" was removed: it kept 1x CpS where popping by value keeps
+        // about 5x, and drop hunting belongs to the season hunt now.
+        if (FrozenCookies.autoWrinkler > 1) FrozenCookies.autoWrinkler = 1;
         // Restore some possibly broken settings
+        // Auto Rigidel (autoSL 2) is gone; a player who chose it still wants the harvest.
+        if (FrozenCookies.autoSL == 2) FrozenCookies.autoSL = 1;
         if (
             !FrozenCookies.autoFTHOFCombo &&
             autoFTHOFComboAction.autobuyyes == 1
@@ -340,10 +353,10 @@ function fcDraw(from, text, origin) {
 }
 
 function fcReset(hard) {
-    // Run for an ascension the player started; the mod's own ascension collects beforehand,
-    // while it still counts (the game grants chips before this reset).
-    if (!hard && !FrozenCookies.preparedForAscension) prepareForAscension();
-    FrozenCookies.preparedForAscension = false;
+    // Nothing is collected here. The game calls this from Reincarnate, on the ascension screen,
+    // where a player can neither sell nor buy, after the chips are granted (main.js:4094, 4125);
+    // popped wrinklers could no longer pay (main.js:16165, 3532). The mod's own ascension collects
+    // before Game.Ascend; an ascension the player starts is theirs.
     Game.oldReset(hard);
     FrozenCookies.frenzyTimes = {};
     FrozenCookies.last_gc_state =
@@ -359,15 +372,28 @@ function fcReset(hard) {
     if (MushieCookies.buyer) MushieCookies.buyer.invalidate();
 }
 
-// Everything worth doing in the last moment before an ascension.
+// The last steps of an ascension the mod starts, a tick after the wrinkler system has popped the
+// wrinklers, so their payout is already in the bank (they pay on a later logic frame,
+// main.js:14513). Only the ascension system calls this, before Game.Ascend.
+//
+// What each step gains, by the game's code:
+// - Selling stock or buildings adds to the bank, not to the cookies baked this run
+//   (minigameMarket.js:252-253, main.js:7873-7874), and the reset wipes the bank. The sales count
+//   toward prestige only through the Chocolate egg, bought last, which earns 5% of the bank
+//   (main.js:10398-10403). A stock sale can also earn a stock market achievement
+//   (minigameMarket.js:246-250), which is kept; the market's stock and profit are zeroed at the
+//   reset anyway (minigameMarket.js:774-779). Goods bought in the current market minute cannot be
+//   sold (minigameMarket.js:243) and are lost with the reset.
+// - Harvesting pays each plant's harvest effect (cookies through Game.Earn, which count) and
+//   unlocks the seeds of mature plants; the reset clears the plot unharvested. It runs before the
+//   buildings are sold, while the CpS that caps the cookie harvests is intact.
 function prepareForAscension() {
-    Game.CollectWrinklers();
-    if (B) {
-        for (let i = 0; i < B.goodsById.length; i++) {
-            B.sellGood(i, 10000);
-        } // sell all stock
+    var market = Game.Objects["Bank"].minigame;
+    if (market && market.goodsById) {
+        for (let i = 0; i < market.goodsById.length; i++) market.sellGood(i, 10000);
     }
-    if (G) G.harvestAll(); // harvest all plants
+    var garden = Game.Objects["Farm"].minigame;
+    if (garden) garden.harvestAll();
     if (
         Game.dragonLevel >= 5 + 4 &&
         !Game.hasAura("Earth Shatterer") &&
@@ -440,10 +466,23 @@ function nextHC(tg) {
     return tg ? toGo : timeDisplay(divCps(toGo, Game.cookiesPs));
 }
 
+// Shows text to copy in the game's own prompt, as the game's Export save does (main.js:2608).
+// window.prompt throws on Steam, which used to leave Game.promptOn set with nothing on screen,
+// so the next Enter confirmed whatever prompt had been shown last.
 function copyToClipboard(text) {
-    Game.promptOn = 1;
-    window.prompt("Copy to clipboard: Ctrl+C, Enter", text);
-    Game.promptOn = 0;
+    var escaped = String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    Game.Prompt(
+        '<h3>Copy to clipboard</h3><div class="block">Press Ctrl+C to copy.</div>' +
+            '<div class="block"><textarea id="textareaPrompt" style="width:100%;height:128px;" readonly>' +
+            escaped +
+            "</textarea></div>",
+        ["Done"]
+    );
+    l("textareaPrompt").focus();
+    l("textareaPrompt").select();
 }
 
 function getBuildingSpread() {
@@ -454,9 +493,9 @@ function getBuildingSpread() {
 
 // todo: add bind for autoascend
 // Press 'a' to toggle autoBuy.
-// Press 'b' to pop up a copyable window with building spread.
+// Press 'b' to show the building spread, ready to copy.
 // Press 'c' to toggle auto-GC
-// Press 'e' to pop up a copyable window with your export string
+// Press 'e' to show your export string, ready to copy
 // Press 'r' to pop up the ascend window (the game's own confirmation)
 // Press 's' to do a manual save
 // Press 'w' to display a wrinkler-info window
@@ -519,7 +558,7 @@ function storeNumberCallback(base, min, max) {
 function updateSpeed(base) {
     userInputPrompt(
         "Autoclicking!",
-        "How many times per second do you want to click? (the game counts at most 50)",
+        "At most how many times per second should it click? The game counts at most 50; any value of 50 or more clicks as fast as the game counts.",
         FrozenCookies[base],
         storeNumberCallback(base, 0, 1000)
     );
@@ -623,17 +662,15 @@ var B = Game.Objects["Bank"].minigame; //Stock Market
 var T = Game.Objects["Temple"].minigame; //Pantheon
 var M = Game.Objects["Wizard tower"].minigame; //Grimoire
 
+// Runs every frame on the mod's loop. A minigame loads after the save does (a timer, then a
+// script: main.js:8622-8640), and every minigame script ends with `var M=0;`, overwriting the
+// handle above; reading them afresh each frame keeps them current.
 function minigameCheckAction() {
-    if (!G) G = Game.Objects["Farm"].minigame; //Garden
-    if (!B) B = Game.Objects["Bank"].minigame; //Stock Market
-    if (!T) T = Game.Objects["Temple"].minigame; //Pantheon
-    if (!M) M = Game.Objects["Wizard tower"].minigame; //Grimoire
-    if (G && B && T && M) clearInterval(FrozenCookies.autoMinigameCheckBot);
-}
-
-function autoTicker() {
-    if (Game.TickerEffect && Game.TickerEffect.type == "fortune")
-        Game.tickerL.click();
+    G = Game.Objects["Farm"].minigame; //Garden
+    B = Game.Objects["Bank"].minigame; //Stock Market
+    T = Game.Objects["Temple"].minigame; //Pantheon
+    M = Game.Objects["Wizard tower"].minigame; //Grimoire
+    installFateTooltip();
 }
 
 function autoEasterAction() {
@@ -763,10 +800,10 @@ function chocolateValue(bankAmount, earthShatter) {
     return value;
 }
 
+// What popping every wrinkler would pay, with every multiplier the game applies. Popping itself
+// belongs to the wrinkler system (src/systems/wrinklers.js).
 function wrinklerValue() {
-    return Game.wrinklers.reduce(function (s, w) {
-        return s + popValue(w);
-    }, 0);
+    return MushieCookies.wrinklerHeld(Game);
 }
 
 function canCastSE() {
@@ -949,95 +986,6 @@ function liveWrinklers() {
     });
 }
 
-function popValue(w) {
-    var toSuck = 1.1;
-    if (Game.Has("Sacrilegious corruption")) toSuck *= 1.05;
-    if (w.type == 1) toSuck *= 3; //shiny wrinklers are an elusive, profitable breed
-    var sucked = w.sucked * toSuck; //cookie dough does weird things inside wrinkler digestive tracts
-    if (Game.Has("Wrinklerspawn")) sucked *= 1.05;
-    return sucked;
-}
-
-function shouldPopWrinklers() {
-    var toPop = [];
-    var living = liveWrinklers();
-    if (living.length > 0) {
-        if (
-            (Game.season == "halloween" || Game.season == "easter") &&
-            !haveAll(Game.season)
-        ) {
-            toPop = living.map(function (w) {
-                return w.id;
-            });
-        } else {
-            var delay = delayAmount();
-            var wrinklerList = Game.wrinklers.slice();
-            var nextRecNeeded = nextPurchase().cost + delay - Game.cookies;
-            var nextRecCps = nextPurchase().delta_cps;
-            var wrinklersNeeded = wrinklerList
-                .sort(function (w1, w2) {
-                    return w2.sucked - w1.sucked;
-                })
-                .reduce(
-                    function (current, w) {
-                        var futureWrinklers =
-                            living.length - (current.ids.length + 1);
-                        if (
-                            (
-                                current.total < nextRecNeeded &&
-                                effectiveCps(
-                                    delay,
-                                    Game.elderWrath,
-                                    futureWrinklers
-                                ) +
-                                    nextRecCps >
-                                    effectiveCps()
-                            ) || (
-                                current.ids.length == 0 && 
-                                living.length == (10 + 2 * (Game.Has("Elder spice") + Game.hasAura("Dragon Guts"))) //always be willing to pop if at max wrinklers
-                            )
-                        ) {
-                            current.ids.push(w.id);
-                            current.total += popValue(w);
-                        }
-                        return current;
-                    },
-                    {
-                        total: 0,
-                        ids: [],
-                    }
-                );
-            toPop =
-                wrinklersNeeded.total > nextRecNeeded
-                    ? wrinklersNeeded.ids
-                    : toPop;
-        }
-    }
-    return toPop;
-}
-
-function autoFrenzyClick() {
-    if (hasClickBuff() && !FrozenCookies.autoFrenzyBot) {
-        if (FrozenCookies.autoclickBot) {
-            clearInterval(FrozenCookies.autoclickBot);
-            FrozenCookies.autoclickBot = 0;
-        }
-        FrozenCookies.autoFrenzyBot = setInterval(
-            MushieCookies.guard("legacy:fcClickCookie", fcClickCookie),
-            1000 / FrozenCookies.frenzyClickSpeed
-        );
-    } else if (!hasClickBuff() && FrozenCookies.autoFrenzyBot) {
-        clearInterval(FrozenCookies.autoFrenzyBot);
-        FrozenCookies.autoFrenzyBot = 0;
-        if (FrozenCookies.autoClick && FrozenCookies.cookieClickSpeed) {
-            FrozenCookies.autoclickBot = setInterval(
-                MushieCookies.guard("legacy:fcClickCookie", fcClickCookie),
-                1000 / FrozenCookies.cookieClickSpeed
-            );
-        }
-    }
-}
-
 function autoGSBuy() {
     if (hasClickBuff() && !Game.hasBuff("Cursed finger")) {
         if (
@@ -1147,18 +1095,6 @@ function goldenCookieLife() {
     return null;
 }
 
-function reindeerLife() {
-    for (var i in Game.shimmers) {
-        if (Game.shimmers[i].type == "reindeer") return Game.shimmers[i].life;
-    }
-    return null;
-}
-
-function fcClickCookie() {
-    if (!Game.OnAscend && !Game.AscendTimer && !Game.specialTabHovered)
-        Game.ClickCookie();
-}
-
 // --- Adapters over the buyer (src/systems/buyer.js). Other legacy code keeps calling these names.
 function asLegacyPurchase(c) {
     // The market's offers (the bank office, a broker) are neither a building nor an upgrade.
@@ -1233,84 +1169,12 @@ function autoCookieBody() {
         }
         FrozenCookies.hc_gain += changeAmount;
     }
-    if (FrozenCookies.autoSL == 1) {
-        var started = Game.lumpT;
-        var ripeAge = Math.ceil(Game.lumpRipeAge);
-        if (
-            Date.now() - started >= ripeAge &&
-            Game.dragonLevel >= 21 &&
-            FrozenCookies.dragonsCurve
-        ) {
-            autoDragonsCurve();
-        } else if (Date.now() - started >= ripeAge) {
-            Game.clickLump();
-        }
-    }
-    if (FrozenCookies.autoSL == 2) autoRigidel();
-    if (FrozenCookies.autoWrinkler == 1) {
-        var popCount = 0;
-        var popList = shouldPopWrinklers();
-        if (FrozenCookies.shinyPop == 1) {
-            _.filter(Game.wrinklers, function (w) {
-                return _.contains(popList, w.id);
-            }).forEach(function (w) {
-                if (w.type !== 1) {
-                    // do not pop Shiny Wrinkler
-                    w.hp = 0;
-                    popCount += 1;
-                }
-            });
-            if (popCount > 0)
-                logEvent("Wrinkler", "Popped " + popCount + " wrinklers.");
-        } else {
-            _.filter(Game.wrinklers, function (w) {
-                return _.contains(popList, w.id);
-            }).forEach(function (w) {
-                w.hp = 0;
-                popCount += 1;
-            });
-            if (popCount > 0)
-                logEvent("Wrinkler", "Popped " + popCount + " wrinklers.");
-        }
-    }
-    if (FrozenCookies.autoWrinkler == 2) {
-        var popCount = 0;
-        var popList = Game.wrinklers;
-        if (FrozenCookies.shinyPop == 1) {
-            popList.forEach(function (w) {
-                if (w.close == true && w.type !== 1) {
-                    w.hp = 0;
-                    popCount += 1;
-                }
-            });
-            if (popCount > 0)
-                logEvent("Wrinkler", "Popped " + popCount + " wrinklers.");
-        } else {
-            popList.forEach(function (w) {
-                if (w.close == true) {
-                    w.hp = 0;
-                    popCount += 1;
-                }
-            });
-            if (popCount > 0)
-                logEvent("Wrinkler", "Popped " + popCount + " wrinklers.");
-        }
-    }
+    // Sugar lumps are harvested by the lump system (src/systems/lumps.js), wrinklers popped by the
+    // wrinkler system (src/systems/wrinklers.js).
 
     var itemBought = false;
 
-
-    // This apparently *has* to stay here, or else fast purchases will multi-click it.
-    if (goldenCookieLife() && FrozenCookies.autoGC) {
-        for (var i in Game.shimmers) {
-            if (Game.shimmers[i].type == "golden") Game.shimmers[i].pop();
-        }
-    }
-    if (reindeerLife() > 0 && FrozenCookies.autoReindeer) {
-        for (var i in Game.shimmers) {
-            if (Game.shimmers[i].type == "reindeer") Game.shimmers[i].pop();
-        }
-    }
+    // Golden cookies, reindeer and fortunes: src/systems/shimmers.js, on its own guard.
     if (FrozenCookies.autoBlacklistOff) autoBlacklistOff();
     var currentFrenzy = cpsBonus() * clickBuffBonus();
     if (currentFrenzy != FrozenCookies.last_gc_state) {
@@ -1395,19 +1259,6 @@ function FCStart() {
         clearInterval(FrozenCookies.cookieBot);
         FrozenCookies.cookieBot = 0;
     }
-    if (FrozenCookies.autoclickBot) {
-        clearInterval(FrozenCookies.autoclickBot);
-        FrozenCookies.autoclickBot = 0;
-    }
-    if (FrozenCookies.frenzyClickBot) {
-        clearInterval(FrozenCookies.frenzyClickBot);
-        FrozenCookies.frenzyClickBot = 0;
-    }
-    if (FrozenCookies.autoFrenzyBot) {
-        clearInterval(FrozenCookies.autoFrenzyBot);
-        FrozenCookies.autoFrenzyBot = 0;
-    }
-
     if (FrozenCookies.autoGSBot) {
         clearInterval(FrozenCookies.autoGSBot);
         FrozenCookies.autoGSBot = 0;
@@ -1421,11 +1272,6 @@ function FCStart() {
         clearInterval(FrozenCookies.autoCastingBot);
         FrozenCookies.autoCastingBot = 0;
     }
-    if (FrozenCookies.autoFortuneBot) {
-        clearInterval(FrozenCookies.autoFortuneBot);
-        FrozenCookies.autoFortuneBot = 0;
-    }
-
     if (FrozenCookies.autoFTHOFComboBot) {
         clearInterval(FrozenCookies.autoFTHOFComboBot);
         FrozenCookies.autoFTHOFComboBot = 0;
@@ -1444,16 +1290,6 @@ function FCStart() {
     if (FrozenCookies.autoHalloweenBot) {
         clearInterval(FrozenCookies.autoHalloweenBot);
         FrozenCookies.autoHalloweenBot = 0;
-    }
-
-    if (FrozenCookies.autoDragonBot) {
-        clearInterval(FrozenCookies.autoDragonBot);
-        FrozenCookies.autoDragonBot = 0;
-    }
-
-    if (FrozenCookies.petDragonBot) {
-        clearInterval(FrozenCookies.petDragonBot);
-        FrozenCookies.petDragonBot = 0;
     }
 
     if (FrozenCookies.autoDragonAura0Bot) {
@@ -1496,11 +1332,6 @@ function FCStart() {
         FrozenCookies.autoCycliusBot = 0;
     }
 
-    if (FrozenCookies.autoMinigameCheckBot) {
-        clearInterval(FrozenCookies.autoMinigameCheckBot);
-        FrozenCookies.autoMinigameCheckBot = 0;
-    }
-
     // Now create new intervals with their specified frequencies.
     // Default frequency is 100ms = 1/10th of a second
 
@@ -1511,19 +1342,7 @@ function FCStart() {
         );
     }
 
-    if (FrozenCookies.autoClick && FrozenCookies.cookieClickSpeed) {
-        FrozenCookies.autoclickBot = setInterval(
-            MushieCookies.guard("legacy:fcClickCookie", fcClickCookie),
-            1000 / FrozenCookies.cookieClickSpeed
-        );
-    }
-
-    if (FrozenCookies.autoFrenzy && FrozenCookies.frenzyClickSpeed) {
-        FrozenCookies.frenzyClickBot = setInterval(
-            MushieCookies.guard("legacy:autoFrenzyClick", autoFrenzyClick),
-            FrozenCookies.frequency
-        );
-    }
+    // Clicking (Autoclick, Autofrenzy): src/systems/clicker.js reads the settings live.
 
     if (FrozenCookies.autoGS) {
         FrozenCookies.autoGSBot = setInterval(
@@ -1542,13 +1361,6 @@ function FCStart() {
     if (FrozenCookies.autoCasting) {
         FrozenCookies.autoCastingBot = setInterval(
             MushieCookies.guard("legacy:autoCast", autoCast),
-            FrozenCookies.frequency * 10
-        );
-    }
-
-    if (FrozenCookies.autoFortune) {
-        FrozenCookies.autoFortuneBot = setInterval(
-            MushieCookies.guard("legacy:autoTicker", autoTicker),
             FrozenCookies.frequency * 10
         );
     }
@@ -1584,19 +1396,7 @@ function FCStart() {
     // The bank office, brokers and loans (autoBank, autoBroker, autoLoan) are run by the market
     // system, src/systems/market.js.
 
-    if (FrozenCookies.autoDragon) {
-        FrozenCookies.autoDragonBot = setInterval(
-            MushieCookies.guard("legacy:autoDragonAction", autoDragonAction),
-            FrozenCookies.frequency
-        );
-    }
-
-    if (FrozenCookies.petDragon) {
-        FrozenCookies.petDragonBot = setInterval(
-            MushieCookies.guard("legacy:petDragonAction", petDragonAction),
-            FrozenCookies.frequency * 10
-        );
-    }
+    // autoDragon and petDragon are read by src/systems/dragon.js on the mod's loop.
 
     if (FrozenCookies.autoDragonAura0) {
         FrozenCookies.autoDragonAura0Bot = setInterval(
@@ -1655,12 +1455,8 @@ function FCStart() {
         );
     }
 
-    if (!G || !B || !T || !M) {
-        FrozenCookies.autoMinigameCheckBot = setInterval(
-            MushieCookies.guard("legacy:minigameCheckAction", minigameCheckAction),
-            FrozenCookies.frequency * 600 // 1 minute
-        );
-    }
+    // The minigame handles are kept current by the mod's loop (minigameCheckAction).
 
-    FCMenu();
+    // Show the choice just made if the menu is open.
+    if (Game.onMenu == "fc_menu") Game.UpdateMenu();
 }
