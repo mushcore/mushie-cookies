@@ -579,15 +579,6 @@ function updateOrbMax(base) {
     );
 }
 
-function updateLoanMultMin(base) {
-    userInputPrompt(
-        "Loans!",
-        'What CpS multiplier should trigger taking loans (e.g. "7" will trigger for a normal Frenzy, "500" will require a huge building buff combo, etc.)?',
-        FrozenCookies[base],
-        storeNumberCallback(base, 0)
-    );
-}
-
 function updateASFMultMin(base) {
     userInputPrompt(
         "Sugar Frenzy!",
@@ -1170,14 +1161,16 @@ function fcClickCookie() {
 
 // --- Adapters over the buyer (src/systems/buyer.js). Other legacy code keeps calling these names.
 function asLegacyPurchase(c) {
+    // The market's offers (the bank office, a broker) are neither a building nor an upgrade.
+    var target = c.kind == "building" ? c.building : c.upgrade || { id: -1, name: c.name };
     return {
-        id: c.kind == "building" ? c.building.id : c.upgrade.id,
+        id: target.id,
         efficiency: c.payback,
         delta_cps: c.deltaIncome,
         base_delta_cps: c.deltaIncome,
         cost: c.price,
-        purchase: c.kind == "building" ? c.building : c.upgrade,
-        type: c.kind == "building" ? "building" : "upgrade",
+        purchase: target,
+        type: c.kind == "building" ? "building" : c.upgrade ? "upgrade" : c.kind,
         name: c.name,
     };
 }
@@ -1453,21 +1446,6 @@ function FCStart() {
         FrozenCookies.autoHalloweenBot = 0;
     }
 
-    if (FrozenCookies.autoBankBot) {
-        clearInterval(FrozenCookies.autoBankBot);
-        FrozenCookies.autoBankBot = 0;
-    }
-
-    if (FrozenCookies.autoBrokerBot) {
-        clearInterval(FrozenCookies.autoBrokerBot);
-        FrozenCookies.autoBrokerBot = 0;
-    }
-
-    if (FrozenCookies.autoLoanBot) {
-        clearInterval(FrozenCookies.autoLoanBot);
-        FrozenCookies.autoLoanBot = 0;
-    }
-
     if (FrozenCookies.autoDragonBot) {
         clearInterval(FrozenCookies.autoDragonBot);
         FrozenCookies.autoDragonBot = 0;
@@ -1603,26 +1581,8 @@ function FCStart() {
         );
     }
 
-    if (FrozenCookies.autoBank) {
-        FrozenCookies.autoBankBot = setInterval(
-            MushieCookies.guard("legacy:autoBankAction", autoBankAction),
-            FrozenCookies.frequency * 10
-        );
-    }
-
-    if (FrozenCookies.autoBroker) {
-        FrozenCookies.autoBrokerBot = setInterval(
-            MushieCookies.guard("legacy:autoBrokerAction", autoBrokerAction),
-            FrozenCookies.frequency * 10
-        );
-    }
-
-    if (FrozenCookies.autoLoan) {
-        FrozenCookies.autoLoanBot = setInterval(
-            MushieCookies.guard("legacy:autoLoanBuy", autoLoanBuy),
-            FrozenCookies.frequency * 2
-        );
-    }
+    // The bank office, brokers and loans (autoBank, autoBroker, autoLoan) are run by the market
+    // system, src/systems/market.js.
 
     if (FrozenCookies.autoDragon) {
         FrozenCookies.autoDragonBot = setInterval(

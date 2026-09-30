@@ -46,6 +46,7 @@ export function extraReserveFrom(settings, helpers) {
 /** Starts the new systems once the legacy code has started. Returns them by name. */
 export function startSystems({ game, loop, legacy, log }) {
     const settings = legacy.settings;
+    let market = null; // made below; it offers the bank office and brokers to the buyer
     const buyer = createBuyer({
         game,
         settings,
@@ -53,6 +54,7 @@ export function startSystems({ game, loop, legacy, log }) {
         log,
         policy: () => policyFrom(game, settings, legacy.blacklistPresets, legacy.prerequisites),
         extraReserve: () => extraReserveFrom(settings, legacy),
+        extraCandidates: (policy) => (market ? market.candidates(policy) : []),
     });
     const ascension = createAscension({
         game,
@@ -66,7 +68,7 @@ export function startSystems({ game, loop, legacy, log }) {
     const lumps = createLumps({ game, settings, loop, log });
     const grimoire = createGrimoire({ game, settings, loop, log });
     const garden = createGarden({ game, settings, loop, log, reserve: () => buyer.reserve() });
-    const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
+    market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve(), buyer, ascension });
     const gods = createGods({ game, settings, loop, log, buyer });
     return { buyer, ascension, lumps, grimoire, garden, market, gods };
 }

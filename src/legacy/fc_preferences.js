@@ -141,20 +141,19 @@ FrozenCookies.preferenceValues = {
         default: 0,
     },
     autoBank: {
-        hint: "Auto-upgrade bank office.",
+        hint: "Upgrade the bank office through Autobuy when the market profit its storage adds repays the cursors.",
         display: ["Auto-Banking OFF", "Auto-Banking ON"],
         default: 0,
     },
     autoBroker: {
-        hint: "Auto-hire stock brokers.",
+        hint: "Hire stock brokers through Autobuy when the overhead saved repays them before the run is expected to end.",
         display: ["Auto-Broker OFF", "Auto-Broker ON"],
         default: 0,
     },
     autoLoan: {
-        hint: "Auto-take loans during click frenzies.",
-        display: ["Auto-Loans OFF", "Take loans 1 and 2", "Take all 3 loans"],
+        hint: "Take a loan only when a combo or the end of the run makes it worth more than its downpayment and interest.",
+        display: ["Auto-Loans OFF", "Consider loans 1 and 2", "Consider all 3 loans"],
         default: 0,
-        extras: '<a class="option" id="minLoanMult" onclick="updateLoanMultMin(\'minLoanMult\');">x${minLoanMult} minimum Frenzy</a>',
     },
 
     // Pantheon options

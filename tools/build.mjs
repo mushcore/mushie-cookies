@@ -15,7 +15,6 @@ export const LEGACY = [
     'fc_main.js',
     'fc_gods.js',
     'fc_spells.js',
-    'fc_bank.js',
     'fc_button.js',
     'fc_infobox.js',
 ];
