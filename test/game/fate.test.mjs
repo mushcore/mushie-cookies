@@ -79,6 +79,53 @@ test('the forecast matches what the game casts, over many casts and seasons', { 
         assert.ok(out.some((r) => r.actualBackfire), 'the sample should include a backfire');
     }));
 
+/** Casts `count` times under the conditions already set and returns forecasts beside results. */
+const compareCasts = (cast, count) => {
+    const castOnce = new Function(`return (${cast})()`);
+    const M = Game.Objects['Wizard tower'].minigame;
+    const results = [];
+    for (let i = 0; i < count; i++) {
+        const predicted = MushieCookies.forecastFate(Game, M, 0);
+        const actual = castOnce();
+        results.push({ predicted: predicted.outcome, actual: actual.force, predictedBackfire: !predicted.success, actualBackfire: actual.wrath === 1 });
+        Game.shimmers.slice().forEach((s) => s.die());
+    }
+    return results;
+};
+
+test('the forecast matches the game with fewer than 10 buildings, where no building special is drawn', { skip }, () =>
+    withGrimoire(
+        async (game) => {
+            const out = await game.eval(
+                ({ cast, compare }) => {
+                    const buildings = Game.BuildingsOwned;
+                    return { buildings, results: new Function(`return (${compare})`)()(cast, 60) };
+                },
+                { cast: castAndRead.toString(), compare: compareCasts.toString() }
+            );
+            assert.ok(out.buildings < 10, `the bakery should have fewer than 10 buildings, has ${out.buildings}`);
+            const wrong = out.results.filter((r) => r.predicted !== r.actual || r.predictedBackfire !== r.actualBackfire);
+            assert.deepEqual(wrong.slice(0, 5), [], `${wrong.length} of ${out.results.length} forecasts were wrong`);
+            assert.ok(out.results.filter((r) => !r.actualBackfire).length >= 20, 'the sample should be mostly successful casts');
+        },
+        { towers: 9 }
+    ));
+
+test('the forecast matches the game during Dragonflight, which takes click frenzy out of the draw', { skip }, () =>
+    withGrimoire(async (game) => {
+        const out = await game.eval(
+            ({ cast, compare }) => {
+                Game.gainBuff('dragonflight', 3600, 1111);
+                return new Function(`return (${compare})`)()(cast, 60);
+            },
+            { cast: castAndRead.toString(), compare: compareCasts.toString() }
+        );
+        const wrong = out.filter((r) => r.predicted !== r.actual || r.predictedBackfire !== r.actualBackfire);
+        assert.deepEqual(wrong.slice(0, 5), [], `${wrong.length} of ${out.length} forecasts were wrong`);
+        assert.ok(out.filter((r) => !r.actualBackfire).length >= 20, 'the sample should be mostly successful casts');
+        assert.ok(!out.some((r) => r.actual === 'click frenzy'), 'the game never draws click frenzy during Dragonflight');
+    }));
+
 test('outcome values match what the game grants', { skip }, () =>
     withGrimoire(async (game) => {
         const out = await game.eval((pop) => {
@@ -221,22 +268,69 @@ test('a forecast further ahead matches the cast that many casts later', { skip }
         assert.deepEqual(out.ahead, out.actual);
     }));
 
+// Worth nothing or less whatever the buffs; everything else is worth casting while autoclicking
+// at 50 a second (a cursed finger then pays 50 × 10 s of CpS a second).
+const BAD = ['clot', 'ruin cookies', 'blab'];
+
 test('forecast casting skips bad outcomes, casts good ones and pops the cookie', { skip }, () =>
     withGrimoire(async (game) => {
-        await game.eval(() => {
+        await game.eval((bad) => {
+            const M = Game.Objects['Wizard tower'].minigame;
+            // A dozen or so casts fit in the run, which need not include a bad one: start with a
+            // bad one next and mana full, so there is at least one to skip.
+            for (let i = 0; i < 100 && !bad.includes(MushieCookies.forecastFate(Game, M, 0).outcome); i++) {
+                M.magic = M.magicM;
+                M.castSpell(M.spells["haggler's charm"]);
+            }
+            M.magic = M.magicM;
+            Game.killBuffs();
+            window.__startSpells = M.spellsCastTotal;
+            // Record every spell cast: what the forecast said just before it, and whether the
+            // cookie a Force the Hand of Fate made was popped.
+            const castSpell = M.castSpell;
+            window.__casts = [];
+            M.castSpell = function (spell, obj) {
+                const forecast = MushieCookies.forecastFate(Game, M, 0).outcome;
+                const before = new Set(Game.shimmers);
+                const cast = castSpell.call(this, spell, obj);
+                if (!cast) return cast;
+                const made = Game.shimmers.find((s) => !before.has(s));
+                const record = { spell: spell === M.spells['hand of fate'] ? 'fate' : spell === M.spells["haggler's charm"] ? 'skip' : spell.name, forecast, made: made ? made.force : null, popped: false };
+                if (made) {
+                    const pop = made.pop;
+                    made.pop = function () {
+                        record.popped = true;
+                        return pop.apply(this, arguments);
+                    };
+                }
+                window.__casts.push(record);
+                return cast;
+            };
             FrozenCookies.autoFate = 1;
             FrozenCookies.autoCasting = 0;
             FrozenCookies.autoClick = 1;
             FrozenCookies.cookieClickSpeed = 50;
             FCStart();
-        });
+        }, BAD);
         await game.advanceSeconds(3 * 3600);
         const out = await game.eval(() => ({
             report: MushieCookies.grimoire.report(),
-            spells: Game.Objects['Wizard tower'].minigame.spellsCastTotal,
+            casts: window.__casts,
+            spells: Game.Objects['Wizard tower'].minigame.spellsCastTotal - window.__startSpells,
             status: Object.entries(MushieCookies.status()).filter(([, s]) => s.failures > 0).map(([n, s]) => `${n}: ${s.lastError}`),
         }));
-        assert.ok(out.report.casts > 0, 'should have cast Force the Hand of Fate');
+        const fate = out.casts.filter((c) => c.spell === 'fate');
+        const skips = out.casts.filter((c) => c.spell === 'skip');
+        const all = JSON.stringify(out.casts.map((c) => `${c.spell}:${c.forecast}`));
+        assert.deepEqual(out.casts.filter((c) => c.spell !== 'fate' && c.spell !== 'skip'), [], 'no other spell is cast');
+        assert.deepEqual(skips.filter((c) => !BAD.includes(c.forecast)), [], 'only bad outcomes are skipped');
+        assert.deepEqual(fate.filter((c) => BAD.includes(c.forecast)), [], 'no bad outcome is cast');
+        assert.deepEqual(fate.filter((c) => c.made !== c.forecast), [], 'each cast makes the forecast cookie');
+        assert.deepEqual(fate.filter((c) => !c.popped), [], 'each cookie a cast makes is popped');
+        assert.ok(fate.length > 0, `should have cast Force the Hand of Fate: ${all}`);
+        assert.ok(skips.length > 0, `the run should include a bad outcome to skip: ${all}`);
+        assert.equal(out.report.casts, fate.length);
+        assert.equal(out.report.skips, skips.length);
         assert.equal(out.spells, out.report.casts + out.report.skips, 'every spell cast is one the system chose');
         assert.deepEqual(out.status, []);
         assert.deepEqual(game.errors, []);
