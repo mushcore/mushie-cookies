@@ -94,8 +94,10 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
     // What each missing drop would add to income, from one what-if session. Santa's trials also
     // take Santa up a level, since each level brings one drop at random (main.js:14745-14760).
     function measureGains() {
-        const base = income();
-        const trials = [];
+        // The baseline is measured in the same session as the trials: right after a purchase the
+        // game's CpS is stale until its next recalculation, and a baseline read outside would
+        // credit every trial with that purchase.
+        const trials = [{ group: 'base', apply() {} }];
         const buy = (names) => () => {
             for (const n of names) {
                 const u = game.Upgrades[n];
@@ -122,7 +124,8 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
         if (heart) trials.push({ group: 'heart', apply: buy([heart]) });
         // The Chocolate egg is the ascension routine's (candidates.js NEVER_BUY): worth nothing here.
         for (const n of missing(game.easterEggs)) if (n !== 'Chocolate egg') trials.push({ group: 'egg', apply: buy([n]) });
-        const measured = trials.length ? simulateEach(game, trials, income) : [];
+        const measured = simulateEach(game, trials, income);
+        const base = measured[0];
         const sums = {};
         const counts = {};
         trials.forEach((t, i) => {
@@ -341,6 +344,8 @@ export function createSeasons({ game, settings, loop, buyer = null, hunt = null,
     loop.add('seasons', tick, { everyFrames: TICK_EVERY, enabled: () => settings.autoSeasons == 1 && !game.OnAscend && !game.AscendTimer });
 
     return {
+        /** What each missing drop and the next Santa level would add to income, measured now. */
+        gains: () => measureGains(),
         /** A plain summary for the console and the tests. */
         report() {
             const owned = (names) => names.filter((n) => game.Has(n)).length;

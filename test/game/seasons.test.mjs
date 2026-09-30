@@ -197,3 +197,23 @@ test('the last Santa level is taken for Santa\'s dominion once every drop is out
         assert.equal(out.santa, 14, JSON.stringify(out.offers));
         assert.equal(out.dominion, 1, 'the buyer buys the dominion the last level unlocks');
     }));
+
+test('drop values are measured against a recalculated baseline, even right after a purchase', { skip }, () =>
+    withMod(async (game) => {
+        await bakery(game);
+        const out = await game.eval(() => {
+            FrozenCookies.autoSeasons = 0;
+            FrozenCookies.autoBuy = 0;
+            const settled = MushieCookies.seasons.gains();
+            // A purchase leaves the game's CpS stale until its next recalculation (Upgrade.buy and
+            // Object.buy only set recalculateGains, main.js:9557, 7847): the baseline must not be
+            // read from it. Earning Increased merriness (+15%) leaves the same state.
+            Game.Upgrades['Increased merriness'].earn();
+            const right = MushieCookies.seasons.gains();
+            Game.CalculateGains();
+            const after = MushieCookies.seasons.gains();
+            return { settled: settled.christmas, right: right.christmas, after: after.christmas };
+        });
+        assert.ok(out.settled > 0);
+        assert.ok(Math.abs(out.right - out.after) <= 1e-6 * out.after, `${out.right} right after the purchase, ${out.after} once recalculated`);
+    }));
