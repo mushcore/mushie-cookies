@@ -99,6 +99,23 @@ test('the buyer is told when a golden hold starts and when it ends, not on every
     assert.equal(buyer.invalidations, 2, 'released');
 });
 
+test('Sugar frenzy never acts on a verdict left from the run before', () => {
+    // Right after a reincarnation the ascension still holds the ended run's verdict (rated, rate
+    // under the average) until its next tick; a frenzy then would land at the start of the new run.
+    const startDate = Date.now() - 60 * 1000;
+    const bought = [];
+    const frenzy = { unlocked: 1, bought: 0, buy: () => bought.push(1) };
+    const game = fakeGame({ startDate, lumps: 150, Upgrades: { 'Sugar frenzy': frenzy } });
+    const loop = fakeLoop();
+    let verdict = { ascend: true, instantRate: 0.9, averageRate: 1, rated: true, startDate: startDate - 86400 * 1000 };
+    createLumps({ game, settings: { sugarFrenzy: 1 }, loop, run: () => verdict });
+    loop.run('sugarFrenzy');
+    assert.equal(bought.length, 0);
+    verdict = { ...verdict, ascend: false, startDate };
+    loop.run('sugarFrenzy');
+    assert.equal(bought.length, 1, 'a verdict on this run is acted on');
+});
+
 test('Sugar frenzy stands aside while the inherited Sugar frenzy option is on', () => {
     const loop = fakeLoop();
     const settings = { sugarFrenzy: 1, autoSugarFrenzy: 1 };

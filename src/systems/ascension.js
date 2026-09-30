@@ -102,14 +102,17 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
 
     function decide() {
         const projected = withExtras();
-        state.verdict = shouldAscend({
-            prestige: game.prestige,
-            projected,
-            history: state.history,
-            start: state.run.start,
-            runSeconds: runSeconds(),
-            firstTarget: firstTarget(),
-        });
+        state.verdict = {
+            ...shouldAscend({
+                prestige: game.prestige,
+                projected,
+                history: state.history,
+                start: state.run.start,
+                runSeconds: runSeconds(),
+                firstTarget: firstTarget(),
+            }),
+            startDate: game.startDate, // the run it judges, so another system never reads it on the next
+        };
         if (options.rule === 'double') {
             const doubled = game.prestige > 0 ? projected >= 2 * game.prestige : projected >= firstTarget();
             state.verdict = { ...state.verdict, ascend: doubled, reason: doubled ? 'prestige would double' : 'prestige would not double yet' };

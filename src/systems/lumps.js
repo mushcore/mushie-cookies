@@ -12,7 +12,7 @@ const SUGAR_FRENZY = 'Sugar frenzy';
  * @param {object} deps.settings  autoSL (harvest), sugarFrenzy, autoLumps (spend), sugarBakingGuard
  * @param {object} deps.loop
  * @param {{invalidate(): void, ranking(): Array}} [deps.buyer]  holds the bank a golden lump pays on
- * @param {() => ({instantRate: number, averageRate: number, rated: boolean} | null)} [deps.run]
+ * @param {() => ({instantRate: number, averageRate: number, rated: boolean, startDate?: number} | null)} [deps.run]
  *        the ascension's growth verdict; null when nothing ends runs
  * @param {() => boolean} [deps.ascending]  the ascension has collected and is about to ascend
  * @param {() => number} [deps.goldenWait]  expected seconds to the next golden cookie
@@ -154,11 +154,15 @@ export function createLumps({
             state.frenzy = null;
             return;
         }
+        // Right after a reincarnation the ascension still holds the ended run's verdict until its
+        // next tick; a verdict on another run judges nothing here.
+        const verdict = run();
+        const stale = !!verdict && verdict.startDate !== undefined && verdict.startDate !== game.startDate;
         const decision = decideFrenzy({
             available,
             buffs: Object.values(game.buffs).map((b) => ({ multCpS: b.multCpS, secondsLeft: b.time / game.fps })),
             worth: worthOfALump(),
-            run: run(),
+            run: stale ? { ...verdict, rated: false } : verdict,
             ascending: ascending(),
         });
         state.frenzy = decision;
