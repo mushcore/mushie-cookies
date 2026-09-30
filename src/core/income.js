@@ -89,5 +89,6 @@ export function estimateIncome(state) {
         click: clickTotal,
         golden: payouts.total,
         byOutcome: payouts.byOutcome,
+        basket: state.basket || 0,
     };
 }

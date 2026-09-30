@@ -135,6 +135,8 @@ export function readState(game, settings) {
         clickPower: unbuffedClickPower(game),
         clicksPerSecond: settings.autoClick ? Math.min(Number(settings.cookieClickSpeed) || 0, MAX_CLICKS_PER_SECOND) : 0,
         bank: game.cookies,
+        // What every building costs right now; a discount upgrade lowers it inside a what-if.
+        basket: game.ObjectsById.reduce((sum, b) => sum + b.getPrice(), 0),
         wrinklers: {
             count: game.elderWrath > 0 ? game.getWrinklersMax() : 0,
             returnMult: wrinklerReturnMult(game),

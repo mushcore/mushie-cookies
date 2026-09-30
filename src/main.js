@@ -6,6 +6,9 @@ import { register } from './game/boot.js';
 export { simulate, simulateEach, takeSnapshot, diffSnapshots } from './core/sim.js';
 export { readState, measureCandidates } from './game/measure.js';
 export { awardForBuildings, awardForUpgrades } from './game/awards.js';
+export { listCandidates, NEVER_BUY } from './game/candidates.js';
+export { estimateIncome } from './core/income.js';
+export { rankCandidates, chooseReserve, decide } from './core/buyer.js';
 
 export const version = __MUSHIE_VERSION__;
 
