@@ -138,30 +138,37 @@ test('outcome values match what the game grants', { skip }, () =>
             };
             const valueNow = (outcome) => MushieCookies.outcomeValue(outcome, MushieCookies.grimoire.context());
             const rows = [];
-            // A CpS buff is worth the CpS the game adds, for as long as the game grants it.
-            FrozenCookies.autoClick = 0;
-            for (const force of ['frenzy', 'blood frenzy', 'clot', 'building special']) {
+            // Durations as they are, then with Lasting fortune's ×1.1 (main.js:5461), where the game
+            // rounds each up to whole seconds: a frenzy lasts ceil(84.7) = 85 s (5524).
+            for (const lasting of [false, true]) {
+                if (lasting) Game.Upgrades['Lasting fortune'].earn();
+                const tag = lasting ? ' at ×1.1' : '';
+                // A CpS buff is worth the CpS the game adds, for as long as the game grants it.
+                FrozenCookies.autoClick = 0;
+                for (const force of ['frenzy', 'blood frenzy', 'clot', 'building special']) {
+                    fresh();
+                    const value = valueNow(force);
+                    const cps = Game.cookiesPs;
+                    const had = new Set(Object.keys(Game.buffs));
+                    popForced(force);
+                    Game.CalculateGains();
+                    const granted = Object.values(Game.buffs).find((b) => !had.has(b.name));
+                    rows.push({ force: force + tag, value, game: ((Game.cookiesPs - cps) * granted.time) / Game.fps, seconds: granted.time / Game.fps });
+                }
+                // A click frenzy is worth the click power the game adds, at the clicking speed.
+                FrozenCookies.autoClick = 1;
+                FrozenCookies.cookieClickSpeed = 50;
                 fresh();
-                const value = valueNow(force);
-                const cps = Game.cookiesPs;
-                const had = new Set(Object.keys(Game.buffs));
-                popForced(force);
+                const value = valueNow('click frenzy');
+                const power = Game.computedMouseCps;
+                popForced('click frenzy');
                 Game.CalculateGains();
-                const granted = Object.values(Game.buffs).find((b) => !had.has(b.name));
-                rows.push({ force, value, game: ((Game.cookiesPs - cps) * granted.time) / Game.fps });
+                const seconds = Game.buffs['Click frenzy'].time / Game.fps;
+                rows.push({ force: 'click frenzy' + tag, value, game: 50 * (Game.computedMouseCps - power) * seconds, seconds });
             }
-            // A click frenzy is worth the click power the game adds, at the clicking speed.
-            FrozenCookies.autoClick = 1;
-            FrozenCookies.cookieClickSpeed = 50;
-            fresh();
-            let value = valueNow('click frenzy');
-            const power = Game.computedMouseCps;
-            popForced('click frenzy');
-            Game.CalculateGains();
-            rows.push({ force: 'click frenzy', value, game: (50 * (Game.computedMouseCps - power) * Game.buffs['Click frenzy'].time) / Game.fps });
             // Lucky pays out at once.
             fresh();
-            value = valueNow('multiply cookies');
+            let value = valueNow('multiply cookies');
             let bank = Game.cookies;
             popForced('multiply cookies');
             rows.push({ force: 'multiply cookies', value, game: Game.cookies - bank });
@@ -171,12 +178,18 @@ test('outcome values match what the game grants', { skip }, () =>
             bank = Game.cookies;
             const drops = 3000;
             for (let i = 0; i < drops; i++) new Game.shimmer('golden', { type: 'cookie storm drop' }, 1).pop();
-            rows.push({ force: 'cookie storm drop', value, game: (Game.cookies - bank) / drops, sampled: true });
+            rows.push({ force: 'cookie storm drop', value, game: (Game.cookies - bank) / drops, sampled: drops });
             return rows;
         }, popForced.toString());
+        // The ×1.1 pass has to reach durations that are not whole seconds before rounding.
+        const seconds = Object.fromEntries(out.filter((r) => r.seconds).map((r) => [r.force, r.seconds]));
+        assert.equal(seconds['frenzy at ×1.1'], 85);
+        assert.equal(seconds['click frenzy at ×1.1'], 15);
         for (const r of out) {
-            // 3000 draws of 1 to 7 put the sampled mean within 2% of the true one (4 sd).
-            const tolerance = r.sampled ? 0.02 : 1e-6;
+            // A draw of 1 to 7 has mean 4 and sd 2 (variance (7² - 1) / 12 = 4), so the mean of n
+            // draws has an sd of 2 / √n, which is 0.5 / √n of 4: 0.91% for 3000. Allow 4.5 sd
+            // (4.1%), a chance miss about once in 150,000 runs; a value off by half a minute is 12.5%.
+            const tolerance = r.sampled ? (4.5 * 0.5) / Math.sqrt(r.sampled) : 1e-6;
             assert.ok(Math.abs(r.value - r.game) <= tolerance * Math.abs(r.game), `${r.force}: valued at ${r.value}, the game gives ${r.game}`);
         }
     }));
@@ -232,6 +245,42 @@ test('a forecast frenzy is held, not cast onto a Frenzy it would only lengthen',
         const report = await game.eval(() => MushieCookies.grimoire.report());
         assert.equal(report.casts, 0, `cast anyway: ${report.last && report.last.reason}`);
         assert.equal(report.decision.action, 'wait');
+    }));
+
+test('a forecast storm drop is held through a Cursed finger, not burnt, and cast when the finger ends', { skip }, () =>
+    withGrimoire(async (game) => {
+        const setup = await game.eval((pop) => {
+            const M = Game.Objects['Wizard tower'].minigame;
+            Game.shimmerTypes.golden.spawnConditions = () => false;
+            // Burn casts until the next one is a storm drop, which a Cursed finger (CpS 0,
+            // main.js:13932) makes worth nothing now and a full four minutes of CpS once it ends.
+            for (let i = 0; i < 200 && MushieCookies.forecastFate(Game, M, 0).outcome !== 'cookie storm drop'; i++) {
+                M.magic = M.magicM;
+                M.castSpell(M.spells["haggler's charm"]);
+            }
+            Game.killBuffs();
+            new Function(`return (${pop})`)()('cursed finger');
+            // Full, so nothing but the finger stands between the drop and a cast.
+            M.magic = M.magicM;
+            Object.assign(FrozenCookies, { autoFate: 1, autoCasting: 0, autoFTHOFCombo: 0, auto100ConsistencyCombo: 0, autoClick: 0 });
+            return { next: MushieCookies.forecastFate(Game, M, 0).outcome, finger: Game.buffs['Cursed finger'].time / Game.fps };
+        }, popForced.toString());
+        assert.equal(setup.next, 'cookie storm drop');
+        const read = () => game.eval(() => ({ report: MushieCookies.grimoire.report(), finger: !!Game.buffs['Cursed finger'] }));
+        // Half the finger: ten ticks, each with the drop worth nothing if cast now.
+        await game.advanceSeconds(setup.finger / 2);
+        const during = await read();
+        assert.ok(during.finger, 'the finger should still be running');
+        assert.equal(during.report.skips, 0, 'a storm drop was burnt because the finger made it worth nothing now');
+        assert.equal(during.report.casts, 0, `cast under the finger: ${during.report.last && during.report.last.reason}`);
+        assert.equal(during.report.decision.action, 'wait');
+        await game.advanceSeconds(setup.finger / 2 + 2);
+        const after = await read();
+        assert.ok(!after.finger, 'the finger should have ended');
+        assert.equal(after.report.skips, 0);
+        assert.equal(after.report.casts, 1);
+        assert.equal(after.report.last.outcome, 'cookie storm drop');
+        assert.deepEqual(game.errors, []);
     }));
 
 test('forecasting does not disturb the game\'s own random numbers', { skip }, () =>
