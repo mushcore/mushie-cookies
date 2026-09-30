@@ -44,6 +44,7 @@ export { rankHeavenly, planChips } from './core/heavenly.js';
 export { AUTOPILOT, applyAutopilot, isAutopilotSetting } from './core/autopilot.js';
 export { planSeason } from './core/seasons.js';
 export { heavenlyCandidates, planHeavenly, slotCandidates, fillPermanentSlots, rankPermanentSlots, assignPermanentSlots } from './game/prestige.js';
+export { payoutOf as wrinklerPayout, heldValue as wrinklerHeld } from './game/wrinklers.js';
 
 export const version = __MUSHIE_VERSION__;
 
@@ -59,6 +60,7 @@ export let garden = null;
 export let market = null;
 export let gods = null;
 export let dragon = null;
+export let wrinklers = null;
 export let seasons = null;
 
 const guards = createGuard({
@@ -109,6 +111,7 @@ const runtime = {
         market = systems.market;
         gods = systems.gods;
         dragon = systems.dragon;
+        wrinklers = systems.wrinklers;
         seasons = systems.seasons;
     },
     save: () => window.saveFCData(),

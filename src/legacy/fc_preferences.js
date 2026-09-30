@@ -89,17 +89,8 @@ FrozenCookies.preferenceValues = {
         default: 0,
     },
     autoWrinkler: {
-        hint: "Auto-pop wrinklers.",
-        display: [
-            "Autopop Wrinklers OFF",
-            "Autopop Wrinklers EFFICIENTLY",
-            "Autopop Wrinklers INSTANTLY",
-        ],
-        default: 0,
-    },
-    shinyPop: {
-        hint: "Protect shiny wrinklers (⚠️ disables Elder Pledge).",
-        display: ["Save Shiny Wrinklers OFF", "Save Shiny Wrinklers ON"],
+        hint: "Keep every wrinkler feeding; pop one only when buying the next purchase sooner is worth more than its feeding. Shinies are kept. Collects them all before an ascension, yours included.",
+        display: ["Auto Wrinklers OFF", "Auto Wrinklers ON"],
         default: 0,
     },
     autoSL: {

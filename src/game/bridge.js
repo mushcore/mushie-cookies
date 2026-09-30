@@ -8,6 +8,7 @@ import { createGarden } from '../systems/garden.js';
 import { createMarket } from '../systems/market.js';
 import { createGods } from '../systems/gods.js';
 import { createDragon } from '../systems/dragon.js';
+import { createWrinklers } from '../systems/wrinklers.js';
 import { createSeasons } from '../systems/seasons.js';
 
 const CHAIN_REACH = 15;
@@ -57,13 +58,15 @@ export function startSystems({ game, loop, legacy, log }) {
         policy: () => policyFrom(game, settings, legacy.blacklistPresets, legacy.prerequisites),
         extraReserve: () => Math.max(extraReserveFrom(settings, legacy), lumps ? lumps.hold() : 0),
     });
+    const wrinklers = createWrinklers({ game, settings, loop, log, buyer });
     const ascension = createAscension({
         game,
         settings,
         loop,
         log,
         buyer,
-        extras: () => legacy.wrinklerValue() + legacy.chocolateValue(),
+        extras: () => wrinklers.held() + legacy.chocolateValue(),
+        collect: () => wrinklers.collect(),
         prepare: () => legacy.prepareForAscension(),
     });
     lumps = createLumps({
@@ -84,5 +87,5 @@ export function startSystems({ game, loop, legacy, log }) {
     const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve() });
     const gods = createGods({ game, settings, loop, log, buyer, dragon });
     const seasons = createSeasons({ game, settings, loop, log, buyer });
-    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, seasons };
+    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, wrinklers, seasons };
 }
