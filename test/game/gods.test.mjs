@@ -19,6 +19,20 @@ async function openTemple(game, names = ['Cursor', 'Grandma', 'Farm', 'Mine', 'F
     await game.waitFor(() => !!(Game.Objects['Temple'].minigame && Game.Objects['Temple'].minigame.godsById && document.getElementById('templeSlot0')));
 }
 
+/**
+ * Buildings for a dragon test. The highest building is a single Temple: its price is a few
+ * minutes of income, as for a building the buyer actually bought. (Sixty of every building and
+ * no upgrades makes the sixtieth Bank a 44-day payback, a state no player reaches.)
+ */
+function dragonBakery(aura) {
+    Game.Earn(1e15);
+    for (const name of ['Cursor', 'Grandma', 'Farm', 'Mine', 'Factory', 'Bank']) Game.Objects[name].buy(60);
+    Game.Objects['Temple'].buy(1);
+    Game.dragonLevel = 20; // auras 0 to 16 (Dragon's Fortune) can be chosen: level >= id + 4
+    Game.dragonAura = aura;
+    Game.CalculateGains();
+}
+
 test('slots gods by measured income, one swap at a time, the way a player drags them', { skip }, async () => {
     const game = await launchWithMod();
     try {
@@ -131,32 +145,154 @@ test('with the inherited worship option on, the Pantheon is left alone', { skip 
     }
 });
 
+test('stands aside while an inherited combo that swaps gods and auras is running', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        await game.eval(() => {
+            Game.Objects['Wizard tower'].buy(1); // the highest building, cheap to sacrifice
+            Game.dragonLevel = 20;
+            Game.dragonAura = 0;
+            FrozenCookies.autoGods = 1;
+            // Mid-combo, the 100% consistency combo has switched the inherited pantheon and aura
+            // options off (fc_spells.js:1334-1347) and swaps gods and auras itself.
+            FrozenCookies.auto100ConsistencyCombo = 1;
+            FrozenCookies.autoWorshipToggle = 0;
+            FrozenCookies.autoDragonToggle = 0;
+        });
+        await game.advanceSeconds(6 * 60);
+        const during = await game.eval(() => ({ report: MushieCookies.gods.report(), aura: Game.dragonAura, slots: Game.Objects['Temple'].minigame.slot.slice() }));
+        assert.deepEqual([during.report.swaps, during.report.auraChanges], [0, 0], JSON.stringify(during.report));
+        assert.deepEqual(during.slots, [-1, -1, -1]);
+        assert.equal(during.aura, 0);
+
+        // The same state with the combo off is one the system acts on.
+        await game.eval(() => {
+            FrozenCookies.auto100ConsistencyCombo = 0;
+        });
+        await game.advanceSeconds(5 * 60);
+        const after = await game.eval(() => MushieCookies.gods.report());
+        assert.ok(after.swaps >= 1 && after.auraChanges >= 1, JSON.stringify(after));
+    } finally {
+        await game.close();
+    }
+});
+
+test('a CpS buff does not make a clicking god look worth a swap', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        await game.eval(() => {
+            // One mouse upgrade: each click adds 1% of CpS, and the game reads the buffed CpS
+            // (main.js:4692). Between buffs Jeremy is the best god here; under a Frenzy the model
+            // sees seven times the clicking and Muridal wins.
+            Game.Upgrades['Plastic mouse'].earn();
+            FrozenCookies.autoClick = 1;
+            FrozenCookies.cookieClickSpeed = 50;
+            FrozenCookies.autoGods = 1;
+            FrozenCookies.autoWorshipToggle = 0;
+            Game.gainBuff('frenzy', 20 * 60, 7);
+        });
+        await game.advanceSeconds(6 * 60);
+        const during = await game.eval(() => MushieCookies.gods.report());
+        assert.equal(during.swaps, 0, `swapped during the Frenzy: ${during.last}`);
+
+        await game.eval(() => {
+            Game.buffs['Frenzy'].time = 0;
+        });
+        await game.advanceSeconds(60);
+        const after = await game.eval(() => {
+            const M = Game.Objects['Temple'].minigame;
+            return { report: MushieCookies.gods.report(), keys: M.slot.map((id) => (id === -1 ? null : Object.keys(M.gods)[id])) };
+        });
+        assert.equal(after.report.swaps, 1, JSON.stringify(after.report));
+        assert.deepEqual(after.keys, ['industry', null, null], 'once the buff is over, the best god between buffs');
+    } finally {
+        await game.close();
+    }
+});
+
 test('picks the dragon aura that adds the most income and pays the game\'s price for it', { skip }, async () => {
     const game = await launchWithMod();
     try {
+        await game.eval(dragonBakery, 0);
         const out = await game.eval(() => {
-            Game.Earn(1e15);
-            for (const name of ['Cursor', 'Grandma', 'Farm', 'Mine', 'Factory', 'Bank']) Game.Objects[name].buy(60);
-            Game.dragonLevel = 20; // auras up to Radiant Appetite (15) are available
-            Game.dragonAura = 0;
-            Game.CalculateGains();
-            const banksBefore = Game.Objects['Bank'].amount;
             FrozenCookies.autoGods = 1;
             FrozenCookies.autoDragonToggle = 0;
-            return { banksBefore };
+            return { temples: Game.Objects['Temple'].amount, owned: Game.BuildingsOwned };
         });
         await game.advanceSeconds(6 * 60);
         const after = await game.eval(() => ({
             aura: Game.dragonAura,
             name: Game.dragonAuras[Game.dragonAura].name,
-            banks: Game.Objects['Bank'].amount,
+            temples: Game.Objects['Temple'].amount,
+            owned: Game.BuildingsOwned,
             report: MushieCookies.gods.report(),
             prompt: !!Game.promptOn,
         }));
         assert.equal(after.name, 'Radiant Appetite', `chose ${after.name}`);
-        assert.equal(after.banks, out.banksBefore - 1, 'the highest building is sacrificed, as the game charges');
+        assert.equal(after.temples, out.temples - 1, 'the highest building is sacrificed, as the game charges');
+        assert.equal(after.owned, out.owned - 1, 'and only that one');
         assert.equal(after.report.auraChanges, 1);
         assert.equal(after.prompt, false, 'no prompt is left open');
+    } finally {
+        await game.close();
+    }
+});
+
+test('a golden cookie on screen does not make Dragon\'s Fortune look worth a building', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await game.eval(dragonBakery, 15); // Radiant Appetite
+        const start = await game.eval(() => {
+            // A golden cookie that stays on screen. Each one multiplies CpS by 2.23 under
+            // Dragon's Fortune (main.js:5108-5110), but only while it is on screen.
+            const spawn = () => {
+                const cookie = new Game.shimmer('golden');
+                cookie.dur = 3600;
+                cookie.life = Math.ceil(Game.fps * cookie.dur);
+            };
+            const fortune = () => MushieCookies.gods.plan().auras.find((m) => m.name === "Dragon's Fortune");
+            spawn();
+            const onScreen = fortune();
+            for (const s of Game.shimmers.slice()) s.die();
+            const none = fortune();
+            spawn();
+            FrozenCookies.autoGods = 1;
+            FrozenCookies.autoDragonToggle = 0;
+            return { owned: Game.BuildingsOwned, onScreen, none };
+        });
+        await game.advanceSeconds(6 * 60);
+        await game.eval(() => {
+            for (const s of Game.shimmers.slice()) s.die();
+        });
+        await game.advanceSeconds(5 * 60);
+        const after = await game.eval(() => ({ aura: Game.dragonAura, owned: Game.BuildingsOwned, report: MushieCookies.gods.report() }));
+        assert.equal(after.aura, 15, `switched to ${after.aura}: ${after.report.last}`);
+        assert.equal(after.owned, start.owned, 'no building was sacrificed');
+        assert.equal(after.report.auraChanges, 0);
+        // The valuation does not depend on the golden cookie being there.
+        assert.ok(start.onScreen && start.none, 'Dragon\'s Fortune is a candidate');
+        const pct = (m) => `${(m.gain * 100).toFixed(2)}%`;
+        assert.ok(Math.abs(start.onScreen.gain - start.none.gain) < 1e-9, `valued at ${pct(start.onScreen)} with a golden cookie on screen, ${pct(start.none)} without`);
+    } finally {
+        await game.close();
+    }
+});
+
+test('an aura the player chose that the model cannot value is left in place', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await game.eval(dragonBakery, 5); // Earth Shatterer: its worth is in selling buildings, not income
+        const owned = await game.eval(() => {
+            FrozenCookies.autoGods = 1;
+            FrozenCookies.autoDragonToggle = 0;
+            return Game.BuildingsOwned;
+        });
+        await game.advanceSeconds(6 * 60);
+        const after = await game.eval(() => ({ aura: Game.dragonAura, owned: Game.BuildingsOwned, report: MushieCookies.gods.report() }));
+        assert.equal(after.aura, 5, `replaced with ${after.aura}: ${after.report.last}`);
+        assert.equal(after.owned, owned);
     } finally {
         await game.close();
     }
