@@ -298,11 +298,6 @@ FrozenCookies.preferenceValues = {
         default: 0,
         extras: '<a class="option" id="minASFMult" onclick="updateASFMultMin(\'minASFMult\');">x${minASFMult} minimum Frenzy</a>',
     },
-    autoSweet: {
-        hint: "⚠️ EXPERIMENTAL: Ascend until 'Sweet' spell appears. No manual shutdown.",
-        display: ["Auto Sweet OFF", "Auto Sweet ON"],
-        default: 0,
-    },
 
     //Dragon options
     dragonOptions: {

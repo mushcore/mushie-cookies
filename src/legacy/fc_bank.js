@@ -43,7 +43,7 @@ function autoBrokerAction() {
 }
 
 function autoLoanBuy() {
-    if (!B || B.officelevel < 2) return;
+    if (!B || B.officeLevel < 2) return;
 
     if (
         hasClickBuff() &&

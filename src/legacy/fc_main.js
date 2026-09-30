@@ -274,10 +274,6 @@ function setOverrides(gameSaveData) {
         FrozenCookies.orbMax = preferenceParse("orbMax", 0);
 
         // Restore some possibly broken settings
-        if (!FrozenCookies.autoSweet && autoSweetAction.autobuyyes == 1) {
-            FrozenCookies.autoBuy = 1;
-            autoSweetAction.autobuyyes = 0;
-        }
         if (
             !FrozenCookies.autoFTHOFCombo &&
             autoFTHOFComboAction.autobuyyes == 1
@@ -892,7 +888,6 @@ function recommendedSettingsAction() {
         FrozenCookies.auto100ConsistencyCombo = 0;
         FrozenCookies.autoSugarFrenzy = 0;
         FrozenCookies.minASFMult = 7777;
-        FrozenCookies.autoSweet = 0;
         //Dragon options
         FrozenCookies.autoDragon = 1;
         FrozenCookies.petDragon = 1;
@@ -2960,11 +2955,7 @@ function autoCookieBody() {
     // This apparently *has* to stay here, or else fast purchases will multi-click it.
     if (goldenCookieLife() && FrozenCookies.autoGC) {
         for (var i in Game.shimmers) {
-            if (
-                Game.shimmers[i].type == "golden"
-                // && (Game.shimmer.wrath != 1 || FrozenCookies.autoWC)
-            )
-                Game.shimmers[i].pop();
+            if (Game.shimmers[i].type == "golden") Game.shimmers[i].pop();
         }
     }
     if (reindeerLife() > 0 && FrozenCookies.autoReindeer) {
@@ -3062,10 +3053,6 @@ function FCStart() {
     if (FrozenCookies.frenzyClickBot) {
         clearInterval(FrozenCookies.frenzyClickBot);
         FrozenCookies.frenzyClickBot = 0;
-    }
-    if (FrozenCookies.autoSweetBot) {
-        clearInterval(FrozenCookies.autoSweetBot);
-        FrozenCookies.autoSweetBot = 0;
     }
 
     if (FrozenCookies.autoGSBot) {
@@ -3249,13 +3236,6 @@ function FCStart() {
         FrozenCookies.auto100ConsistencyComboBot = setInterval(
             MushieCookies.guard("legacy:auto100ConsistencyComboAction", auto100ConsistencyComboAction),
             FrozenCookies.frequency * 2
-        );
-    }
-
-    if (FrozenCookies.autoSweet) {
-        FrozenCookies.autoSweetBot = setInterval(
-            MushieCookies.guard("legacy:autoSweetAction", autoSweetAction),
-            FrozenCookies.frequency * 10
         );
     }
 

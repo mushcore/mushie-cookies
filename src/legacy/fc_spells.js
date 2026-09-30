@@ -67,7 +67,7 @@ nextSpell = function (i) {
                 choices.push('<b style="color:#00C4FF">Click Frenzy');
             if (Math.random() < 0.1)
                 choices.push(
-                    '<b style="color:#FFDE5F">Cookie Chain',
+                    '<b style="color:#00C4FF">Cookie Storm',
                     '<b style="color:#00C4FF">Cookie Storm',
                     "Blab"
                 );
@@ -281,8 +281,7 @@ function autoCast() {
 
     if (
         FrozenCookies.autoFTHOFCombo == 1 ||
-        FrozenCookies.auto100ConsistencyCombo == 1 ||
-        FrozenCookies.autoSweet == 1
+        FrozenCookies.auto100ConsistencyCombo == 1
     ) {
         FrozenCookies.autoCasting = 0;
     }
@@ -714,10 +713,8 @@ function autoFTHOFComboAction() {
     }
 
     // Not currently possible to do the combo
-    if (
-        FrozenCookies.auto100ConsistencyCombo == 1 || // 100% combo should override
-        FrozenCookies.autoSweet == 1 // Autosweet overrides
-    ) {
+    // 100% combo should override
+    if (FrozenCookies.auto100ConsistencyCombo == 1) {
         FrozenCookies.autoFTHOFCombo = 0;
     }
 
@@ -733,8 +730,8 @@ function autoFTHOFComboAction() {
             ((FrozenCookies.towerLimit && M.magic >= M.magicM) ||
                 (!FrozenCookies.towerLimit && M.magic >= M.magicM - 1)) &&
             !Game.hasBuff("Click frenzy") &&
-            !nextSpellName(0) == "Click Frenzy" &&
-            !nextSpellName(1) == "Click Frenzy")
+            nextSpellName(0) != "Click Frenzy" &&
+            nextSpellName(1) != "Click Frenzy")
     ) {
         if (autoFTHOFComboAction.autobuyyes == 1) {
             FrozenCookies.autoBuy = 1;
@@ -793,8 +790,8 @@ function autoFTHOFComboAction() {
             return;
         case 1:
             if (
-                !nextSpellName(0) == "Click Frenzy" &&
-                !nextSpellName(1) == "Click Frenzy"
+                nextSpellName(0) != "Click Frenzy" &&
+                nextSpellName(1) != "Click Frenzy"
             ) {
                 autoFTHOFComboAction.state = 0;
                 return;
@@ -950,8 +947,8 @@ function autoFTHOFComboAction() {
             return;
         case 2:
             if (
-                !nextSpellName(0) == "Building Special" &&
-                !nextSpellName(1) == "Building Special"
+                nextSpellName(0) != "Building Special" &&
+                nextSpellName(1) != "Building Special"
             ) {
                 autoFTHOFComboAction.state = 0;
                 return;
@@ -1170,8 +1167,6 @@ function auto100ConsistencyComboAction() {
         return;
     }
 
-    // Autosweet overrides
-    if (FrozenCookies.autoSweet == 1) FrozenCookies.auto100ConsistencyCombo = 0;
 
     // Not currently possible to do the combo
     if (
@@ -1372,8 +1367,7 @@ function auto100ConsistencyComboAction() {
             return;
 
         case 3: // Check for whiskerbloom (14) and if not found, plant it
-            if (G.plantsById[14].unlocked == 0) {
-                // Whiskerbloom seed unlocked
+            if (G.plantsById[14].unlocked) {
                 var whisk = false;
                 for (let i = 0; i < 6; i++) {
                     for (let j = 0; j < 6; j++) {
@@ -1404,7 +1398,7 @@ function auto100ConsistencyComboAction() {
         case 4: // Change dragon auras to radiant appetite and dragon's fortune
             if (
                 Game.dragonAura == 16 && // DF
-                !Game.dragonAura2 == 15 // RA
+                Game.dragonAura2 != 15 // RA
             ) {
                 Game.specialTab = "dragon";
                 Game.SetDragonAura(15, 1);
@@ -1417,7 +1411,7 @@ function auto100ConsistencyComboAction() {
 
             if (
                 Game.dragonAura2 == 15 && // RA
-                !Game.dragonAura == 16 // DF
+                Game.dragonAura != 16 // DF
             ) {
                 Game.specialTab = "dragon";
                 Game.SetDragonAura(16, 0);
@@ -1468,8 +1462,10 @@ function auto100ConsistencyComboAction() {
             return;
 
         case 8: // Use sugar lump to refill magic
-            M.lumpRefill.click();
-            Game.ConfirmPrompt();
+            if (!FrozenCookies.sugarBakingGuard || Game.lumps > 100) {
+                M.lumpRefill.click();
+                Game.ConfirmPrompt();
+            }
             auto100ConsistencyComboAction.state = 9;
             return;
 
@@ -1513,8 +1509,8 @@ function auto100ConsistencyComboAction() {
             return;
 
         case 12: // Activate Building Special/Elder Frenzy and Click Frenzy buffs
-            Game.shimmers[0].pop();
-            Game.shimmers[0].pop();
+            if (Game.shimmers.length) Game.shimmers[0].pop();
+            if (Game.shimmers.length) Game.shimmers[0].pop();
             auto100ConsistencyComboAction.state = 13;
             return;
 
@@ -1593,7 +1589,7 @@ function auto100ConsistencyComboAction() {
             for (var i in Game.shimmers) {
                 if (
                     Game.shimmers[i].type == "golden" &&
-                    Game.shimmer.wrath != 1
+                    Game.shimmers[i].wrath != 1
                 ) {
                     Game.shimmers[i].pop();
                 }
@@ -1866,16 +1862,6 @@ function auto100ConsistencyComboAction() {
                         Game.Objects["Time machine"].amount
                 );
             }
-            if (
-                Game.Objects["Antimatter condenser"].amount <
-                auto100ConsistencyComboAction.countAntiMatter
-            ) {
-                safeBuy(
-                    Game.Objects["Antimatter condenser"],
-                    auto100ConsistencyComboAction.countAntiMatter -
-                        Game.Objects["Antimatter condenser"].amount
-                );
-            }
             FrozenCookies.autobuyCount += 1;
             auto100ConsistencyComboAction.state = 20;
             return;
@@ -1902,84 +1888,6 @@ function auto100ConsistencyComboAction() {
             return;
     }
     return;
-}
-
-function autoSweetAction() {
-    if (!FrozenCookies.autoSweet) return;
-
-    if (FrozenCookies.autoBuy == 1) {
-        autoSweetAction.autobuyyes = 1;
-        FrozenCookies.autoBuy = 0;
-    } else {
-        autoSweetAction.autobuyyes = 0;
-    }
-
-    if (typeof Game.ready !== "undefined" && Game.ready) {
-        if (typeof autoSweetAction.state == "undefined")
-            autoSweetAction.state = 0;
-
-        if (!autoSweetAction.state) {
-            if (
-                // Check first 10 spells
-                nextSpellName(0) == "Sugar Lump" ||
-                nextSpellName(1) == "Sugar Lump" ||
-                nextSpellName(2) == "Sugar Lump" ||
-                nextSpellName(3) == "Sugar Lump" ||
-                nextSpellName(4) == "Sugar Lump" ||
-                nextSpellName(5) == "Sugar Lump" ||
-                nextSpellName(6) == "Sugar Lump" ||
-                nextSpellName(7) == "Sugar Lump" ||
-                nextSpellName(8) == "Sugar Lump" ||
-                nextSpellName(9) == "Sugar Lump"
-            ) {
-                autoSweetAction.state = 1;
-            }
-        }
-
-        if (!autoSweetAction.state && !Game.OnAscend && !Game.AscendTimer) {
-            logEvent("autoSweet", 'No "Sweet" detected, ascending');
-            Game.Reincarnate(1);
-        }
-
-        switch (autoSweetAction.state) {
-            case 0:
-                return;
-            case 1:
-                if (FrozenCookies.towerLimit) {
-                    autoSweetAction.manaPrev = FrozenCookies.manaMax;
-                    FrozenCookies.manaMax = 37;
-                }
-                if (
-                    (FrozenCookies.towerLimit && M.magic >= M.magicM) ||
-                    (!FrozenCookies.towerLimit && M.magic >= M.magicM - 1)
-                ) {
-                    if (nextSpellName(0) != "Sugar Lump") {
-                        M.castSpell(M.spellsById[4]);
-                        logEvent(
-                            "autoSweet",
-                            "Cast Haggler's Charm while waiting for 'Sweet'"
-                        );
-                    }
-                    if (nextSpellName(0) == "Sugar Lump") {
-                        M.castSpell(M.spellsById[1]);
-                        autoSweetAction.state = 0;
-                        logEvent(
-                            "autoSweet",
-                            "Sugar Lump Get! Disabling Auto Sweet"
-                        );
-                        if (autoSweetAction.manaPrev != -1)
-                            FrozenCookies.manaMax = autoSweetAction.manaPrev;
-                        if (autoSweetAction.autobuyyes == 1) {
-                            FrozenCookies.autoBuy = 1;
-                            autoSweetAction.autobuyyes = 0;
-                        }
-                        FrozenCookies.autoSweet = 0;
-                    }
-                }
-                return;
-        }
-        return;
-    }
 }
 
 // Not a spell but only used by spell combos
