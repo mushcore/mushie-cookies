@@ -53,9 +53,11 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
     const cpsBuffRunning = () => Object.values(game.buffs).some((b) => b.multCpS && b.multCpS !== 1);
     // While a click buff runs each click is worth hundreds of ordinary ones, and a ranking pass
     // (hundreds of what-ifs inside Game.Logic) holds the page's one thread while the clicker's
-    // timer waits: in the game's runtime, buying from a rich bank cut 41 accepted clicks a second
-    // to between 5 and 22. So buying and ranking wait the buff out (Click frenzy lasts 13 s,
-    // Dragonflight and Cursed finger 10 s, times the golden cookie duration upgrades).
+    // timer waits: in the game's runtime, during a Click frenzy with a rich bank, the clicker got
+    // 23 accepted clicks a second with the buyer buying through it (0.4 to 36 over eight tries)
+    // and 39 with it standing aside (tools/dev/clicker.mjs). So buying and ranking wait the buff
+    // out (Click frenzy lasts 13 s, Dragonflight and Cursed finger 10 s, times the golden cookie
+    // duration upgrades).
     const clickBuff = () => options.clickPriority && clickBuffRunning(game.buffs);
 
     // Anything here changing means the ranking may be wrong.

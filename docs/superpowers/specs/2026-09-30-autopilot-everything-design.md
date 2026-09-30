@@ -23,8 +23,8 @@ Every option starts off. One switch, **Autopilot**, automates every part of the 
 | Part of the game | Owner | State on 2026-09-30 |
 |---|---|---|
 | Buildings and upgrades | buyer | done (M2) |
-| Clicking the big cookie | clicker | inherited interval clicker; to rebuild (section 4.1) |
-| Golden, wrath and storm cookies, reindeer, news fortunes | shimmers | inherited, shares a guard with wrinkler code; to rebuild (4.2) |
+| Clicking the big cookie | clicker | rebuilt in wave one (section 4.1): a self-scheduling pump, the measured click rate in the income model, the buyer standing aside during click buffs. In the game's own runtime, window shown, 8 tries over two sessions on a fully loaded machine: 44.3 accepted clicks a second (40.6 to 48.1) with no call turned away, against 33.1 (30.8 to 35.9) for a 50-a-second interval and 43.6 (39.7 to 47.5) for a 250-a-second one, which turned away 79% of its calls. During a Click frenzy with a rich bank: 38.8 (36.1 to 42.9) with the buyer standing aside, 23.4 (0.4 to 35.9) with it buying through. Minimized, no better than the interval: 29.9 (14.3 to 41.2) against 31.4 (6.3 to 41.0). In the harness all three reach the game's 50 |
+| Golden, wrath and storm cookies, reindeer, news fortunes | shimmers | rebuilt in wave one (4.2): on its own guard, first on the loop each frame. Harness, 3 seeds of one game hour with a storm every five minutes: 0 missed an hour, as for the inherited popping (about 1,265 popped an hour); with a persistent failure injected into the inherited loop, the inherited popping missed all of them (1,241 to 1,263 an hour) and this system none. The hour-of-CpS fortune, drawn 4,000 times on each of 3 recorded 4-hour runs: 7.1× the expected payout of clicking it on sight (6.8× to 7.4×), though in 35% to 51% of draws it was still unclaimed when the run ended |
 | Wrinklers | wrinklers | inherited popping with verified defects; to rebuild (4.3) |
 | Seasons, Santa, seasonal drops | seasons | nothing buys seasons or levels Santa; to build (4.4) |
 | Dragon training and petting | dragon | inherited trainer ignores reserve and horizon; petting reseeds the RNG; to rebuild (4.5) |
