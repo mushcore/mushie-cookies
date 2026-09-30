@@ -119,6 +119,8 @@ export async function launchGame({ seed = 'mushie', headless = true, mods = [], 
             }
         },
         advanceSeconds: (seconds) => handle.advance(Math.round(seconds * 30)),
+        /** The machine sleeps for `seconds`: Date.now() and the timers move on, no frame runs. */
+        machineSleep: (seconds) => page.evaluate((ms) => window.__vt.sleep(ms), seconds * 1000),
         /** Advances until Mushie Cookies reports that it has started. */
         async modStarted() {
             for (let tries = 0; tries < 20; tries++) {

@@ -164,5 +164,16 @@ export function installVirtualTime({ epoch, modUrls }) {
         }
     };
 
+    /**
+     * The machine sleeps: the clock and every timer move on by `ms` and no frame runs. On waking
+     * the real game would catch up at most 5 s (main.js:16788); the next advance() plays that part.
+     */
+    vt.sleep = (ms) => {
+        vt.start += ms;
+        vt.now += ms;
+        for (const t of vt.timers.values()) t.at += ms;
+        vt.soonest += ms;
+    };
+
     window.__vt = vt;
 }
