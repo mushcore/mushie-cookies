@@ -9,7 +9,8 @@
 import { simulateEach } from '../core/sim.js';
 import { estimateIncome } from '../core/income.js';
 import { readState, reindeerState } from '../game/measure.js';
-import { planSeason, switchPrice, santaPrice, uniformWaits, eggWaits, collectionValue, heartVisit } from '../core/seasons.js';
+import { wrinklerModel } from '../game/wrinklers.js';
+import { planSeason, switchPrice, santaPrice, uniformWaits, eggWaits, collectionValue, collectionSeconds, heartVisit } from '../core/seasons.js';
 
 const TICK_EVERY = 150; // frames: five seconds
 const MEASURE_EVERY = 900; // frames: what-ifs are redone every 30 s, or when the season or Santa changes
@@ -60,7 +61,17 @@ export function createSeasons({ game, settings, loop, buyer = null, wrinklers = 
     const inStore = (upgrade) => game.UpgradesInStore.indexOf(upgrade) !== -1;
     const god = () => (game.hasGod ? game.hasGod('seasons') : 0);
     const missing = (names) => names.filter((n) => !game.HasUnlocked(n) && !game.Has(n));
-    const income = () => estimateIncome(readState(game, settings)).total;
+    // A drop is kept for the rest of the run, so it is valued on the income the run keeps, not on
+    // what the running season or a hunt makes of it for a while: reindeer as where the run rests
+    // (Christmas, once a switcher can take it there), and wrinklers as kept when no hunt is on.
+    // Valued on the income of the moment, a Halloween cookie was worth the reindeer's share more
+    // from Christmas than from Halloween, and the planner switched in and straight back out.
+    const income = () =>
+        estimateIncome({
+            ...readState(game, settings),
+            reindeer: reindeerState(game, settings, { season: canSwitch() ? 'christmas' : game.season }),
+            wrinklers: wrinklerModel(game, settings, { hunting: false }),
+        }).total;
     // One bank: with Autobuy on or off, only what the buyer is not holding is spent.
     const reserve = () => (buyer ? buyer.reserve() : 0);
     const spendable = () => game.cookies - reserve();
@@ -224,7 +235,10 @@ export function createSeasons({ game, settings, loop, buyer = null, wrinklers = 
             commonMissing: eggs.filter((n) => game.eggDrops.indexOf(n) !== -1).length,
             rate: golden * c.eggGolden + (eggHunt ? eggHunt.popsPerSecond : pops) * c.eggPop,
         });
-        const huntCost = (verdict, waits) => (verdict ? verdict.cost * Math.min(H, waits.reduce((a, b) => a + b, 0)) : 0);
+        // Halloween and Easter pay only their drops: they are visits, lasting until those are in.
+        const spookySeconds = collectionSeconds({ waits: spookyWaits, horizon: H });
+        const eggSeconds = collectionSeconds({ waits: eggWait, horizon: H });
+        const huntCost = (verdict, seconds) => (verdict ? verdict.cost * seconds : 0);
         const zero = { standing: 0, collection: 0, nextDrop: Infinity };
         return {
             chances: c,
@@ -233,13 +247,15 @@ export function createSeasons({ game, settings, loop, buyer = null, wrinklers = 
                 christmas: { standing, collection: christmas, nextDrop: christmasNext },
                 halloween: {
                     standing: 0,
-                    collection: collectionValue({ waits: spookyWaits, gain: gains.halloween, horizon: H }) - huntCost(spookyHunt, spookyWaits),
+                    collection: collectionValue({ waits: spookyWaits, gain: gains.halloween, horizon: H }) - huntCost(spookyHunt, spookySeconds),
                     nextDrop: spookyWaits.length ? spookyWaits[0] : Infinity,
+                    seconds: spookySeconds,
                 },
                 easter: {
                     standing: 0,
-                    collection: collectionValue({ waits: eggWait, gain: gains.egg, horizon: H }) - huntCost(eggHunt, eggWait),
+                    collection: collectionValue({ waits: eggWait, gain: gains.egg, horizon: H }) - huntCost(eggHunt, eggSeconds),
                     nextDrop: eggWait.length ? eggWait[0] : Infinity,
+                    seconds: eggSeconds,
                 },
                 valentines: { ...zero },
                 fools: zero,

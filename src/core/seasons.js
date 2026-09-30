@@ -74,6 +74,18 @@ export function collectionValue({ waits, gain, horizon }) {
     return value;
 }
 
+/** Seconds until the last of the drops `collectionValue` counts is expected in. */
+export function collectionSeconds({ waits, horizon }) {
+    let t = 0;
+    let last = 0;
+    for (const wait of waits) {
+        t += wait;
+        if (!(t < horizon)) break;
+        last = t;
+    }
+    return last;
+}
+
 /**
  * What a Valentine's visit would collect now. Heart k unlocks, in Valentine's only, once cookies
  * earned reach its price/20 and heart k-1 is bought (main.js:9790-9798, 16335-16345); each is
@@ -115,7 +127,8 @@ export function heartVisit({ hearts, earned, gain, horizon, budget, income }) {
  * @param {[number, number]} s.prices       the next switch and the one after it
  * @param {number} s.horizon                seconds left in the run
  * @param {object} s.values                 by season: {standing: cookies a second while it runs,
- *        collection: cookies its missing drops are worth within the horizon, nextDrop: seconds}
+ *        collection: cookies its missing drops are worth within the horizon, nextDrop: seconds,
+ *        seconds: until the last of those drops is expected in; given, the season is visited}
  * @param {{value, locked, seconds}|null} s.visit  what a Valentine's visit would collect now
  * @param {string[]} [s.blocked]            seasons not to switch into
  * @param {number} s.secondsInSeason        how long the current season has run
@@ -137,13 +150,41 @@ export function planSeason(s) {
     const blocked = new Set(s.blocked || []);
     const free = (to) => !!s.baseSeason && to === s.baseSeason && s.season !== s.baseSeason;
     const [p0, p1] = s.prices;
-    const now = worth(s.season);
     const plans = [];
     const targets = new Set(REST.concat(s.baseSeason ? [s.baseSeason] : []));
+    // Where a visit may end: anywhere, unless the calendar's season has drops to give.
+    const restAfter = (visited) => [...targets].filter((rest) => rest !== visited && !blocked.has(rest) && !(keep && rest !== s.baseSeason));
+
+    // A season with drops to collect in `seconds` (less than the horizon) is visited: it runs until
+    // they are expected in, then the run rests elsewhere. Rested in for the whole horizon instead,
+    // it was set against a whole run of reindeer: after its first drop it no longer beat them, and
+    // the planner switched out, and later back in at a higher price.
+    const span = (season) => {
+        const v = value(season);
+        return v.collection > 0 && v.seconds > 0 && v.seconds < H ? v.seconds : null;
+    };
+    const visitWorth = (season, rest) => value(season).collection + value(season).standing * span(season) + worth(rest, H - span(season));
+    let now = worth(s.season);
+    let finishing = null;
+    if (span(s.season) !== null) {
+        for (const rest of restAfter(s.season)) {
+            const net = visitWorth(s.season, rest) - (free(rest) ? 0 : p0);
+            if (net > now) {
+                now = net;
+                finishing = rest;
+            }
+        }
+    }
+
     for (const to of targets) {
         if (to === s.season || blocked.has(to) || (keep && to !== s.baseSeason)) continue;
         const price = free(to) ? 0 : p0;
         plans.push({ to, price, net: worth(to) - price, reason: `rest in ${to}` });
+        if (span(to) === null) continue;
+        for (const rest of restAfter(to)) {
+            const back = rest === s.baseSeason && s.baseSeason ? 0 : price > 0 ? p1 : p0;
+            plans.push({ to, rest, price, net: visitWorth(to, rest) - price - back, reason: `visit ${to} for its drops, then ${rest}` });
+        }
     }
     if (visit && s.season !== 'valentines' && !blocked.has('valentines')) {
         // Valentine's first, then the season to rest in: going there first saves a switch. When
@@ -162,7 +203,9 @@ export function planSeason(s) {
     for (const plan of plans) if (!best || plan.net > best.net) best = plan;
     if (!best) return stay(keep ? 'the calendar season still has drops to give' : 'nowhere to go');
     const gain = best.net - now;
-    if (!(gain > SWITCH_MARGIN * best.price) || !(gain > 0)) return stay(`${best.reason} would not pay`);
+    if (!(gain > SWITCH_MARGIN * best.price) || !(gain > 0)) {
+        return stay(finishing ? `${s.season}'s drops are still coming, then ${finishing}` : `${best.reason} would not pay`);
+    }
     const out = { action: best.price === 0 && free(best.to) ? 'cancel' : 'switch', to: best.to, price: best.price, gain, reason: best.reason };
     if (best.rest) out.rest = best.rest;
     return out;

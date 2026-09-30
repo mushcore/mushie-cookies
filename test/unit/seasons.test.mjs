@@ -6,6 +6,7 @@ import {
     uniformWaits,
     eggWaits,
     collectionValue,
+    collectionSeconds,
     heartVisit,
     planSeason,
     MAX_VISIT_SECONDS,
@@ -236,6 +237,38 @@ test('when the calendar season is Valentine\'s, a visit to it is a free cancel a
     assert.equal(out.rest, 'christmas');
     assert.equal(out.price, 0);
     assert.ok(close(out.gain, 5e9 + 1e6 * 3540 - 1e9 - 1e6 * 3600));
+});
+
+test('collecting drops takes the waits of those that come before the run ends', () => {
+    assert.equal(collectionSeconds({ waits: [100, 200, 5000], horizon: 3600 }), 300);
+    assert.equal(collectionSeconds({ waits: [], horizon: 3600 }), 0);
+    assert.equal(collectionSeconds({ waits: [Infinity], horizon: 3600 }), 0);
+});
+
+test('from Christmas, a season that pays only drops is visited when they beat two switches and the reindeer missed', () => {
+    // Four billion of Halloween cookies, all in within 600 s: then back to Christmas. Rested in for
+    // the whole run it would lose the reindeer of the whole run, and was never gone to.
+    const halloween = { standing: 0, collection: 4e9, nextDrop: 100, seconds: 600 };
+    const out = planSeason(base({ season: 'christmas', values: { ...base().values, halloween } }));
+    assert.equal(out.action, 'switch', JSON.stringify(out));
+    assert.equal(out.to, 'halloween');
+    assert.equal(out.rest, 'christmas');
+    assert.ok(close(out.gain, 4e9 + 1e6 * 3000 - 1e9 - 1.5e9 - 1e6 * 3600), `${out.gain}`);
+    const small = planSeason(base({ season: 'christmas', values: { ...base().values, halloween: { ...halloween, collection: 2e9 } } }));
+    assert.equal(small.action, 'stay', JSON.stringify(small));
+});
+
+test('a visit for drops is not cut short: it lasts while what is still to come beats the reindeer missed', () => {
+    // After its first drop a Halloween visit was left for Christmas, and gone back to later at a
+    // higher price: the rest of the drops were set against a whole run of reindeer.
+    const halloween = { standing: 0, collection: 2e9, nextDrop: 100, seconds: 600 };
+    const stay = planSeason(base({ season: 'halloween', values: { ...base().values, halloween } }));
+    assert.equal(stay.action, 'stay', JSON.stringify(stay));
+    // Once they are in, or what is left is worth less than the reindeer it would cost, it leaves.
+    const done = planSeason(base({ season: 'halloween' }));
+    assert.equal(done.to, 'christmas', JSON.stringify(done));
+    const slow = planSeason(base({ season: 'halloween', values: { ...base().values, halloween: { ...halloween, collection: 1e8, seconds: 2000 } } }));
+    assert.equal(slow.to, 'christmas', JSON.stringify(slow));
 });
 
 test('after a visit away from a calendar season with drops to give, it goes back to it, for free', () => {

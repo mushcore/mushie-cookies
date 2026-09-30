@@ -340,6 +340,53 @@ test('a Halloween hunt pops wrinklers for drops, and stops once all seven are in
         assert.deepEqual(game.errors, []);
     }));
 
+test('a drop is worth the same in any season, and while a hunt runs', { skip }, () =>
+    withMod(async (game) => {
+        // A drop is kept for the rest of the run, which a switcher can rest in Christmas. Valued on
+        // the income of the moment, a Halloween cookie was worth the reindeer's share more from
+        // Christmas than from Halloween, and the wrinklers' share more than during a hunt: the
+        // planner switched in and straight back out.
+        await bakery(game);
+        await game.eval(() => {
+            // Fixture: a grandmapocalypse whose wrinklers are popped for their cookies, in Christmas.
+            Game.elderWrath = 3;
+            Game.Upgrades['Wrinkler doormat'].earn();
+            Game.baseSeason = 'christmas';
+            Game.season = 'christmas';
+            Game.CalculateGains();
+            FrozenCookies.autoWrinkler = 1;
+            FrozenCookies.autoBuy = 0; // the bakery stays as it is between the two measurements
+            FrozenCookies.autoSeasons = 0; // the test moves the season
+        });
+        await game.advanceSeconds(60);
+        const measure = () =>
+            game.eval(() => {
+                const s = MushieCookies.readState(Game, FrozenCookies);
+                const g = MushieCookies.seasons.gains();
+                return {
+                    reindeer: !!s.reindeer,
+                    hunting: MushieCookies.wrinklers.report().hunting,
+                    gains: { santa: g.santa, christmas: g.christmas, halloween: g.halloween, heart: g.heart, egg: g.egg },
+                };
+            });
+        const christmas = await measure();
+        assert.equal(christmas.reindeer, true, 'the fixture has reindeer to click');
+        await game.eval(() => {
+            Game.baseSeason = 'halloween'; // fixture: the calendar turns to Halloween
+            Game.season = 'halloween';
+            Game.CalculateGains();
+            MushieCookies.wrinklers.hunt({ season: 'halloween', value: () => 1e30 });
+        });
+        await game.advanceSeconds(5);
+        const halloween = await measure();
+        assert.equal(halloween.hunting, true, 'the fixture hunts');
+        for (const [name, gain] of Object.entries(christmas.gains)) {
+            assert.ok(gain > 0, `${name} is worth something`);
+            const other = halloween.gains[name];
+            assert.ok(Math.abs(other - gain) <= 0.005 * gain, `${name}: ${gain} in Christmas, ${other} in Halloween while hunting`);
+        }
+    }));
+
 test('drop values are measured against a recalculated baseline, even right after a purchase', { skip }, () =>
     withMod(async (game) => {
         await bakery(game);

@@ -80,14 +80,15 @@ export function wrinklerParams(game) {
  * - Popping on (autoWrinkler 1): the count the policy keeps attached on average (its measured pop
  *   rate and the spawn gap, with the refill still to come when slots are empty), and the pop
  *   multiplier, since everything stored reaches the bank when it is popped.
- * - During a season hunt every wrinkler is popped as it arrives: none are counted.
+ * - During a season hunt every wrinkler is popped as it arrives: none are counted. `hunting`
+ *   asks for the state without the hunt (a permanent drop is valued on the income the run keeps).
  * - Popping off: slots fill and stay full, and what they store is not spendable until an
  *   ascension collects it, so they only wither.
  */
-export function wrinklerModel(game, settings) {
+export function wrinklerModel(game, settings, { hunting = telemetry.hunting } = {}) {
     const p = wrinklerParams(game);
     const popping = Number(settings.autoWrinkler) > 0;
-    if (popping && telemetry.hunting) return { count: 0, returnMult: 0, suckRate: p.suck };
+    if (popping && hunting) return { count: 0, returnMult: 0, suckRate: p.suck };
     const count = expectedAttached({
         max: p.max,
         now: p.inPlay,
