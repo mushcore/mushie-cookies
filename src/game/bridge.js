@@ -75,6 +75,7 @@ export function startSystems({ game, loop, legacy, log, guard }) {
     let lumps = null; // created below; the buyer keeps the bank a golden lump is timed to pay on
     const collectLumpNow = () => lumps && lumps.collectBeforeAscension();
     const collectLump = guard ? guard('lumpHarvest', collectLumpNow) : collectLumpNow;
+    let market = null; // created below; it offers the bank office and brokers to the buyer
     const buyer = createBuyer({
         game,
         settings,
@@ -82,6 +83,7 @@ export function startSystems({ game, loop, legacy, log, guard }) {
         log,
         policy: () => policyFrom(game, settings, legacy.blacklistPresets, legacy.prerequisites),
         extraReserve: () => Math.max(extraReserveFrom(settings, legacy), lumps ? lumps.hold() : 0),
+        extraCandidates: (policy) => (market ? market.candidates(policy) : []),
     });
     const wrinklers = createWrinklers({ game, settings, loop, log, buyer });
     const heavenly = createHeavenly({ game, settings, loop });
@@ -112,7 +114,7 @@ export function startSystems({ game, loop, legacy, log, guard }) {
     });
     const grimoire = createGrimoire({ game, settings, loop, log });
     const garden = createGarden({ game, settings, loop, log, reserve: () => buyer.reserve() });
-    const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
+    market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve(), buyer, ascension });
     // The dragon trains before the gods pick auras; `dragon` tells them when a level is gained.
     // The dragon's horizon is the run as played, on the ascension's clock.
     const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve(), runSeconds: () => ascension.runSeconds() });

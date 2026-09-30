@@ -78,6 +78,33 @@ function profit(vals, modes, buyAt, sellAt, overhead, modeAware) {
     return total / vals.length;
 }
 
+/**
+ * Money tied up per tick, per share of storage, by the same trades as `profit`: what a share
+ * cost, counted for every tick it is held. Profit over this is the return on the money a trade
+ * takes away from buying, which the cash allocator weighs against the buyer's best purchase.
+ */
+function heldPerTick(vals, modes, buyAt, sellAt, overhead, modeAware) {
+    let holding = false;
+    let paid = 0;
+    let held = 0;
+    const good = { val: 0, mode: 0, stock: 0 };
+    const thresholds = { buyAt, sellAt };
+    for (let t = 0; t < vals.length; t++) {
+        good.val = vals[t];
+        good.mode = modes[t];
+        good.stock = holding ? 1 : 0;
+        const action = tradeDecision({ good, thresholds, modeAware });
+        if (action === 'buy' && !holding) {
+            holding = true;
+            paid = good.val * (1 + overhead);
+        } else if (action === 'sell' && holding) {
+            holding = false;
+        }
+        if (holding) held += paid;
+    }
+    return held / vals.length;
+}
+
 // The grid search runs `profit` for thousands of price pairs per good. Flat, a pair costs a pass
 // over every tick; this makes it cost one step per trade. Holding nothing, `profit` acts only on
 // a buy, which depends on the buy price alone; holding, only on a sell, which depends on the sell
@@ -152,7 +179,8 @@ for (const bankLevel of BANK_LEVELS) {
             const check = profit(vals[id], modes[id], best.buy * rest, best.sell * rest, overhead, best.modeAware);
             if (check !== best.profit) throw new Error(`search and simulation disagree at ${bankLevel}/${overhead}/${id}: ${best.profit} against ${check}`);
             const published = profit(vals[id], modes[id], 0.5 * rest, 1.25 * rest, overhead, false);
-            table.entries[`${bankLevel}/${overhead}/${id}`] = { buy: best.buy, sell: best.sell, modeAware: best.modeAware, profitPerTick: +best.profit.toFixed(5) };
+            const held = heldPerTick(vals[id], modes[id], best.buy * rest, best.sell * rest, overhead, best.modeAware);
+            table.entries[`${bankLevel}/${overhead}/${id}`] = { buy: best.buy, sell: best.sell, modeAware: best.modeAware, profitPerTick: +best.profit.toFixed(5), heldPerTick: +held.toFixed(4) };
             report.push({ bankLevel, overhead, id, best: best.profit, published });
         }
     }

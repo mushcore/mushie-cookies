@@ -16,7 +16,8 @@ export function payback({ price, deltaIncome, income, bank }) {
  * Ranks candidates by payback.
  *
  * @param {object} args
- * @param {Array<{key, kind, price, steps?}>} args.candidates
+ * @param {Array<{key, kind, price, steps?, extraIncome?}>} args.candidates  extraIncome: cookies per
+ *   second the candidate adds that the income model does not see (market profit from an office)
  * @param {Array<{total: number, basket?: number}>} args.measured  income after each candidate, aligned with candidates
  * @param {{total: number, basket?: number}} args.income           income now
  * @param {number} args.bank
@@ -25,7 +26,7 @@ export function payback({ price, deltaIncome, income, bank }) {
 export function rankCandidates({ candidates, measured, income, bank }) {
     const ranked = candidates.map((candidate, i) => {
         const after = measured[i];
-        let deltaIncome = after.total - income.total;
+        let deltaIncome = after.total - income.total + (candidate.extraIncome || 0);
         // A discount is worth the share of future spending it saves; spending runs at about
         // the rate of income, so a p% discount is worth p% of income.
         if (income.basket > 0 && after.basket > 0 && after.basket < income.basket) {

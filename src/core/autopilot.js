@@ -57,12 +57,18 @@ export const AUTOPILOT = Object.freeze({
     autoDragonOrbs: 0,
     orbLimit: 0,
 
-    // Combos the new systems do not model yet stay off until measured.
+    // The market's parts, by what each measured (tools/dev/bank.mjs, 12 luck-free hours, every
+    // variant of a seed on the same market prices): office upgrades earned x0.986 to x1.107
+    // (geometric mean x1.044 on four seeds, three up); brokers x1.00, their payback test hiring
+    // none that would not repay in the run.
+    autoBank: 1,
+    autoBroker: 1,
+
+    // Combos the new systems do not model yet stay off until measured. Loans are modelled but off:
+    // under golden cookies they measured x0.40 to x1.01 over 4 hours (geometric mean x0.76).
     autoGS: 0,
     autoGodzamok: 0,
     autoLoan: 0,
-    autoBank: 0,
-    autoBroker: 0,
 
     // Dragon: trained by what each level's aura repays, petted for drops forecast on a private
     // generator (src/systems/dragon.js).
