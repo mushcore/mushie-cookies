@@ -385,6 +385,42 @@ test('the garden stands aside while the inherited consistency combo is on', { sk
         assert.ok((await game.eval(() => MushieCookies.garden.report().planted)) > 0, 'and comes back once it is off');
     }));
 
+test('a seed unlocked while the garden is planning is in the plan that follows', { skip }, () =>
+    // From these seeds only gildmillet can be bred, which takes most of a day of seed money. White
+    // mildew breeds brown mold, one parent for eight tiles at 50% (minigameGarden.js:657).
+    withGarden({ unlocked: ['bakerWheat', 'thumbcorn', 'cronerice', 'bakeberry', 'meddleweed'] }, async (game) => {
+        await game.eval(() => {
+            Game.shimmerTypes.golden.spawnConditions = () => false;
+            FrozenCookies.autoGarden = 1;
+            // Every target the garden holds, frame by frame: a plan is tended from the tick it
+            // is adopted.
+            window.targets = [];
+            Game.registerHook('logic', () => {
+                const target = MushieCookies.garden.report().target;
+                if (target && !window.targets.includes(target)) window.targets.push(target);
+            });
+        });
+        let mode = null;
+        for (let frame = 0; frame < 120 && mode !== 'planning'; frame++) {
+            await game.advance(1);
+            mode = await game.eval(() => MushieCookies.garden.report().mode);
+        }
+        assert.equal(mode, 'planning', 'fixture: the recipes have been read');
+        // Before the next garden tick: the plan is still being laid out.
+        await game.eval(() => {
+            const M = Game.Objects['Farm'].minigame;
+            M.unlockSeed(M.plants.whiteMildew);
+        });
+        await game.advanceSeconds(2);
+        await untilPlanned(game);
+        await game.advanceSeconds(10);
+        await untilPlanned(game);
+        const out = await game.eval(() => ({ report: MushieCookies.garden.report(), targets: window.targets, failures: failures() }));
+        assert.equal(out.report.target, 'brownMold', JSON.stringify(out.report));
+        assert.deepEqual(out.targets, ['brownMold'], 'no plan laid out without the new seed was ever adopted');
+        assert.deepEqual(out.failures, []);
+    }));
+
 test("the garden's work in one frame stays small, even right after a seed unlocks", { skip }, () =>
     withGarden({ unlocked: ALL_BUT_BIG_RINGS.slice(0, 23) }, async (game) => {
         const out = await game.eval(() => {

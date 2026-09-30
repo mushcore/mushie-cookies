@@ -165,13 +165,15 @@ export function createGarden({ game, settings, loop, reserve = () => 0, log = ()
         // so the rest of the plot works on the next target meanwhile.
         const secured = securedNow(M);
         const tiles = plotTiles(M).filter((t) => !secured.tiles.has(tileKey(t)));
+        // The seed count the recipes are read with: a seed unlocked after this is not in them.
+        const stamp = M.plantsUnlockedN;
         const recipes = findRecipes(M);
         const candidates = [];
         for (const plant of Object.values(M.plants)) {
             if (plant.unlocked || secured.plants.has(plant.key)) continue;
             for (const recipe of recipes[plant.key] || []) candidates.push({ target: plant.key, parents: recipe.parents });
         }
-        return { secured, tiles, candidates, next: 0, best: null, loops: M.parent.amount >= M.soils.woodchips.req ? 3 : 1 };
+        return { secured, tiles, candidates, stamp, next: 0, best: null, loops: M.parent.amount >= M.soils.woodchips.req ? 3 : 1 };
     }
 
     /** Lays out candidates until the tick's share is used; the finished plan, or null. */
@@ -193,8 +195,7 @@ export function createGarden({ game, settings, loop, reserve = () => 0, log = ()
         return job.next < job.candidates.length ? null : finishPlan(M, job);
     }
 
-    function finishPlan(M, { secured, tiles, best }) {
-        const stamp = M.plantsUnlockedN;
+    function finishPlan(M, { secured, tiles, best, stamp }) {
         if (best) {
             const minutes = best.value.cost / Math.max(game.cookiesPs, 1) / 60;
             log(
@@ -307,8 +308,9 @@ export function createGarden({ game, settings, loop, reserve = () => 0, log = ()
         if (state.planning || stale(M)) {
             // Nothing is planted for a plan being replaced, but seeds are still collected.
             harvestMature(M);
-            // The recipe search has a tick to itself; layouts follow, one a tick.
-            if (!state.planning) {
+            // The recipe search has a tick to itself; layouts follow, one a tick. A seed unlocked
+            // meanwhile brings recipes the candidates lack: the search starts again.
+            if (!state.planning || state.planning.stamp !== M.plantsUnlockedN) {
                 state.planning = startPlan(M);
                 return;
             }
