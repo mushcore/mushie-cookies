@@ -11,6 +11,7 @@
  * cookie buff is `add:true`). So an outcome whose buff is running does not stack on it; it is
  * that buff running on after its current time runs out.
  */
+import { cpsMultOf, clickMultOf } from './buffs.js';
 
 // The buff each outcome grants, by the name the game files it under (main.js:13869-13968).
 // A building special's name depends on the building it picks (5886-5907).
@@ -29,8 +30,6 @@ const STORM_DROP_SECONDS = 4 * 60;
 // During a cookie storm a drop appears on half of the game's frames (main.js:5257).
 const STORM_DROP_CHANCE = 0.5;
 
-const cpsMultOf = (buff) => (buff.multCpS === undefined ? 1 : buff.multCpS);
-const clickMultOf = (buff) => (buff.multClick === undefined ? 1 : buff.multClick);
 const cpsMult = (running) => running.reduce((m, b) => m * cpsMultOf(b), 1);
 const clickMult = (running) => running.reduce((m, b) => m * clickMultOf(b), 1);
 const storming = (running) => running.some((b) => b.name === 'Cookie storm');
