@@ -31,7 +31,7 @@ Every option starts off. One switch, **Autopilot**, automates every part of the 
 | Dragon auras, pantheon | gods | done (M8), thrash fixed in review |
 | Heavenly upgrades, permanent slots | ascension | done (M3); planner misses unlock-only upgrades; to fix (4.6) |
 | Ascension timing and the steps before it | ascension | done (M3); pre-ascension routine to rebuild (4.7) |
-| Sugar lumps: harvest, spend, Sugar frenzy | lumps | spending done (M4); harvest inherited; Sugar frenzy never used; to extend (4.8) |
+| Sugar lumps: harvest, spend, Sugar frenzy | lumps | done (wave one): harvest, golden-lump timing and Sugar frenzy moved into the lump system, inherited harvest and Rigidel/Dragon's Curve steps removed, every target holds for Sugar baking once it is owned. Luck-free harness: 1.043 harvests a game day, as the inherited click (1.000 left to fall); a golden lump paid 2.9× to 4.9× the ripe harvest over three bakery stages, cookies over 3.5 h ×1.03 to ×1.19; Sugar frenzy timed to the rate rule gave ×1.09 and ×1.12 log-prestige per second of run (×1.13 and ×1.26 prestige per run, from starting prestiges of 1 and 3 million; it fired 1.2 h before the rule's ascension), while one switched on at the start of the run inflated the run average and the rule ascended after 1.3 h and 5.3 h (×0.35 and ×0.81); on a save with Sugar baking and 100 lumps the inherited order spent 99 (CpS ×0.51), the hold none |
 | Grimoire | grimoire | done (M5); double-cast and holding the forced cookie to add (4.9) |
 | Garden | garden | done (M6), reserve fixed in review; harvest-combo mode to add (4.10) |
 | Stock market trading | market | done (M7) |

@@ -11,7 +11,7 @@
 //                                                 the start, one in the last hour (where the system aims)
 //   node tools/dev/lumps.mjs hold                 a save with Sugar baking and 100 lumps: the inherited
 //                                                 spending order against the hold
-//   node tools/dev/lumps.mjs run <hours> [seed] [--prestige=1e6,3e6]
+//   node tools/dev/lumps.mjs run <hours> [seed] [--prestige=1e6,3e6] [--variants=off,rule,start]
 //                                                 Sugar frenzy off, by the lump system's rule, and at the
 //                                                 start of the run, through the rate rule's ascension,
 //                                                 from a high-prestige start
@@ -308,7 +308,8 @@ async function hold() {
 // prestiges (--prestige=1e6,3e6).
 async function run(hours, seed, prestiges) {
     const rows = [];
-    const variants = ['off', 'rule', 'start'];
+    const variantArg = args.find((a) => a.startsWith('--variants='));
+    const variants = variantArg ? variantArg.split('=')[1].split(',') : ['off', 'rule', 'start'];
     for (const p0 of prestiges) {
         for (const variant of variants) {
             const row = await withGame(seed, async (game) => {
@@ -381,7 +382,8 @@ async function run(hours, seed, prestiges) {
             .map((p0) => {
                 const off = rows.find((r) => r.p0 === p0 && r.variant === 'off');
                 const v = rows.find((r) => r.p0 === p0 && r.variant === variant);
-                return off.yieldPerSecond && v.yieldPerSecond ? { y: v.yieldPerSecond / off.yieldPerSecond, p: v.prestigeGained / off.prestigeGained } : null;
+                if (!off || !v || !off.yieldPerSecond || !v.yieldPerSecond) return null;
+                return { y: v.yieldPerSecond / off.yieldPerSecond, p: v.prestigeGained / off.prestigeGained };
             })
             .filter(Boolean);
         if (!ratios.length) continue;
