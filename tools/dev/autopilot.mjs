@@ -1,12 +1,12 @@
 // Plays a fresh save with nothing but the Autopilot, the way a new player would install the mod
 // and walk away, and reports every system each game hour.
 // Usage: node tools/dev/autopilot.mjs <gameHours> [seed] [--no-golden] [--every=hours] [--first-target=prestige]
-//          [--save-at=h1,h2,...] [--checkpoint-dir=dir] [--from=checkpoint.json] > out.json
+//          [--save-at=h1,h2,...] [--checkpoint-dir=dir] [--from=checkpoint.json] [--mod=built main.js] > out.json
 // --save-at writes a checkpoint (the save and the virtual time) at those hours; --from resumes one,
 // so A/B runs can branch from a shared state instead of replaying the hours before it.
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchWithMod } from '../../test/harness/game.mjs';
+import { launchWithMod, launchGame } from '../../test/harness/game.mjs';
 
 const hours = Number(process.argv[2] || 24);
 const seed = process.argv[3] && !process.argv[3].startsWith('--') ? process.argv[3] : 'autopilot';
@@ -27,7 +27,14 @@ const startHour = from ? from.hour : 0;
 if (from) process.stderr.write(`resuming ${from.seed} at hour ${from.hour}
 `);
 
-const game = await launchWithMod({ seed, autopilot: true, checkpoint: from });
+// --mod pins a built mod file, so a run queued for a game slot does not pick up a later build.
+const modFile = arg('mod');
+const game = modFile
+    ? await launchGame({ seed, autopilot: true, checkpoint: from, mods: [path.resolve(modFile)] }).then(async (g) => {
+          if (g) await g.modStarted();
+          return g;
+      })
+    : await launchWithMod({ seed, autopilot: true, checkpoint: from });
 if (!game) {
     console.error('game location not configured');
     process.exit(1);
