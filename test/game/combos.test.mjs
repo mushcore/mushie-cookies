@@ -329,6 +329,73 @@ test('turns the Golden switch on for a click buff that pays for it, and off once
     }
 });
 
+// With golden cookies not clicked, what the switch stops is worth nothing: on, it adds half of
+// CpS (main.js:5133-5142) and pays both toggles, 2.5 hours of CpS (main.js:10679, 10694), back
+// in well under an hour once the mouse upgrades carry it into every click.
+test('turns the Golden switch on for good beside a long boost, and waits out only an income spike', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openBakery(game);
+        await game.eval(clicking, MICE);
+        await game.eval(goldenSwitch);
+        await game.eval(() => {
+            FrozenCookies.autoGC = 0;
+            FrozenCookies.autoGS = 1;
+            // A Frenzy is an hour of CpS times 7 on the price: worth waiting out.
+            Game.gainBuff('frenzy', 77, 7);
+        });
+        await game.advanceSeconds(70);
+        const spike = await game.eval(switchNow);
+        assert.equal(spike.on, false, `paid for on top of a Frenzy: ${JSON.stringify(spike.report)}`);
+
+        // A retirement loan lifts CpS by a fifth for two days (minigameMarket.js:352): waiting it
+        // out to save a fifth of the price would forgo two days of the switch.
+        await game.eval(() => {
+            Game.buffs['Frenzy'].time = 0;
+            Game.gainBuff('loan 3', 2 * 24 * 60 * 60, 1.2);
+        });
+        await game.advanceSeconds(70);
+        const long = await game.eval(switchNow);
+        assert.equal(long.on, true, `left off beside a long boost: ${JSON.stringify(long.report)}`);
+        assert.equal(long.report.mode, 'standing');
+        assert.ok(long.buffs.includes('Loan 3'));
+        assert.deepEqual(game.errors, []);
+    } finally {
+        await game.close();
+    }
+});
+
+// No mouse upgrade: the switch adds only half of CpS, and pays both toggles back in about five
+// hours. The standing check judges that over the run's expected length, which the ascension
+// system times by play (src/systems/ascension.js), not by the wall clock.
+test('judges leaving the Golden switch on for good over the run as the play clock times it', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openBakery(game);
+        await game.eval(clicking, []);
+        await game.eval(goldenSwitch);
+        await game.eval(() => {
+            FrozenCookies.autoGC = 0;
+            FrozenCookies.autoGS = 1;
+        });
+        await game.advanceSeconds(70);
+        const young = await game.eval(switchNow);
+        assert.equal(young.on, false, `a run of minutes is not expected to last five hours: ${JSON.stringify(young.report)}`);
+
+        // A month of play by the ascension system's clock, minutes by the wall clock.
+        await game.eval(() => {
+            MushieCookies.ascension.runSeconds = () => 30 * 24 * 60 * 60;
+        });
+        await game.advanceSeconds(70);
+        const old = await game.eval(switchNow);
+        assert.equal(old.on, true, `left off in a month-long run: ${JSON.stringify(old.report)}`);
+        assert.equal(old.report.mode, 'standing');
+        assert.deepEqual(game.errors, []);
+    } finally {
+        await game.close();
+    }
+});
+
 test('leaves the Golden switch off when the click buff does not pay for it, and turns it off at once beside a long buff', { skip }, async () => {
     const game = await launchWithMod();
     try {

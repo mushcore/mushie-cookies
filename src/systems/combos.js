@@ -14,6 +14,7 @@
 // can spawn (src/game/measure.js), and the price of turning the switch off on top.
 import { simulate } from '../core/sim.js';
 import { estimateIncome } from '../core/income.js';
+import { classifyBuffs, KINDS } from '../core/buffs.js';
 import {
     planSale,
     saleOptions,
@@ -21,7 +22,6 @@ import {
     devastationGainPerUnit,
     godzamokOn,
     goldenSwitchOn,
-    buffProduct,
     switchPlan,
     offPlan,
     keepStanding,
@@ -29,7 +29,7 @@ import {
     DEVASTATION_SECONDS,
 } from '../core/combos.js';
 import { goldenCookiesClicked, lindyHorizon } from '../core/gods.js';
-import { readState } from '../game/measure.js';
+import { readState, clicksPerSecond } from '../game/measure.js';
 import { sellableBuildings, godzamokLevel, CYCLE_FRAMES } from '../game/combos.js';
 
 const TICK_EVERY = 3; // frames
@@ -47,9 +47,11 @@ const SWITCH_OFF = 'Golden switch [on]';
  * @param {object} deps.settings  autoGodzamok, autoGS, autoClick, cookieClickSpeed, and the inherited combos
  * @param {object} deps.loop
  * @param {object} [deps.buyer]   for its reserve, and to re-rank after a toggle
+ * @param {() => number} [deps.runSeconds]  how long the run has been played (the ascension
+ *   system's clock); by default its age by the wall clock
  * @param {(what: string) => void} [deps.log]
  */
-export function createCombos({ game, settings, loop, buyer = null, log = () => {} }) {
+export function createCombos({ game, settings, loop, buyer = null, runSeconds = null, log = () => {} }) {
     // - cycleFrames: frames between sales.
     // - rebuy: 'now' buys each building sold straight back; 'buyer' leaves it to the buyer, one
     //   sale per Devastation window (kept to measure one against the other).
@@ -75,19 +77,26 @@ export function createCombos({ game, settings, loop, buyer = null, log = () => {
     const invalidate = () => buyer && buyer.invalidate();
     const reserve = () => Math.max(buyer ? buyer.reserve() : 0, state.hold);
     const free = () => game.cookies - reserve();
-    const runSeconds = () => Math.max(0, (Date.now() - game.startDate) / 1000);
+    // The run's length as played: the game makes nothing while the machine sleeps or the loop
+    // stalls, and the wall clock would count that as run.
+    const played = runSeconds || (() => Math.max(0, (Date.now() - game.startDate) / 1000));
 
-    /** Every running buff as the pure decisions see it. */
+    /** Every running buff as the shared classifier sees it, in the shape the pure decisions take. */
     function runningBuffs() {
-        return Object.values(game.buffs).map((b) => ({
-            name: b.name,
-            multCpS: b.multCpS === undefined ? 1 : b.multCpS,
-            multClick: b.multClick === undefined ? 1 : b.multClick,
-            secondsLeft: b.time / game.fps,
+        return classifyBuffs(game.buffs, { fps: game.fps }).map((c) => ({
+            name: c.name,
+            type: c.type,
+            kind: c.kind,
+            multCpS: c.cpsMult,
+            multClick: c.clickMult,
+            fixedClick: c.fixedClick,
+            secondsLeft: c.secondsLeft,
         }));
     }
-    // Devastation multiplies clicks too, but it is the combo's own doing, not a reason for it.
-    const clickBuffsOf = (buffs) => buffs.filter((b) => b.name !== 'Devastation' && b.multClick > 1);
+    // Short click spikes (Click frenzy, Dragonflight). Devastation multiplies clicks too, but it
+    // is the combo's own doing, not a reason for it.
+    const clickBuffsOf = (buffs) => buffs.filter((b) => b.kind === KINDS.SPIKE && b.multClick > 1 && b.type !== 'devastation');
+    const devastationOf = (buffs) => buffs.find((b) => b.type === 'devastation') || null;
 
     // --- Godzamok -----------------------------------------------------------------------------
 
@@ -96,17 +105,18 @@ export function createCombos({ game, settings, loop, buyer = null, log = () => {
         const perBuilding = devastationPerBuilding(godzamokLevel(game));
         const clicking = clickBuffsOf(buffs);
         // A Cursed finger fixes what a click earns, whatever multiplies it (main.js:4744).
-        if (!perBuilding || !clicking.length || game.hasBuff('Cursed finger')) return null;
-        const clicksPerSecond = readState(game, settings).clicksPerSecond;
-        if (!(clicksPerSecond > 0)) return null;
-        const devastation = game.hasBuff('Devastation');
+        if (!perBuilding || !clicking.length || buffs.some((b) => b.fixedClick !== null)) return null;
+        // The clicker's measured rate (src/systems/clicker.js), as the income model counts it.
+        const rate = clicksPerSecond(settings);
+        if (!(rate > 0)) return null;
+        const devastation = devastationOf(buffs);
         const devMult = devastation ? devastation.multClick : 1;
         const gainPerUnit = devastationGainPerUnit({
             perBuilding,
-            clickIncome: (clicksPerSecond * game.computedMouseCps) / devMult,
+            clickIncome: (rate * game.computedMouseCps) / devMult,
             buffs: clicking,
             // A sale while the buff runs adds to it without renewing it (main.js:7889-7894).
-            windowSeconds: devastation ? devastation.time / game.fps : DEVASTATION_SECONDS,
+            windowSeconds: devastation ? devastation.secondsLeft : DEVASTATION_SECONDS,
         });
         const plan = planSale({ options: saleOptions(sellableBuildings(game)), gainPerUnit, budget: free() });
         return plan.units > 0 ? { ...plan, fresh: !devastation, perBuilding } : null;
@@ -115,7 +125,7 @@ export function createCombos({ game, settings, loop, buyer = null, log = () => {
     function godzamok(frame, buffs) {
         if (frame - state.lastCycle < options.cycleFrames) return;
         const leave = options.rebuy === 'buyer';
-        if (leave && game.hasBuff('Devastation')) return;
+        if (leave && devastationOf(buffs)) return;
         const plan = saleNow(buffs);
         if (!plan) return;
         const before = game.cookies;
@@ -230,7 +240,7 @@ export function createCombos({ game, settings, loop, buyer = null, log = () => {
 
     function planArgs(frame, buffs) {
         const m = switchEffect(frame);
-        return { m, args: { deltaCps: m.deltaCps, deltaClick: m.deltaClick, clicksPerSecond: readState(game, settings).clicksPerSecond, priceOffBase: m.priceOffBase, goldenRate: m.goldenRate, buffs } };
+        return { m, args: { deltaCps: m.deltaCps, deltaClick: m.deltaClick, clicksPerSecond: clicksPerSecond(settings), priceOffBase: m.priceOffBase, goldenRate: m.goldenRate, buffs } };
     }
 
     function considerOn(frame, buffs, turnOn) {
@@ -254,11 +264,13 @@ export function createCombos({ game, settings, loop, buyer = null, log = () => {
     function considerStanding(frame, buffs, turnOn) {
         if (frame < state.standingAt) return;
         state.standingAt = frame + STANDING_EVERY;
-        // The price is an hour of the CpS of the moment: never paid on top of a CpS buff.
-        if (buffProduct(buffs, 0, 'multCpS') > 1) return;
+        // The price is an hour of the CpS of the moment: never paid on top of a short CpS spike.
+        // A long boost (a retirement loan's x1.2 for two days, Sugar frenzy's hour) is not waited
+        // out: that would forgo the switch for longer than the part of the price it saves.
+        if (buffs.some((b) => b.kind === KINDS.SPIKE && b.multCpS > 1)) return;
         const m = switchEffect(frame);
         const priceOn = turnOn.getPrice();
-        const worth = turnOnStanding({ incomeOn: m.incomeOn, incomeOff: m.incomeOff, priceOn, priceOff: m.priceOffBase, horizonSeconds: lindyHorizon(runSeconds()) });
+        const worth = turnOnStanding({ incomeOn: m.incomeOn, incomeOff: m.incomeOff, priceOn, priceOff: m.priceOffBase, horizonSeconds: lindyHorizon(played()) });
         if (!worth || priceOn > free() || !buySwitch(turnOn)) return;
         state.mode = 'standing';
         state.heldBefore = 0;

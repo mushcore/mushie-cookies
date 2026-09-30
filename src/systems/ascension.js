@@ -251,5 +251,7 @@ export function createAscension({ game, settings, loop, extras = () => 0, collec
         verdict: () => state.verdict,
         /** 'playing', 'settling' (collected, about to ascend) or 'ascending'. */
         phase: () => state.phase,
+        /** Seconds the run has been played (see runSeconds above); cheap, for other systems. */
+        runSeconds: () => runSeconds(),
     };
 }
