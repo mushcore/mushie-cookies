@@ -53,8 +53,10 @@ test('an office upgrade and the rebuy of its cursors never spend the reserve the
                 const before = Game.cookies;
                 const reserve = MushieCookies.buyer.reserve();
                 const office = M.officeLevel;
+                // The office offer the buyer took: its price must cover the rebuy.
+                const offer = MushieCookies.market.report().office;
                 const out = buy.apply(this, arguments);
-                window.__cursorBuys.push({ before, after: Game.cookies, reserve, office });
+                window.__cursorBuys.push({ before, after: Game.cookies, reserve, office, offer });
                 return out;
             };
             FrozenCookies.autoBank = 1;
@@ -78,6 +80,12 @@ test('an office upgrade and the rebuy of its cursors never spend the reserve the
             status: MushieCookies.status(),
         }));
         assert.ok(out.level >= 1, `the office should have been upgraded (still level ${out.level}): ${JSON.stringify(out.report.office)}`);
+        // The buyer keeps a purchase inside the reserve by its price (price + reserve <= bank), so
+        // the office is priced with the rebuy of what it sacrifices. Priced without it, the office
+        // looks free and the reserve read here falls with it, so the check below cannot see it.
+        const rebuys = out.buys.filter((b) => b.office >= 1);
+        assert.ok(rebuys.length > 0, 'the sacrificed cursors should be bought back');
+        assert.ok(rebuys[0].offer.price >= setup.rebuy * (1 - 1e-9), `the office was priced at ${rebuys[0].offer.price}, its rebuy costs ${setup.rebuy}`);
         const intoReserve = out.buys.filter((b) => b.after < b.reserve * (1 - 1e-9));
         assert.deepEqual(intoReserve.slice(0, 3), [], `${intoReserve.length} of ${out.buys.length} cursor purchases spent the reserve`);
         assert.ok(out.cursors >= 150, `the sacrificed cursors should be bought back, have ${out.cursors}`);
@@ -138,11 +146,15 @@ test('brokers are hired only when they repay before the run is expected to end',
         await game.advanceSeconds(2 * 3600);
         const out = await game.eval(() => {
             const M = Game.Objects['Bank'].minigame;
-            return { brokers: M.brokers, max: M.getMaxBrokers(), report: MushieCookies.market.report(), status: MushieCookies.status() };
+            // What the market offers the buyer now. The buyer's ranking alone would keep a broker
+            // this slow to repay out of this bakery, so the offer is what shows the payback test.
+            const offered = MushieCookies.market.candidates({ excludedBuildings: new Set(), limits: {} }).filter((c) => c.kind === 'broker').length;
+            return { brokers: M.brokers, max: M.getMaxBrokers(), offered, report: MushieCookies.market.report(), status: MushieCookies.status() };
         });
         assert.ok(out.max > 0, 'brokers could be hired');
         assert.ok(out.report.buys > 0, 'the market traded, so a broker had something to save');
         assert.ok(!(out.report.brokerPayback <= out.report.runLeft), `a broker would repay in time, so the claim is not tested: ${JSON.stringify(out.report)}`);
+        assert.equal(out.offered, 0, `a broker that cannot repay in the run was offered to the buyer: ${JSON.stringify(out.report)}`);
         assert.equal(out.brokers, 0, `hired ${out.brokers} brokers that cannot repay: ${JSON.stringify(out.report)}`);
 
         // The run is timed by play, on the ascension's clock: the game makes nothing while the
