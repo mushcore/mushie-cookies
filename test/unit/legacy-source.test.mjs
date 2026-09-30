@@ -148,3 +148,16 @@ test('every function called by bare name is defined somewhere', () => {
     const unexplained = [...missing].filter((name) => !locals.has(name)).sort();
     assert.deepEqual(unexplained, []);
 });
+
+test('no inherited code switches seasons: the season system is the one owner', () => {
+    // autoEasterAction and autoHalloweenAction bought the Bunny and Ghostly biscuits outside the
+    // buyer's reserve, fought each other, and bought a locked biscuit without Season switcher.
+    const found = [];
+    for (const [file, src] of all) {
+        if (/\bautoEasterAction\b|\bautoHalloweenAction\b/.test(src)) found.push(`${file}: inherited season switch`);
+        if (/UpgradesById\[\s*(18[2-5]|209)\s*\]\s*\.buy\(/.test(src)) found.push(`${file}: buys a season biscuit`);
+        if (/Game\.season\s*=[^=]/.test(src)) found.push(`${file}: writes Game.season`);
+        if (/UpgradeSanta\(/.test(src)) found.push(`${file}: levels Santa`);
+    }
+    assert.deepEqual(found, []);
+});

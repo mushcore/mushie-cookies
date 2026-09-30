@@ -19,7 +19,7 @@ test('the Autopilot is the first option and, like every option, off by default',
     assert.equal(Object.keys(prefs)[0], 'autopilot');
     for (const [name, p] of Object.entries(prefs)) {
         // Display options keep the inherited defaults; everything that plays starts off.
-        if (p.display && !DISPLAY.includes(name) && name !== 'freeSeason' && name !== 'simulatedGCPercent') assert.equal(p.default, 0, `${name} defaults to ${p.default}`);
+        if (p.display && !DISPLAY.includes(name) && name !== 'simulatedGCPercent') assert.equal(p.default, 0, `${name} defaults to ${p.default}`);
     }
     assert.equal(prefs.FCshortcuts.default, 0, 'keyboard shortcuts are a feature too');
     assert.deepEqual(prefs.autopilot.display, ['Autopilot OFF', 'Autopilot ON']);
@@ -55,6 +55,18 @@ test('the Autopilot never runs two systems that act on the same thing', () => {
         if (!AUTOPILOT[modern]) continue;
         for (const l of legacy) assert.equal(AUTOPILOT[l], 0, `${modern} is on, so ${l} must be off`);
     }
+});
+
+test('one season setting replaces the inherited season switches and the options nothing read', () => {
+    // autoEaster and autoHalloween switched seasons outside the buyer's reserve and fought each
+    // other; defaultSeasonToggle, defaultSeason and freeSeason had no reader at all.
+    for (const gone of ['autoEaster', 'autoHalloween', 'defaultSeasonToggle', 'defaultSeason', 'freeSeason']) {
+        assert.equal(prefs[gone], undefined, `${gone} is still an option`);
+        assert.equal(gone in AUTOPILOT, false, `${gone} is still in the Autopilot`);
+    }
+    assert.deepEqual(prefs.autoSeasons.display.length, 2);
+    assert.equal(prefs.autoSeasons.default, 0);
+    assert.equal(AUTOPILOT.autoSeasons, 1);
 });
 
 test('applying the Autopilot sets every value and reports only what changed', () => {

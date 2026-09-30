@@ -173,6 +173,21 @@ function wrinklerState(game, settings) {
 }
 
 /**
+ * Reindeer run only in Christmas (main.js:5834-5837) and pay only when clicked, so they count
+ * when autoReindeer clicks them. One spawns on the shimmer timer, 3 to 6 minutes, halved by
+ * Reindeer baking grounds (main.js:5842-5866); Ho ho ho-flavored frosting doubles the payout
+ * (main.js:5791). `season` asks what they would pay in another season.
+ */
+export function reindeerState(game, settings, { season = game.season } = {}) {
+    const type = game.shimmerTypes.reindeer;
+    if (season !== 'christmas' || !settings.autoReindeer || !type) return null;
+    // Clicked on sight, a reindeer's time on screen adds nothing to the wait between them.
+    const meanInterval = expectedSpawnFrames(type.getMinTime(type), type.getMaxTime(type)) / game.fps;
+    const payoutMult = (game.Has('Ho ho ho-flavored frosting') ? 2 : 1) * game.eff('reindeerGain');
+    return { meanInterval, payoutMult };
+}
+
+/**
  * The income state of the game as it is now.
  * @param {object} settings  the mod's settings: autoClick, cookieClickSpeed
  */
@@ -186,6 +201,7 @@ export function readState(game, settings) {
         basket: game.ObjectsById.reduce((sum, b) => sum + b.getPrice(), 0),
         wrinklers: wrinklerState(game, settings),
         golden: goldenState(game, settings),
+        reindeer: reindeerState(game, settings),
     };
 }
 

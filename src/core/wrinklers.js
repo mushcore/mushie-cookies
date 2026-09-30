@@ -146,10 +146,22 @@ export function decidePops(args) {
 export function expectedAttached({ max, now, popRate = 0, spawnPerSecond, crawl = CRAWL_SECONDS, horizon = 3600 }) {
     const current = Math.max(0, Math.min(max, now));
     if (!(spawnPerSecond > 0)) return current;
-    const steady = Math.max(0, Math.min(max, max - popRate * (crawl + 1 / spawnPerSecond)));
+    const steady = steadyAttached({ max, popRate, spawnPerSecond, crawl });
     const x = spawnPerSecond * horizon;
     const remaining = Number.isFinite(x) && x > 0 ? (1 - Math.exp(-x)) / x : 0;
     return steady + (current - steady) * remaining;
+}
+
+/** Wrinklers attached `seconds` from now: the refill `expectedAttached` averages, at one moment. */
+export function attachedAfter({ max, now, popRate = 0, spawnPerSecond, crawl = CRAWL_SECONDS, seconds }) {
+    const current = Math.max(0, Math.min(max, now));
+    if (!(spawnPerSecond > 0)) return current;
+    const steady = steadyAttached({ max, popRate, spawnPerSecond, crawl });
+    return steady + (current - steady) * Math.exp(-spawnPerSecond * Math.max(0, seconds));
+}
+
+function steadyAttached({ max, popRate, spawnPerSecond, crawl }) {
+    return Math.max(0, Math.min(max, max - popRate * (crawl + 1 / spawnPerSecond)));
 }
 
 /** Halloween cookie fail rate per pop (main.js:14488-14499). */

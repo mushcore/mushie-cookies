@@ -12,6 +12,7 @@ import { createDragon } from '../systems/dragon.js';
 import { createShimmers } from '../systems/shimmers.js';
 import { createClicker } from '../systems/clicker.js';
 import { createWrinklers } from '../systems/wrinklers.js';
+import { createSeasons } from '../systems/seasons.js';
 
 const CHAIN_REACH = 15;
 
@@ -105,5 +106,8 @@ export function startSystems({ game, loop, legacy, log, guard }) {
     // The dragon trains before the gods pick auras; `dragon` tells them when a level is gained.
     const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve() });
     const gods = createGods({ game, settings, loop, log, buyer, dragon });
-    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, shimmers, clicker, wrinklers, heavenly };
+    // Halloween cookies and eggs drop from popped wrinklers: the season system asks the wrinkler
+    // system to hunt them, and the wrinkler system weighs each hunt against what it forfeits.
+    const seasons = createSeasons({ game, settings, loop, log, buyer, wrinklers });
+    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, shimmers, clicker, wrinklers, heavenly, seasons };
 }

@@ -375,40 +375,9 @@ FrozenCookies.preferenceValues = {
     seasonOptions: {
         hint: "Season:",
     },
-    defaultSeasonToggle: {
-        hint: "Auto-switch to selected season if no upgrades needed.",
-        display: ["Autobuy Seasons OFF", "Autobuy Seasons ON"],
-        default: 0,
-    },
-    defaultSeason: {
-        hint: "Select default season.",
-        display: [
-            "Default Season OFF",
-            "Default Season BUSINESS DAY",
-            "Default Season CHRISTMAS",
-            "Default Season EASTER",
-            "Default Season HALLOWEEN",
-            "Default Season VALENTINE'S DAY",
-        ],
-        default: 0,
-    },
-    freeSeason: {
-        hint: "Stay in free base season if no upgrades needed.",
-        display: [
-            "Free Season OFF",
-            "Free Season for CHRISTMAS and BUSINESS DAY",
-            "Free Season for ALL",
-        ],
-        default: 1,
-    },
-    autoEaster: {
-        hint: "Switch to Easter during Cookie Storm if eggs missing.",
-        display: ["Auto-Easter Switch OFF", "Auto-Easter Switch ON"],
-        default: 0,
-    },
-    autoHalloween: {
-        hint: "Switch to Halloween if wrinklers present and cookies missing.",
-        display: ["Auto-Halloween Switch OFF", "Auto-Halloween Switch ON"],
+    autoSeasons: {
+        hint: "Switch seasons (with Season switcher) when the drops and reindeer repay the switch, visit Valentine's for hearts, rest in Christmas, and level Santa by measured value.",
+        display: ["Auto Seasons OFF", "Auto Seasons ON"],
         default: 0,
     },
 

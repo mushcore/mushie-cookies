@@ -69,13 +69,8 @@ export const AUTOPILOT = Object.freeze({
     autoDragon: 1,
     petDragon: 1,
 
-    // Seasons. The inherited Easter and Halloween switches fight each other at rising prices,
-    // ignore the buyer's reserve and pop every wrinkler all season; off until the season planner.
-    defaultSeasonToggle: 0,
-    defaultSeason: 0,
-    freeSeason: 1,
-    autoEaster: 0,
-    autoHalloween: 0,
+    // Seasons and Santa: the season planner, the only owner of the season.
+    autoSeasons: 1,
 
     // Banks the inherited code held back for manual combos.
     holdManBank: 0,

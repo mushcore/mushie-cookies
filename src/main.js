@@ -42,6 +42,7 @@ export { levelCost, rebuyCost, trainableChain, chooseTarget, magicCap } from './
 export { gardenOf, plotTiles, chanceFunction, findRecipe, findRecipes } from './game/garden.js';
 export { planChips, planTree, rankSlots } from './core/heavenly.js';
 export { AUTOPILOT, applyAutopilot, isAutopilotSetting } from './core/autopilot.js';
+export { planSeason } from './core/seasons.js';
 export { planHeavenly, slotCandidates, fillPermanentSlots, rankPermanentSlots, assignPermanentSlots } from './game/prestige.js';
 export { payoutOf as wrinklerPayout, heldValue as wrinklerHeld } from './game/wrinklers.js';
 
@@ -63,6 +64,7 @@ export let dragon = null;
 export let shimmers = null;
 export let clicker = null;
 export let wrinklers = null;
+export let seasons = null;
 
 const guards = createGuard({
     maxFailures: 5,
@@ -117,6 +119,7 @@ const runtime = {
         shimmers = systems.shimmers;
         clicker = systems.clicker;
         wrinklers = systems.wrinklers;
+        seasons = systems.seasons;
     },
     save: () => window.saveFCData(),
     load: (data) => window.setOverrides(data),

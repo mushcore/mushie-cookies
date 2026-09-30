@@ -461,21 +461,21 @@ var upgradeJson = {
 
     // Santa upgrades
     152: { buildings: [], upgrades: [182] }, // A festive hat
-    153: { buildings: [], upgrades: [152], santa: 1 }, // Increased merriness
-    154: { buildings: [], upgrades: [152], santa: 1 }, // Improved jolliness
-    155: { buildings: [], upgrades: [152], santa: 1 }, // A lump of coal
-    156: { buildings: [], upgrades: [152], santa: 1 }, // An itchy sweater
-    157: { buildings: [], upgrades: [152], santa: 1 }, // Reindeer baking grounds
-    158: { buildings: [], upgrades: [152], santa: 1 }, // Weighted sleighs
-    159: { buildings: [], upgrades: [152], santa: 1 }, // Ho ho ho-flavored frosting
-    160: { buildings: [], upgrades: [152], santa: 1 }, // Season savings
-    161: { buildings: [], upgrades: [152], santa: 1 }, // Toy workshop
-    162: { buildings: [], upgrades: [152], santa: 1 }, // Naughty list
-    163: { buildings: [], upgrades: [152], santa: 1 }, // Santa's bottomless bag
-    164: { buildings: [], upgrades: [152], santa: 1 }, // Santa's helpers
-    165: { buildings: [], upgrades: [152], santa: 1 }, // Santa's legacy
-    166: { buildings: [], upgrades: [152], santa: 1 }, // Santa's milk and cookies
-    168: { buildings: [], upgrades: [152], santa: 14 }, // Santa's dominion
+    153: { buildings: [], upgrades: [152] }, // Increased merriness
+    154: { buildings: [], upgrades: [152] }, // Improved jolliness
+    155: { buildings: [], upgrades: [152] }, // A lump of coal
+    156: { buildings: [], upgrades: [152] }, // An itchy sweater
+    157: { buildings: [], upgrades: [152] }, // Reindeer baking grounds
+    158: { buildings: [], upgrades: [152] }, // Weighted sleighs
+    159: { buildings: [], upgrades: [152] }, // Ho ho ho-flavored frosting
+    160: { buildings: [], upgrades: [152] }, // Season savings
+    161: { buildings: [], upgrades: [152] }, // Toy workshop
+    162: { buildings: [], upgrades: [152] }, // Naughty list
+    163: { buildings: [], upgrades: [152] }, // Santa's bottomless bag
+    164: { buildings: [], upgrades: [152] }, // Santa's helpers
+    165: { buildings: [], upgrades: [152] }, // Santa's legacy
+    166: { buildings: [], upgrades: [152] }, // Santa's milk and cookies
+    168: { buildings: [], upgrades: [152] }, // Santa's dominion
 
     // Season switching - requires "Season switcher" heavenly upgrade (181)
     182: { buildings: [], upgrades: [181], }, // Christmas
@@ -560,8 +560,6 @@ var recommendationBlacklist = [
     563, 564, // shimmering veil
     806, // jukebox
 ];
-
-var seasons = ["", "fools", "christmas", "easter", "halloween", "valentines"];
 
 var holidayCookies = {
     halloween: [134, 135, 136, 137, 138, 139, 140],

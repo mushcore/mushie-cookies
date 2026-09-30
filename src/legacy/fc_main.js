@@ -682,53 +682,6 @@ function minigameCheckAction() {
     installFateTooltip();
 }
 
-function autoEasterAction() {
-    if (
-        !FrozenCookies.autoEaster ||
-        Game.season == "easter" ||
-        haveAll("easter")
-    ) {
-        return;
-    }
-
-    if (
-        Game.hasBuff("Cookie storm") &&
-        Game.season != "easter" &&
-        !haveAll("easter") &&
-        Game.Has("Season switcher") &&
-        Game.UpgradesById[209].unlocked
-    ) {
-        Game.UpgradesById[209].buy();
-    }
-}
-
-function autoHalloweenAction() {
-    if (
-        !FrozenCookies.autoHalloween ||
-        Game.season == "valentines" ||
-        Game.season == "easter" ||
-        Game.season == "halloween" ||
-        haveAll("halloween")
-    ) {
-        return;
-    }
-
-    var living = liveWrinklers();
-    if (
-        living.length > 0 &&
-        Game.season != "easter" &&
-        Game.season != "halloween" &&
-        !haveAll("halloween")
-    ) {
-        if (!Game.Has("Season switcher") || !Game.UpgradesById[183].unlocked) return;
-        Game.UpgradesById[183].buy();
-        logEvent(
-            "autoHalloween",
-            "Swapping to Halloween season to use wrinklers"
-        );
-    }
-}
-
 function autoBlacklistOff() {
     switch (FrozenCookies.blacklist) {
         case 1:
@@ -1106,6 +1059,19 @@ function goldenCookieLife() {
 
 // --- Adapters over the buyer (src/systems/buyer.js). Other legacy code keeps calling these names.
 function asLegacyPurchase(c) {
+    if (c.kind == "offer") {
+        // Sold through the buyer by another system (a season switch, a Santa level).
+        return {
+            id: c.key,
+            efficiency: c.payback,
+            delta_cps: c.deltaIncome,
+            base_delta_cps: c.deltaIncome,
+            cost: c.price,
+            purchase: { id: c.key, name: c.name, buy: c.buy, getCost: function () { return c.price; } },
+            type: "other",
+            name: c.name,
+        };
+    }
     return {
         id: c.kind == "building" ? c.building.id : c.upgrade.id,
         efficiency: c.payback,
@@ -1289,16 +1255,6 @@ function FCStart() {
         FrozenCookies.auto100ConsistencyComboBot = 0;
     }
 
-    if (FrozenCookies.autoEasterBot) {
-        clearInterval(FrozenCookies.autoEasterBot);
-        FrozenCookies.autoEasterBot = 0;
-    }
-
-    if (FrozenCookies.autoHalloweenBot) {
-        clearInterval(FrozenCookies.autoHalloweenBot);
-        FrozenCookies.autoHalloweenBot = 0;
-    }
-
     if (FrozenCookies.autoBankBot) {
         clearInterval(FrozenCookies.autoBankBot);
         FrozenCookies.autoBankBot = 0;
@@ -1398,20 +1354,6 @@ function FCStart() {
         FrozenCookies.auto100ConsistencyComboBot = setInterval(
             MushieCookies.guard("legacy:auto100ConsistencyComboAction", auto100ConsistencyComboAction),
             FrozenCookies.frequency * 2
-        );
-    }
-
-    if (FrozenCookies.autoEaster) {
-        FrozenCookies.autoEasterBot = setInterval(
-            MushieCookies.guard("legacy:autoEasterAction", autoEasterAction),
-            FrozenCookies.frequency * 5
-        );
-    }
-
-    if (FrozenCookies.autoHalloween) {
-        FrozenCookies.autoHalloweenBot = setInterval(
-            MushieCookies.guard("legacy:autoHalloweenAction", autoHalloweenAction),
-            FrozenCookies.frequency * 5
         );
     }
 
