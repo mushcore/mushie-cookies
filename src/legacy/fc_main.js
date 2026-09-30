@@ -147,8 +147,17 @@ function legacyStart(saveData) {
         function () {
             updateTimers();
         },
-        { everyFrames: 8 }
+        {
+            everyFrames: 8,
+            enabled: function () {
+                return !!FrozenCookies.fancyui;
+            },
+        }
     );
+    // The minigames load after this point, and each minigame script ends by setting the
+    // global M to 0; the handles and the Grimoire tooltip are brought up to date every frame.
+    MushieCookies.loop.add("legacy:minigames", minigameCheckAction);
+    installFCMenu();
     logEvent(
         "Load",
         "Mushie Cookies v " +
@@ -196,10 +205,9 @@ function setOverrides(gameSaveData) {
     // Set `App`, on older version of CC it's not set to anything, so default it to `undefined`
     if (!window.App) window.App = undefined;
 
+    // Game.sayTime is left to the game: its callers rely on `detail` and on '' for no time left.
+    // The mod's own labels use timeDisplay.
     Beautify = fcBeautify;
-    Game.sayTime = function (time, detail) {
-        return timeDisplay(time / Game.fps);
-    };
     if (typeof Game.tooltip.oldDraw != "function") {
         Game.tooltip.oldDraw = Game.tooltip.draw;
         Game.tooltip.draw = fcDraw;
@@ -458,10 +466,23 @@ function nextHC(tg) {
     return tg ? toGo : timeDisplay(divCps(toGo, Game.cookiesPs));
 }
 
+// Shows text to copy in the game's own prompt, as the game's Export save does (main.js:2608).
+// window.prompt throws on Steam, which used to leave Game.promptOn set with nothing on screen,
+// so the next Enter confirmed whatever prompt had been shown last.
 function copyToClipboard(text) {
-    Game.promptOn = 1;
-    window.prompt("Copy to clipboard: Ctrl+C, Enter", text);
-    Game.promptOn = 0;
+    var escaped = String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    Game.Prompt(
+        '<h3>Copy to clipboard</h3><div class="block">Press Ctrl+C to copy.</div>' +
+            '<div class="block"><textarea id="textareaPrompt" style="width:100%;height:128px;" readonly>' +
+            escaped +
+            "</textarea></div>",
+        ["Done"]
+    );
+    l("textareaPrompt").focus();
+    l("textareaPrompt").select();
 }
 
 function getBuildingSpread() {
@@ -472,9 +493,9 @@ function getBuildingSpread() {
 
 // todo: add bind for autoascend
 // Press 'a' to toggle autoBuy.
-// Press 'b' to pop up a copyable window with building spread.
+// Press 'b' to show the building spread, ready to copy.
 // Press 'c' to toggle auto-GC
-// Press 'e' to pop up a copyable window with your export string
+// Press 'e' to show your export string, ready to copy
 // Press 'r' to pop up the ascend window (the game's own confirmation)
 // Press 's' to do a manual save
 // Press 'w' to display a wrinkler-info window
@@ -650,12 +671,15 @@ var B = Game.Objects["Bank"].minigame; //Stock Market
 var T = Game.Objects["Temple"].minigame; //Pantheon
 var M = Game.Objects["Wizard tower"].minigame; //Grimoire
 
+// Runs every frame on the mod's loop. A minigame loads after the save does (a timer, then a
+// script: main.js:8622-8640), and every minigame script ends with `var M=0;`, overwriting the
+// handle above; reading them afresh each frame keeps them current.
 function minigameCheckAction() {
-    if (!G) G = Game.Objects["Farm"].minigame; //Garden
-    if (!B) B = Game.Objects["Bank"].minigame; //Stock Market
-    if (!T) T = Game.Objects["Temple"].minigame; //Pantheon
-    if (!M) M = Game.Objects["Wizard tower"].minigame; //Grimoire
-    if (G && B && T && M) clearInterval(FrozenCookies.autoMinigameCheckBot);
+    G = Game.Objects["Farm"].minigame; //Garden
+    B = Game.Objects["Bank"].minigame; //Stock Market
+    T = Game.Objects["Temple"].minigame; //Pantheon
+    M = Game.Objects["Wizard tower"].minigame; //Grimoire
+    installFateTooltip();
 }
 
 function autoEasterAction() {
@@ -1330,11 +1354,6 @@ function FCStart() {
         FrozenCookies.autoCycliusBot = 0;
     }
 
-    if (FrozenCookies.autoMinigameCheckBot) {
-        clearInterval(FrozenCookies.autoMinigameCheckBot);
-        FrozenCookies.autoMinigameCheckBot = 0;
-    }
-
     // Now create new intervals with their specified frequencies.
     // Default frequency is 100ms = 1/10th of a second
 
@@ -1476,12 +1495,8 @@ function FCStart() {
         );
     }
 
-    if (!G || !B || !T || !M) {
-        FrozenCookies.autoMinigameCheckBot = setInterval(
-            MushieCookies.guard("legacy:minigameCheckAction", minigameCheckAction),
-            FrozenCookies.frequency * 600 // 1 minute
-        );
-    }
+    // The minigame handles are kept current by the mod's loop (minigameCheckAction).
 
-    FCMenu();
+    // Show the choice just made if the menu is open.
+    if (Game.onMenu == "fc_menu") Game.UpdateMenu();
 }
