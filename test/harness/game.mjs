@@ -98,12 +98,16 @@ export async function launchGame({ seed = 'mushie', headless = true, mods = [] }
             }
             throw new Error(`Mushie Cookies did not start. Errors: ${bootErrors.concat(errors).join(' | ') || 'none'}`);
         },
-        /** Polls in real time; for things the browser loads asynchronously, such as minigame scripts. */
+        /**
+         * Waits for something the browser loads asynchronously, such as a minigame script.
+         * Game frames keep running meanwhile: minigames finish setting up on logic frames.
+         */
         async waitFor(fn, arg, timeoutMs = 15000) {
             const until = Date.now() + timeoutMs;
             while (Date.now() < until) {
                 if (await page.evaluate(fn, arg)) return;
-                await sleep(25);
+                await handle.advance(3);
+                await sleep(20);
             }
             throw new Error('waitFor timed out');
         },

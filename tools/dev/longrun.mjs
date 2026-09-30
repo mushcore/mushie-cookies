@@ -28,6 +28,7 @@ try {
             const starter = ['Legacy', 'Heavenly cookies', 'How to bake your dragon', 'Box of brand biscuits', 'Heavenly luck', 'Permanent upgrade slot I', 'Twin Gates of Transcendence', 'Belphegor'];
             for (const name of starter) {
                 const u = Game.Upgrades[name];
+                if (u.getPrice() > Game.heavenlyChips) continue; // only what the chips cover
                 Game.heavenlyChips -= u.getPrice();
                 Game.heavenlyChipsSpent += u.getPrice();
                 u.earn();

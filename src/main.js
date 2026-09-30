@@ -12,6 +12,7 @@ export { estimateIncome } from './core/income.js';
 export { rankCandidates, chooseReserve, decide } from './core/buyer.js';
 export { shouldAscend } from './core/ascension.js';
 export { nextLevelUp } from './core/lumps.js';
+export { forecastFate, forecastMany } from './game/fate.js';
 export { rankHeavenly, planChips } from './core/heavenly.js';
 export { heavenlyCandidates, planHeavenly, slotCandidates, fillPermanentSlots } from './game/prestige.js';
 
