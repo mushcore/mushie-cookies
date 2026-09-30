@@ -1,6 +1,6 @@
 // What the buyer may consider buying right now, each with its price and an `apply` that
 // makes the purchase inside a what-if.
-import { awardForBuildings, awardForUpgrades } from './awards.js';
+import { awardForBuildings, awardForUpgrades, pendingAwards } from './awards.js';
 
 /** Upgrades the buyer never buys by itself: selectors, switches and decisions other systems own. */
 export const NEVER_BUY = new Set([
@@ -22,7 +22,7 @@ const WRATH_STAGE = { 'One mind': 1, 'Communal brainsweep': 2, 'Elder Pact': 3 }
 
 const STORE_POOLS = new Set(['', 'cookie', 'tech']);
 
-function buildingCandidate(game, building) {
+function buildingCandidate(game, building, pending) {
     return {
         key: `building:${building.name}`,
         kind: 'building',
@@ -33,26 +33,26 @@ function buildingCandidate(game, building) {
             building.amount += 1;
             building.bought += 1;
             game.BuildingsOwned += 1;
-            awardForBuildings(game, building);
+            awardForBuildings(game, building, pending);
         },
     };
 }
 
-function applyUpgrade(game, upgrade) {
+function applyUpgrade(game, upgrade, pending) {
     upgrade.bought = 1;
     game.UpgradesOwned += 1;
     if (WRATH_STAGE[upgrade.name]) game.elderWrath = WRATH_STAGE[upgrade.name];
-    awardForUpgrades(game);
+    awardForUpgrades(game, pending);
 }
 
-function upgradeCandidate(game, upgrade) {
+function upgradeCandidate(game, upgrade, pending) {
     return {
         key: `upgrade:${upgrade.id}`,
         kind: 'upgrade',
         name: upgrade.name,
         upgrade,
         price: upgrade.getPrice(),
-        apply: () => applyUpgrade(game, upgrade),
+        apply: () => applyUpgrade(game, upgrade, pending),
     };
 }
 
@@ -60,7 +60,7 @@ function upgradeCandidate(game, upgrade) {
  * A locked upgrade that buying a few more buildings would unlock, as one purchase: the buildings
  * and the upgrade together. `needs` maps building ids to the count that unlocks it.
  */
-function chainCandidate(game, upgrade, needs, reach = Infinity) {
+function chainCandidate(game, upgrade, needs, reach = Infinity, pending = undefined) {
     const steps = [];
     for (const [id, count] of needs) {
         const building = game.ObjectsById[id];
@@ -85,9 +85,9 @@ function chainCandidate(game, upgrade, needs, reach = Infinity) {
                 building.amount += missing;
                 building.bought += missing;
                 game.BuildingsOwned += missing;
-                awardForBuildings(game, building);
+                awardForBuildings(game, building, pending);
             }
-            applyUpgrade(game, upgrade);
+            applyUpgrade(game, upgrade, pending);
         },
     };
 }
@@ -134,13 +134,15 @@ function chainTargets(game, prerequisites, excludedBuildings) {
  */
 export function listCandidates(game, policy) {
     const out = [];
+    // Every trial starts from this state, so what is already due is the same for all of them.
+    const pending = pendingAwards(game);
     const buildings =
         policy.excludedBuildings === 'all' ? [] : game.ObjectsById.filter((b) => !policy.excludedBuildings.has(b.id));
-    for (const building of buildings) out.push(buildingCandidate(game, building));
+    for (const building of buildings) out.push(buildingCandidate(game, building, pending));
     if (policy.excludedUpgrades !== 'all') {
         for (const upgrade of game.UpgradesInStore) {
             if (!STORE_POOLS.has(upgrade.pool) || NEVER_BUY.has(upgrade.id) || policy.excludedUpgrades.has(upgrade.id)) continue;
-            out.push(upgradeCandidate(game, upgrade));
+            out.push(upgradeCandidate(game, upgrade, pending));
         }
         if (policy.excludedBuildings !== 'all') {
             const limits = policy.limits || {};
@@ -148,7 +150,7 @@ export function listCandidates(game, policy) {
                 if (!STORE_POOLS.has(upgrade.pool) || NEVER_BUY.has(upgrade.id) || policy.excludedUpgrades.has(upgrade.id)) continue;
                 // Fortunes come from the news ticker, whatever the building counts say.
                 if (upgrade.tier === 'fortune') continue;
-                const chain = chainCandidate(game, upgrade, needs, policy.chainReach);
+                const chain = chainCandidate(game, upgrade, needs, policy.chainReach, pending);
                 if (!chain) continue;
                 if (chain.steps.some((s) => limits[s.building.id] !== undefined && s.building.amount + s.missing > limits[s.building.id])) continue;
                 out.push(chain);
