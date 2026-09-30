@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { launchGame, skipReason } from '../harness/game.mjs';
+import { launchGame, launchWithMod, skipReason } from '../harness/game.mjs';
 
 const skip = skipReason();
 
@@ -116,5 +116,41 @@ test('after reset the game reaches for nothing outside the local server', { skip
         assert.deepEqual(game.errors, []);
     } finally {
         await game.close();
+    }
+});
+
+test('a checkpoint resumes the same bakery at the same moment, and play goes on from it', { skip }, async () => {
+    const first = await launchWithMod({ seed: 'checkpoint', autopilot: true });
+    let checkpoint;
+    let before;
+    try {
+        await first.advanceSeconds(20 * 60);
+        checkpoint = await first.takeCheckpoint();
+        before = await first.eval(() => ({
+            now: Date.now(), earned: Game.cookiesEarned, bank: Game.cookies, buildings: Game.BuildingsOwned,
+            upgrades: Game.UpgradesOwned, startDate: Game.startDate, autopilot: FrozenCookies.autopilot,
+        }));
+    } finally {
+        await first.close();
+    }
+    const second = await launchWithMod({ seed: 'checkpoint', autopilot: true, checkpoint });
+    try {
+        const after = await second.eval(() => ({
+            now: Date.now(), earned: Game.cookiesEarned, bank: Game.cookies, buildings: Game.BuildingsOwned,
+            upgrades: Game.UpgradesOwned, startDate: Game.startDate, autopilot: FrozenCookies.autopilot,
+        }));
+        assert.equal(after.buildings, before.buildings);
+        assert.equal(after.upgrades, before.upgrades);
+        assert.equal(after.startDate, before.startDate);
+        assert.equal(after.autopilot, 1, 'the mod resumes with the settings it saved');
+        assert.ok(Math.abs(after.now - before.now) < 5000, `clock resumed at ${after.now - before.now} ms from the checkpoint`);
+        // No offline earnings or losses: the save was taken at the moment the clock resumes.
+        assert.ok(Math.abs(after.earned - before.earned) / before.earned < 0.01, `earned ${after.earned} against ${before.earned}`);
+        await second.advanceSeconds(10 * 60);
+        const later = await second.eval(() => ({ buildings: Game.BuildingsOwned, earned: Game.cookiesEarned }));
+        assert.ok(later.buildings > before.buildings, 'the Autopilot keeps buying after the resume');
+        assert.ok(later.earned > before.earned * 1.2);
+    } finally {
+        await second.close();
     }
 });
