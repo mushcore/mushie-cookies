@@ -5,7 +5,7 @@
 // purchase, unless the trade returns more per cookie than that purchase (src/core/bank.js).
 import { restingValue, tradeDecision } from '../core/market.js';
 import { OFFICES, officeIncome, overhead as overheadWith, brokerIncome, brokerWorthHiring, expectedRunLeft, tradeReturn, marketBudget } from '../core/bank.js';
-import { LOANS, chooseLoan, secondsToAscension, comboProfile, castTimes, loanOccasion, incomeMultiple, loanFactor } from '../core/loans.js';
+import { LOANS, chooseLoan, comboProfile, castTimes, loanOccasion, incomeMultiple, loanFactor } from '../core/loans.js';
 import { classifyBuffs, unbuffedFactors } from '../core/buffs.js';
 import { estimateIncome } from '../core/income.js';
 import { simulate } from '../core/sim.js';
@@ -15,7 +15,7 @@ import { forecastMany } from '../game/fate.js';
 import table from '../data/market-thresholds.json';
 
 const TICK_EVERY = 30; // frames; the market itself ticks once a minute
-const SAMPLE_SECONDS = 60; // growth, earnings and the ascension forecast are sampled once a minute
+const SAMPLE_SECONDS = 60; // growth and earnings are sampled once a minute
 const GROWTH_SECONDS = 30 * 60; // the window CpS growth is measured over
 // The window a loan reads the run's earnings over. Its interest lasts 40 minutes to 5 days and
 // scales every combo that lands in it; a half hour right after one sees none.
@@ -54,8 +54,7 @@ export function thresholdsFor(id, bankLevel, overhead) {
  * @param {object} deps.loop
  * @param {() => number} [deps.reserve]  cookies the buyer is holding back
  * @param {{committed(): number, ranking(): Array<object>}} [deps.buyer]  what it is saving for, and its ranking
- * @param {{verdict(): object, runSeconds(): number}} [deps.ascension]  its verdict, for forecasting
- *   when the run ends, and its run clock
+ * @param {{runSeconds(): number}} [deps.ascension]  its run clock
  * @param {(what: string) => void} [deps.log]
  */
 export function createMarket({ game, settings, loop, reserve = () => 0, buyer = null, ascension = null, log = () => {} }) {
@@ -75,8 +74,7 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
         volumeSince: 0,
         fill: 1, // how often a buy signal found the market able to fill its room
         sampled: new Map(), // good id -> the market tick its fill was last sampled
-        samples: [], // [{t, raw, earned}], one a minute
-        gaps: [], // [{t, gap}] of the ascension verdict, one a minute
+        samples: [], // [{t, raw, earned, cps, factor}], one a minute
         lastSampleAt: -Infinity,
         allocation: null, // the inputs of the last buy decision
         loan: null, // the last loan decision
@@ -103,7 +101,6 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
         state.volume = 0;
         state.volumeSince = now();
         state.samples = [];
-        state.gaps = [];
         state.lastSampleAt = -Infinity;
     }
 
@@ -119,12 +116,6 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
             factor: loanFactor(game.buffs, { fps: game.fps }), // what running loans put on CpS
         });
         while (state.samples.length > 2 && state.samples[1].t <= t - EARNED_SECONDS) state.samples.shift();
-        // A first ascension waits for a prestige target, not for growth to slow (src/core/ascension.js).
-        const verdict = ascension && settings.autoAscendToggle == 1 && game.prestige > 0 ? ascension.verdict() : null;
-        if (verdict && verdict.startDate === game.startDate && Number.isFinite(verdict.instantRate) && Number.isFinite(verdict.averageRate)) {
-            state.gaps.push({ t, gap: verdict.instantRate - verdict.averageRate });
-            while (state.gaps.length > 2 && state.gaps[1].t <= t - GROWTH_SECONDS) state.gaps.shift();
-        }
     }
 
     /** Rate the run's raw CpS record is rising at, per second, over the last half hour. */
@@ -367,15 +358,13 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
             (l) => l.id <= allowed && M.officeLevel >= l.office && !game.hasBuff(`Loan ${l.id}`) && !game.hasBuff(`Loan ${l.id} (interest)`)
         );
         if (!loans.length) return;
-        // Nothing but a combo can make a loan pay. The run's end cannot: a loan taken for its
-        // interest to be cleared at the ascension (Debt evasion) was measured to lose (src/core/loans.js).
+        // Nothing but a combo can make a loan pay. The run's end cannot, and it plays no part in a
+        // combo's loan either: a loan valued on its interest being cleared at the ascension (Debt
+        // evasion) was measured to lose (src/core/loans.js).
         if (!loanOccasion({ buffs: game.buffs, fps: game.fps })) {
             state.loan = { taken: null, reason: "no combo running; a loan at the run's end was measured to lose, so none is taken for it" };
             return;
         }
-        // A combo's loan is still valued only until the forecast end: interest the ascension clears
-        // is never charged (main.js:3492, 13827).
-        const secondsLeft = settings.autoAscendToggle == 1 ? secondsToAscension(state.gaps) : Infinity;
         // How many combos land in an interest window is read from the run's own earnings; until
         // they cover the window read, a loan would be taken blind. With a forced combo every 30
         // minutes, the first ones, taken before any was seen, lost the most (tools/dev/bank.mjs).
@@ -396,19 +385,19 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
         const next = buyerNext();
         const choice = chooseLoan({
             loans,
-            now: { profile, expected, bank: game.cookies, secondsLeft },
+            now: { profile, expected, bank: game.cookies },
             spendable: game.cookies - reserve(),
             committed: committed(),
             buyerReturn: next && Number.isFinite(next.purePayback) && next.purePayback > 0 ? 1 / next.purePayback : 0,
             ahead: forecastCombos(window, { durationMult: live.golden.durationMult, clicksPerSecond: live.clicksPerSecond, share }),
         });
         if (!choice) {
-            state.loan = { taken: null, reason: 'no loan is worth its cost', secondsLeft };
+            state.loan = { taken: null, reason: 'no loan is worth its cost' };
             return;
         }
         press(`bankLoan${choice.loan.id}`);
         if (!game.hasBuff(`Loan ${choice.loan.id}`)) return;
-        const record = { id: choice.loan.id, net: choice.net, gain: choice.gain, cost: choice.cost, secondsLeft, at: runSeconds() };
+        const record = { id: choice.loan.id, net: choice.net, gain: choice.gain, cost: choice.cost, at: runSeconds() };
         state.loans.push(record);
         state.loan = { taken: record };
         log(`market: took loan ${choice.loan.id}, worth ${Math.round(choice.net).toLocaleString()} cookies over its cost`);
@@ -453,7 +442,6 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
                 brokers: state.brokers,
                 loans: state.loans.slice(),
                 loan: state.loan,
-                secondsToAscension: secondsToAscension(state.gaps),
             };
         },
     };

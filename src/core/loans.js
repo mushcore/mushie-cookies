@@ -5,8 +5,22 @@
  * bank at once (minigameMarket.js:348-353, 369-384). On ordinary income every loan loses (see
  * the tests), so a loan pays only on income far above ordinary for its boost: a combo of golden
  * cookie buffs, whose clicks it scales too (each mouse upgrade adds 1% of the buffed CpS to a
- * click, main.js:4692-4708), or a run that ends before its interest does (the reset clears every
- * buff without running a loan's onDie, main.js:3492 and 13827, so no interest is charged).
+ * click, main.js:4692-4708).
+ *
+ * The run's end plays no part. An ascension clears a loan's interest unpaid (the reset kills
+ * buffs without their onDie, main.js:3492 and 13827; the game awards "Debt evasion" for it,
+ * main.js:3489), so a player may fairly time a loan to it, but measured it loses:
+ * - Taken for the end alone (loan 1 when the ascension system's end was forecast inside its two
+ *   hours): the boost kept the run's growth above its average, so the run went on until the boost
+ *   ended; the interest then collapsed CpS and the ascension came at once, 14 minutes into the
+ *   interest, hours before the run without the loan ended. x0.05 and x0.11 the prestige gained,
+ *   x0.25 and x0.51 per second (tools/dev/bank.mjs --prestige, luck-free, two starting
+ *   prestiges, with the run-end occasion that b4ad7bc removed).
+ * - Taken on a plain Frenzy every 15 minutes, its interest counted only up to the forecast end:
+ *   the forecast, blind to the loan's own boost, said 21 and 95 minutes; the runs went on some
+ *   2 hours more and ascended inside the interest. x0.82 and x0.60 the prestige gained
+ *   (tools/dev/bank.mjs --prestige --frenzy=15, at dab8410).
+ * So every loan is valued over its whole boost and interest, as if the run went on.
  */
 import { incomeSpikeRunning, classifyBuffs } from './buffs.js';
 
@@ -45,15 +59,14 @@ export function incomeOver(profile, expected, from, to) {
  * @param {Array<{seconds, perSecond}>} [args.profile]  income the loan would scale over the running buffs
  * @param {number} args.expected     income it would scale per second on average, with no buff known
  * @param {number} args.bank
- * @param {number} [args.secondsLeft=Infinity]  until the run ends; nothing after that counts
  * @param {Array<{inSeconds: number, profile}>} [args.ahead]  combos forecast to come
  * @returns {{gain: number, cost: number, net: number}}
  */
-export function loanValue({ loan, profile = [], expected, bank, secondsLeft = Infinity, ahead = [] }) {
-    const boostEnd = Math.min(loan.seconds, secondsLeft);
-    const interestEnd = Math.min(loan.seconds + loan.interestSeconds, secondsLeft);
+export function loanValue({ loan, profile = [], expected, bank, ahead = [] }) {
+    const boostEnd = loan.seconds;
+    const interestEnd = loan.seconds + loan.interestSeconds;
     let gain = (loan.mult - 1) * incomeOver(profile, expected, 0, boostEnd);
-    let interest = interestEnd > loan.seconds ? (1 - loan.interestMult) * expected * (interestEnd - loan.seconds) : 0;
+    let interest = (1 - loan.interestMult) * expected * loan.interestSeconds;
     // A combo forecast to land while the loan runs is scaled with everything else: up during the
     // boost, down during the interest, where one combo can cost more than the loan made.
     for (const combo of ahead) {
@@ -72,16 +85,7 @@ export function loanValue({ loan, profile = [], expected, bank, secondsLeft = In
  * What could make a loan pay now, before any valuation: 'combo' while an income spike runs (the
  * shared classifier, src/core/buffs.js), else null. A long boost (Sugar frenzy, a loan, a golden
  * lump's blessing) is no combo: it lasts hours or days, and on it every loan loses as on ordinary
- * income.
- *
- * The run's end is no occasion either. An ascension clears a loan's interest unpaid (the reset
- * kills buffs without their onDie, main.js:3492 and 13827; the game awards "Debt evasion" for
- * it, main.js:3489), so a player may fairly time a loan to it. Measured, it loses: loan 1 taken
- * when the ascension system's end was forecast inside its two hours kept the run's growth above
- * its average, so the run went on until the boost ended; the interest then collapsed CpS and the
- * ascension came at once, 14 minutes into the interest, hours before the run without the loan
- * ended (x0.05 and x0.11 the prestige gained, x0.25 and x0.51 per second; tools/dev/bank.mjs
- * --prestige, luck-free, two starting prestiges).
+ * income. The run's end is no occasion either (see the top of this file).
  * @param {object} args
  * @param {object|Array<object>} args.buffs  Game.buffs
  * @param {number} [args.fps=30]
@@ -186,38 +190,6 @@ export function incomeMultiple(samples, seconds) {
     return sum / (last.t - samples[from].t);
 }
 
-const ETA_WINDOW_SECONDS = 30 * 60; // how far back the trend is fitted
-const ETA_MIN_SAMPLES = 10;
-
-/**
- * Seconds until the ascension system is expected to end the run, or Infinity when it cannot be
- * said. It ascends once the run's current growth rate falls under the run's average
- * (src/core/ascension.js); this fits a line to their gap over the last half hour and extends it
- * to zero.
- * @param {Array<{t: number, gap: number}>} samples  oldest first; t in seconds, gap = current − average
- */
-export function secondsToAscension(samples) {
-    if (!samples.length) return Infinity;
-    const last = samples[samples.length - 1];
-    if (last.gap <= 0) return 0;
-    const recent = samples.filter((s) => s.t >= last.t - ETA_WINDOW_SECONDS);
-    if (recent.length < ETA_MIN_SAMPLES) return Infinity;
-    const n = recent.length;
-    const mt = recent.reduce((s, x) => s + x.t, 0) / n;
-    const mg = recent.reduce((s, x) => s + x.gap, 0) / n;
-    let num = 0;
-    let den = 0;
-    for (const x of recent) {
-        num += (x.t - mt) * (x.gap - mg);
-        den += (x.t - mt) * (x.t - mt);
-    }
-    const slope = den > 0 ? num / den : 0;
-    if (!(slope < 0)) return Infinity;
-    // Where the fitted line reaches zero, measured from the latest sample.
-    const atLast = mg + slope * (last.t - mt);
-    return Math.max(0, -atLast / slope);
-}
-
 /**
  * Which loan to take now, or null for none.
  *
@@ -230,7 +202,7 @@ export function secondsToAscension(samples) {
  *
  * @param {object} args
  * @param {Array<object>} args.loans       loans that can be taken now (office level, none running)
- * @param {{profile, expected, bank, secondsLeft}} args.now
+ * @param {{profile, expected, bank}} args.now
  * @param {number} args.spendable          bank above the buyer's reserve
  * @param {number} [args.committed=0]      of that, what the buyer is saving for its next purchase
  * @param {number} [args.buyerReturn=0]    1 / that purchase's purePayback
@@ -238,25 +210,23 @@ export function secondsToAscension(samples) {
  * @returns {{loan: object, net: number, gain: number, cost: number} | null}
  */
 export function chooseLoan({ loans, now, spendable, committed = 0, buyerReturn = 0, ahead = [] }) {
-    const secondsLeft = now.secondsLeft === undefined ? Infinity : now.secondsLeft;
     let best = null;
     for (const loan of loans) {
         const down = loan.downpayment * now.bank;
         if (down > spendable) continue;
-        const value = loanValue({ loan, ...now, secondsLeft, ahead });
+        const value = loanValue({ loan, profile: now.profile, expected: now.expected, bank: now.bank, ahead });
         if (!(value.net > 0)) continue;
-        if (down > spendable - committed && !(value.net / (down * Math.min(loan.seconds, secondsLeft)) > buyerReturn)) continue;
+        if (down > spendable - committed && !(value.net / (down * loan.seconds) > buyerReturn)) continue;
         const window = loan.seconds + loan.interestSeconds;
         // Taken on a combo to come instead, the loan is valued from there, with the combos after it.
         const better = ahead.some(
             (combo) =>
-                combo.inSeconds < Math.min(window, secondsLeft) &&
+                combo.inSeconds < window &&
                 loanValue({
                     loan,
                     profile: combo.profile,
                     expected: now.expected,
                     bank: now.bank,
-                    secondsLeft: secondsLeft - combo.inSeconds,
                     ahead: ahead.filter((c) => c.inSeconds > combo.inSeconds).map((c) => ({ ...c, inSeconds: c.inSeconds - combo.inSeconds })),
                 }).net > value.net
         );

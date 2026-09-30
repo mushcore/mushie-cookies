@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LOANS, incomeOver, loanValue, chooseLoan, secondsToAscension, comboProfile, castTimes, loanOccasion, incomeMultiple, loanFactor } from '../../src/core/loans.js';
+import { LOANS, incomeOver, loanValue, chooseLoan, comboProfile, castTimes, loanOccasion, incomeMultiple, loanFactor } from '../../src/core/loans.js';
 import { BUFF_FIXTURES, buffFromFixture } from '../fixtures/buffs.mjs';
 
 const close = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
@@ -51,37 +51,47 @@ test('a pawnshop loan pays on a click frenzy: 40 seconds doubled against 40 minu
     assert.ok(v.net > 0);
 });
 
-test('an ascension ends a loan and its interest: nothing after the run counts', () => {
-    // killBuffs at the reset never runs a loan's onDie, so no interest is ever charged (main.js:3492, 13827).
-    const v = loanValue({ loan: loan1, profile: [], expected: 1, bank: 1000, secondsLeft: 3600 });
-    assert.ok(close(v.gain, 0.5 * 3600));
-    assert.ok(close(v.cost, 0.2 * 1000), 'only the downpayment');
-    const partial = loanValue({ loan: loan1, profile: [], expected: 1, bank: 0, secondsLeft: 7200 + 1000 });
-    assert.ok(close(partial.cost, 0.75 * 1000), 'interest only until the run ends');
+test('the run\'s forecast end plays no part in a loan: its boost and its interest are valued in full', () => {
+    // An ascension clears a loan's interest unpaid (killBuffs never runs its onDie, main.js:3492,
+    // 13827), but a loan valued as if it would lost: its boost held the run up past the forecast,
+    // and the run ascended inside the interest, with less prestige (x0.82 and x0.60 on a plain
+    // Frenzy every 15 minutes; x0.05 and x0.11 taken for the end alone). A plain Frenzy (x7, 77 s)
+    // pays for no loan on its own.
+    const frenzy = comboProfile({ buffs: [{ seconds: 77, multCpS: 7 }], cps: 1, clicksPerSecond: 0, clickShare: 0 });
+    const now = { profile: frenzy, expected: 1, bank: 2000 };
+    assert.equal(chooseLoan({ loans: [loan1, loan2], now, spendable: 2000 }), null, 'a plain Frenzy');
+    // The same Frenzy with the ascension forecast 6,553 s away, as in the debt-evasion run.
+    const forecast = chooseLoan({ loans: [loan1, loan2], now: { ...now, secondsLeft: 6553 }, spendable: 2000 });
+    assert.equal(forecast, null, `took loan ${forecast && forecast.loan.id} for the run's end: ${JSON.stringify(forecast)}`);
+    for (const loan of LOANS) {
+        assert.deepEqual(loanValue({ loan, expected: 1, bank: 1000, secondsLeft: 3600 }), loanValue({ loan, expected: 1, bank: 1000 }), `loan ${loan.id}`);
+    }
 });
 
 test('a loan is taken only when it is worth more than it costs', () => {
-    const now = { profile: [], expected: 1, bank: 1000, secondsLeft: Infinity };
+    const now = { profile: [], expected: 1, bank: 1000 };
     assert.equal(chooseLoan({ loans: LOANS, now, spendable: 1000 }), null);
 });
 
 test('the downpayment may take only what the buyer is not holding', () => {
-    const now = { profile: [{ seconds: 26, perSecond: 1000 }], expected: 1, bank: 1000, secondsLeft: Infinity };
+    const now = { profile: [{ seconds: 26, perSecond: 1000 }], expected: 1, bank: 1000 };
     assert.equal(chooseLoan({ loans: [loan2], now, spendable: 1000 }).loan.id, 2);
     // 40% of a 1000 bank is 400; with 300 free above the reserve, no loan.
     assert.equal(chooseLoan({ loans: [loan2], now, spendable: 300 }), null);
 });
 
 test('of the loans worth taking, the most valuable is taken', () => {
-    // Close to the end of the run: the modest loan's two hours pay, the pawnshop's 40 seconds barely.
-    const now = { profile: [], expected: 1, bank: 100, secondsLeft: 3000 };
+    // A spike of 100× ordinary income for ten minutes: the modest loan's two hours scale all of
+    // it, the pawnshop's 40 seconds a fifteenth. Both pay; the modest loan pays more.
+    const now = { profile: [{ seconds: 600, perSecond: 100 }], expected: 1, bank: 100 };
+    assert.ok(loanValue({ loan: loan2, ...now }).net > 0, 'the pawnshop loan pays too');
     const choice = chooseLoan({ loans: [loan1, loan2], now, spendable: 100 });
     assert.equal(choice.loan.id, 1);
-    assert.ok(close(choice.net, 0.5 * 3000 - 0.2 * 100));
+    assert.ok(close(choice.net, 0.5 * (60000 + 6600) - 0.2 * 100 - 0.75 * 14400));
 });
 
 test('a loan waits when a better combo is forecast inside its window', () => {
-    const now = { profile: [{ seconds: 26, perSecond: 1000 }], expected: 1, bank: 1000, secondsLeft: Infinity };
+    const now = { profile: [{ seconds: 26, perSecond: 1000 }], expected: 1, bank: 1000 };
     const bigger = { profile: [{ seconds: 26, perSecond: 5000 }] };
     // In 10 minutes, inside the pawnshop loan's 40 minutes of interest: wait for it.
     assert.equal(chooseLoan({ loans: [loan2], now, spendable: 1000, ahead: [{ inSeconds: 600, ...bigger }] }), null);
@@ -92,27 +102,14 @@ test('a loan waits when a better combo is forecast inside its window', () => {
     assert.equal(chooseLoan({ loans: [loan2], now, spendable: 1000, ahead: [{ inSeconds: 600, ...smaller }] }).loan.id, 2);
 });
 
-test('the ascension is forecast where the run\'s current growth, falling in a line, meets its average', () => {
-    // The ascension system ascends once the current growth rate drops under the run's average
-    // (src/core/ascension.js); `gap` is the first minus the second, sampled once a minute.
-    const slow = Array.from({ length: 31 }, (_, i) => ({ t: 60 * i, gap: 30 - 0.01 * 60 * i }));
-    assert.ok(close(secondsToAscension(slow), (30 - 18) / 0.01), 'twelve more at a hundredth a second');
-    const rising = Array.from({ length: 31 }, (_, i) => ({ t: 60 * i, gap: 1 + 0.01 * 60 * i }));
-    assert.equal(secondsToAscension(rising), Infinity);
-    const crossed = slow.concat([{ t: 1860, gap: -1 }]);
-    assert.equal(secondsToAscension(crossed), 0, 'already below: the ascension is due');
-    assert.equal(secondsToAscension(slow.slice(0, 5)), Infinity, 'too little history to say');
-    assert.equal(secondsToAscension([]), Infinity);
-});
-
 test('a downpayment takes what the buyer is saving for only when the loan out-earns that purchase', () => {
-    // Near the end of the run the modest loan pays: 0.5 × 3000 = 1500 over 20 of downpayment.
-    const now = { profile: [], expected: 1, bank: 100, secondsLeft: 3000 };
+    // On ten minutes at 100× the modest loan nets 22,480 over its 20 of downpayment.
+    const now = { profile: [{ seconds: 600, perSecond: 100 }], expected: 1, bank: 100 };
     // With 100 free but 90 of it saved for a purchase, the 20 of downpayment cuts into the saving.
-    // The loan returns 1480 on 20 over 3000 s, about 0.025 a second.
-    assert.equal(chooseLoan({ loans: [loan1], now, spendable: 100, committed: 90, buyerReturn: 0.01 }).loan.id, 1);
-    assert.equal(chooseLoan({ loans: [loan1], now, spendable: 100, committed: 90, buyerReturn: 0.05 }), null);
-    assert.equal(chooseLoan({ loans: [loan1], now, spendable: 100, committed: 50, buyerReturn: 0.05 }).loan.id, 1, 'the saving is untouched');
+    // The loan returns 22,480 on 20 over its 7,200 s, about 0.156 a second.
+    assert.equal(chooseLoan({ loans: [loan1], now, spendable: 100, committed: 90, buyerReturn: 0.1 }).loan.id, 1);
+    assert.equal(chooseLoan({ loans: [loan1], now, spendable: 100, committed: 90, buyerReturn: 0.2 }), null);
+    assert.equal(chooseLoan({ loans: [loan1], now, spendable: 100, committed: 50, buyerReturn: 0.2 }).loan.id, 1, 'the saving is untouched');
 });
 
 test('a combo\'s profile is what a loan scales, piece by piece as each buff ends', () => {
@@ -151,8 +148,6 @@ test('a combo forecast inside the interest counts against the loan, one inside t
     assert.ok(close(hit.gain, pawn.gain));
     const later = loanValue({ loan: loan2, expected: 1, bank: 0, ahead: [{ inSeconds: 3000, ...combo }] });
     assert.ok(close(later.net, pawn.net), 'after the interest it changes nothing');
-    const ended = loanValue({ loan: loan2, expected: 1, bank: 0, secondsLeft: 500, ahead: [{ inSeconds: 600, ...combo }] });
-    assert.ok(close(ended.cost, 0.9 * (500 - 40.2)), 'nor after the run');
     // An hour on falls in the modest loan's two hours at ×1.5.
     const modest = loanValue({ loan: loan1, expected: 1, bank: 0 });
     const boosted = loanValue({ loan: loan1, expected: 1, bank: 0, ahead: [{ inSeconds: 3600, ...combo }] });
@@ -163,7 +158,7 @@ test('a combo forecast inside the interest counts against the loan, one inside t
 test('a pawnshop loan waits when the next combo forecast would fall in its interest', () => {
     // Two combos alike, ten minutes apart. Taken on the first, the loan's 40 minutes at a tenth
     // would cost 90% of the second; taken on the second, nothing.
-    const now = { profile: [{ seconds: 26, perSecond: 1000 }], expected: 1, bank: 1000, secondsLeft: Infinity };
+    const now = { profile: [{ seconds: 26, perSecond: 1000 }], expected: 1, bank: 1000 };
     const same = { profile: [{ seconds: 26, perSecond: 1000 }] };
     assert.equal(chooseLoan({ loans: [loan2], now, spendable: 1000, ahead: [{ inSeconds: 600, ...same }] }), null);
     // When the second is the one being valued, none follows it: it is taken.
