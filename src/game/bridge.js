@@ -16,11 +16,14 @@ import { createSeasons } from '../systems/seasons.js';
 
 const CHAIN_REACH = 15;
 
-/** Which buildings and upgrades the settings exclude, read live. */
+/** Which buildings and upgrades the settings exclude, and whether wrinklers are popped, read live. */
 export function policyFrom(game, settings, presets, prerequisites) {
     const preset = (presets && presets[settings.blacklist]) || { upgrades: [], buildings: [] };
     const excludedUpgrades = preset.upgrades === true ? 'all' : new Set(preset.upgrades);
-    if (preset.buildings === true) return { excludedBuildings: 'all', excludedUpgrades, chainReach: CHAIN_REACH, prerequisites };
+    // A purchase that pops wrinklers (the elder plan, src/game/candidates.js) waits while the
+    // wrinkler system leaves them be.
+    const popsWrinklers = Number(settings.autoWrinkler) > 0;
+    if (preset.buildings === true) return { excludedBuildings: 'all', excludedUpgrades, chainReach: CHAIN_REACH, prerequisites, popsWrinklers };
 
     const excludedBuildings = new Set(preset.buildings);
     // limits: building id -> the most the settings allow. At the limit the building is excluded;
@@ -37,7 +40,7 @@ export function policyFrom(game, settings, presets, prerequisites) {
     if (settings.mineLimit) limit('Mine', settings.mineMax);
     if (settings.factoryLimit) limit('Factory', settings.factoryMax);
     if (settings.autoDragonOrbs && settings.orbLimit) limit('You', settings.orbMax);
-    return { excludedBuildings, excludedUpgrades, chainReach: CHAIN_REACH, prerequisites, limits };
+    return { excludedBuildings, excludedUpgrades, chainReach: CHAIN_REACH, prerequisites, limits, popsWrinklers };
 }
 
 /** Bank the settings ask to hold beyond the golden cookie reserve, from the legacy helpers. */

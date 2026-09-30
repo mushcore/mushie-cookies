@@ -157,15 +157,23 @@ test('the fiftieth cursor is worth its achievement inside a what-if', { skip }, 
             cursor.amount = 49;
             cursor.bought = 49;
             Game.BuildingsOwned = Game.ObjectsById.reduce((s, b) => s + b.amount, 0);
+            // The setup's 139 buildings make Builder due at the next five-second check
+            // (main.js:16457). Won now, it cannot stand in for the cursor's own achievement.
+            Game.Win('Builder');
             Game.CalculateGains();
             const owned = Game.AchievementsOwned;
             const plain = { apply: () => { cursor.amount++; cursor.bought++; Game.BuildingsOwned++; } };
             const aware = { apply: () => { plain.apply(); MushieCookies.awardForBuildings(Game, cursor); } };
-            const [a, b] = MushieCookies.simulateEach(Game, [plain, aware], () => ({ cps: Game.cookiesPs, owned: Game.AchievementsOwned }));
-            return { plain: a, aware: b, ownedAfter: Game.AchievementsOwned, ownedBefore: owned, amount: cursor.amount };
+            const measure = () => ({ cps: Game.cookiesPs, owned: Game.AchievementsOwned, wheel: Game.Achievements['Mouse wheel'].won });
+            const [a, b] = MushieCookies.simulateEach(Game, [plain, aware], measure);
+            return { plain: a, aware: b, ownedAfter: Game.AchievementsOwned, ownedBefore: owned, amount: cursor.amount, wheelAfter: Game.Achievements['Mouse wheel'].won };
         });
-        assert.ok(out.aware.owned > out.plain.owned, 'the tier achievement should be counted in the aware trial');
+        // The cursor's buy function wins Mouse wheel at fifty (main.js:8718).
+        assert.equal(out.plain.wheel, 0);
+        assert.equal(out.aware.wheel, 1, 'Mouse wheel should be won in the aware trial');
+        assert.equal(out.aware.owned, out.plain.owned + 1, 'Mouse wheel, and nothing else, is counted in the aware trial');
         assert.ok(out.aware.cps > out.plain.cps, 'the achievement raises milk and so CpS');
+        assert.equal(out.wheelAfter, 0);
         assert.equal(out.ownedAfter, out.ownedBefore);
         assert.equal(out.amount, 49);
     }));
