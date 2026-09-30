@@ -7,6 +7,8 @@ import { createGrimoire } from '../systems/grimoire.js';
 import { createGarden } from '../systems/garden.js';
 import { createMarket } from '../systems/market.js';
 import { createGods } from '../systems/gods.js';
+import { createShimmers } from '../systems/shimmers.js';
+import { createClicker } from '../systems/clicker.js';
 
 const CHAIN_REACH = 15;
 
@@ -44,8 +46,23 @@ export function extraReserveFrom(settings, helpers) {
 }
 
 /** Starts the new systems once the legacy code has started. Returns them by name. */
-export function startSystems({ game, loop, legacy, log }) {
+export function startSystems({ game, loop, legacy, log, guard }) {
     const settings = legacy.settings;
+    // First on the loop: a shimmer is popped in the frame it appears, before any system reads the
+    // screen (see src/systems/shimmers.js).
+    const shimmers = createShimmers({
+        game,
+        settings,
+        loop,
+        log,
+        // Asked from the loop only, once `ascension` below exists.
+        ascensionImminent: () => {
+            if (settings.autoAscendToggle != 1) return false;
+            const r = ascension.report();
+            return r.phase !== 'playing' || !!(r.verdict && r.verdict.ascend);
+        },
+    });
+    const clicker = createClicker({ game, settings, loop, log, guard });
     const buyer = createBuyer({
         game,
         settings,
@@ -68,5 +85,5 @@ export function startSystems({ game, loop, legacy, log }) {
     const garden = createGarden({ game, settings, loop, log });
     const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
     const gods = createGods({ game, settings, loop, log, buyer });
-    return { buyer, ascension, lumps, grimoire, garden, market, gods };
+    return { buyer, ascension, lumps, grimoire, garden, market, gods, shimmers, clicker };
 }

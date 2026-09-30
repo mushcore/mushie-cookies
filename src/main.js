@@ -5,7 +5,7 @@ import { register } from './game/boot.js';
 import { startSystems } from './game/bridge.js';
 
 export { simulate, simulateEach, takeSnapshot, diffSnapshots } from './core/sim.js';
-export { readState, measureCandidates } from './game/measure.js';
+export { readState, measureCandidates, clicksPerSecond } from './game/measure.js';
 import { readState as readStateNow } from './game/measure.js';
 import { estimateIncome as estimateNow } from './core/income.js';
 
@@ -44,6 +44,8 @@ export let grimoire = null;
 export let garden = null;
 export let market = null;
 export let gods = null;
+export let shimmers = null;
+export let clicker = null;
 
 const guards = createGuard({
     maxFailures: 5,
@@ -73,6 +75,7 @@ const runtime = {
             game: window.Game,
             loop,
             log,
+            guard,
             legacy: {
                 settings: window.FrozenCookies,
                 blacklistPresets: window.blacklist,
@@ -92,6 +95,8 @@ const runtime = {
         garden = systems.garden;
         market = systems.market;
         gods = systems.gods;
+        shimmers = systems.shimmers;
+        clicker = systems.clicker;
     },
     save: () => window.saveFCData(),
     load: (data) => window.setOverrides(data),

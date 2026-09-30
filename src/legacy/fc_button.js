@@ -481,11 +481,8 @@ function FCMenu() {
         subsection.append(
             $("<div>").addClass("title").html("Other Information")
         );
-        cps =
-            baseCps() +
-            (FrozenCookies.autoClick
-                ? Game.computedMouseCps * Math.min(FrozenCookies.cookieClickSpeed, 50)
-                : 0);
+        // Clicks at the rate the clicker measures, 0 with Autoclick off.
+        cps = baseCps() + Game.computedMouseCps * MushieCookies.clicksPerSecond(FrozenCookies);
         baseChosen = Game.hasBuff("Frenzy") ? "" : " (*)";
         frenzyChosen = Game.hasBuff("Frenzy") ? " (*)" : "";
         clickStr = FrozenCookies.autoClick ? " + Autoclick" : "";

@@ -1,7 +1,8 @@
 // The buyer: ranks everything for sale by the income it adds, keeps a reserve for golden
 // cookies when that pays, and buys. Runs on the loop; reads settings live.
 import { estimateIncome } from '../core/income.js';
-import { rankCandidates, chooseReserve, decide } from '../core/buyer.js';
+import { rankCandidates, chooseReserve, decide, withoutBought } from '../core/buyer.js';
+import { clickBuffRunning } from '../core/clicker.js';
 import { readState, measureCandidates } from '../game/measure.js';
 import { listCandidates } from '../game/candidates.js';
 
@@ -39,6 +40,7 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         stamp: '',
         last: null, // the last decision, for the menu
         purchases: 0,
+        ranks: 0,
         failed: new Map(), // candidate key -> frame it may be tried again
         frame: 0,
     };
@@ -47,6 +49,12 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
     // add a share of the buffed CpS, main.js:4692-4708), so rankings are made between buffs and
     // the last one is kept while a buff runs.
     const cpsBuffRunning = () => Object.values(game.buffs).some((b) => b.multCpS && b.multCpS !== 1);
+    // While a click buff runs each click is worth hundreds of ordinary ones, and a ranking pass
+    // (hundreds of what-ifs inside Game.Logic) holds the page's one thread while the clicker's
+    // timer waits: in the game's runtime, buying from a rich bank cut 41 accepted clicks a second
+    // to between 5 and 22. So buying and ranking wait the buff out (Click frenzy lasts 13 s,
+    // Dragonflight and Cursed finger 10 s, times the golden cookie duration upgrades).
+    const clickBuff = () => clickBuffRunning(game.buffs);
 
     // Anything here changing means the ranking may be wrong.
     const stampOf = () =>
@@ -81,11 +89,13 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         state.rankedAt = frame;
         state.stale = false;
         state.stamp = stampOf();
+        state.ranks++;
     }
 
     function refreshIfStale(frame) {
         const due = state.stale || !state.income || frame - state.rankedAt >= RERANK_FRAMES || state.stamp !== stampOf();
         if (!due) return;
+        if (state.income && clickBuff()) return; // even a stale ranking waits for the clicks
         if (state.income && cpsBuffRunning() && !state.stale) return;
         rank(frame);
     }
@@ -152,13 +162,17 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
 
     function tick(frame) {
         state.frame = frame;
+        if (state.income && clickBuff()) return;
         refreshIfStale(frame);
         for (let i = 0; i < PURCHASES_PER_TICK; i++) {
             const choice = decide({ ranked: state.ranked, reserve: state.reserve, bank: game.cookies });
             state.last = { choice, reserve: state.reserve };
             if (!choice) break;
             if (!buy(choice)) break;
-            rank(frame);
+            // During a CpS buff the ranking is left out of date (refreshIfStale redoes it once the
+            // buff ends) and buying goes on down it, less what this purchase changed.
+            if (cpsBuffRunning()) state.ranked = withoutBought(state.ranked, choice);
+            else rank(frame);
         }
         enablers();
     }
@@ -180,6 +194,10 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         },
         reserve() {
             return state.reserve;
+        },
+        /** Rankings made and purchases made so far; reading them ranks nothing. */
+        activity() {
+            return { ranks: state.ranks, purchases: state.purchases };
         },
         /** What the next purchase is, or null; ranks first if the ranking is stale. */
         next() {

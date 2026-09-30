@@ -275,8 +275,9 @@ function updateTimers() {
         Math.min(Game.cookies, bankTotal) / (bankTotal + purchaseTotal);
     purchasePercent = purchaseTotal / (purchaseTotal + bankTotal);
     bankMax = bankTotal / (purchaseTotal + bankTotal);
+    // Clicks at the rate the clicker measures, 0 with Autoclick off.
     actualCps =
-        Game.cookiesPs + Game.mouseCps() * FrozenCookies.cookieClickSpeed;
+        Game.cookiesPs + Game.mouseCps() * MushieCookies.clicksPerSecond(FrozenCookies);
 
     t_draw = [];
 
