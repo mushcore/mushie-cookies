@@ -256,6 +256,62 @@ test('the Pantheon system slots Godzamok once the combo system sells for him and
     }
 });
 
+// The switch the combo holds on for a click buff (26 s, up to 154 s with a Frenzy under it) stops
+// golden cookies (main.js:5673-5676), and with them every click buff Godzamok plays: judged in
+// that state he is worth nothing. A Pantheon decision that falls in such a window must judge the
+// gods as they stand once the switch goes off again, or it takes him out mid-buff and spends a
+// second swap to put him back.
+test('the Pantheon system judges the gods with the Golden switch the combo holds on for a click buff off', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openBakery(game);
+        await game.eval(clicking, MICE);
+        await game.eval(goldenSwitch);
+        await game.eval(slotGodzamok, 0);
+        await game.eval(() => {
+            Object.assign(FrozenCookies, { autoGods: 1, autoWorshipToggle: 0, autoGodzamok: 1, autoGS: 1 });
+            // Every drag the Pantheon system makes, with the switch as it was at that moment.
+            const M = Game.Objects['Temple'].minigame;
+            window.__drags = [];
+            const drag = M.dragGod;
+            M.dragGod = function (god) {
+                window.__drags.push({ god: god.name, switchOn: !!Game.Has('Golden switch [off]'), buffs: Object.keys(Game.buffs) });
+                return drag.apply(this, arguments);
+            };
+        });
+        const best = (plan) => {
+            const top = plan.gods.reduce((a, b) => (b.gain > a.gain ? b : a));
+            return { god: top.god, slot: top.slot, gain: top.gain };
+        };
+        const off = best(await game.eval(() => MushieCookies.gods.plan()));
+        // From three minutes in, a Click frenzy every 27 s: the combo turns the switch on for each
+        // and off after, and the Pantheon system's first decision, five minutes after the mod
+        // started, falls in one.
+        await game.advanceSeconds(180);
+        let during = null;
+        for (let i = 0; i < 7; i++) {
+            await game.eval(() => Game.gainBuff('click frenzy', 26, 777));
+            await game.advanceSeconds(1);
+            if (!during) during = await game.eval(() => ({ plan: MushieCookies.gods.plan(), on: !!Game.Has('Golden switch [off]'), report: MushieCookies.combos.report() }));
+            await game.advanceSeconds(26);
+        }
+        const out = await game.eval(() => {
+            const M = Game.Objects['Temple'].minigame;
+            return { slots: M.slot.map((id) => (id === -1 ? null : Object.keys(M.gods)[id])), drags: window.__drags, gods: MushieCookies.gods.report(), combos: MushieCookies.combos.report() };
+        });
+        console.log('switch off:', JSON.stringify(off), 'switch on:', JSON.stringify(best(during.plan)), JSON.stringify(out));
+        assert.equal(during.on, true, `the combo left the switch off: ${JSON.stringify(during.report)}`);
+        const seen = best(during.plan);
+        assert.deepEqual({ god: seen.god, slot: seen.slot }, { god: off.god, slot: off.slot }, `best move with the switch on ${JSON.stringify(seen)}, off ${JSON.stringify(off)}`);
+        assert.ok(Math.abs(seen.gain - off.gain) < 0.001, `gain ${seen.gain} with the switch on, ${off.gain} off`);
+        assert.ok(out.drags.some((d) => d.switchOn), `no decision fell while the switch was on: ${JSON.stringify(out.drags)}`);
+        assert.equal(out.slots[0], 'ruin', `Godzamok taken out of the diamond slot: ${JSON.stringify(out.gods)}`);
+        assert.deepEqual(game.errors, []);
+    } finally {
+        await game.close();
+    }
+});
+
 /**
  * Runs in the page: the Golden switch heavenly upgrade owned, so the switch is in the store, and
  * golden cookies clicked as they appear, twice as often with Lucky day (main.js:5683): what the
@@ -456,6 +512,82 @@ test('turns the Golden switch on as the click buff starts when the bank covers t
         const after = await game.eval(switchNow);
         assert.equal(after.on, false, JSON.stringify(after.report));
         assert.equal(after.report.switchedOff, 1);
+        assert.deepEqual(game.errors, []);
+    } finally {
+        await game.close();
+    }
+});
+
+// Each frame the game recalculates CpS (main.js:16274) before it ends the buffs that ran out
+// (13809-13822): on the frame a Frenzy ends, the price of turning the switch off, an hour of CpS
+// (main.js:10694), still carries its x7 until the next frame.
+test('turns the Golden switch off after a Frenzy at the price without it', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openBakery(game);
+        await game.eval(clicking, MICE);
+        await game.eval(goldenSwitch);
+        await game.eval(() => {
+            FrozenCookies.autoGS = 1;
+        });
+        // The combo system looks every third frame: the Frenzy ends once on each of the three.
+        for (const frames of [1, 2, 3]) {
+            await game.eval(() => {
+                Game.gainBuff('frenzy', 154, 7);
+                Game.gainBuff('click frenzy', 26, 777);
+            });
+            await game.advanceSeconds(30);
+            const waiting = await game.eval(switchNow);
+            assert.equal(waiting.on, true, `off before the Frenzy ended: ${JSON.stringify(waiting.report)}`);
+            // The Frenzy is the only buff on CpS: the price without it is a seventh.
+            waiting.priceWithout = await game.eval((f) => {
+                Game.buffs['Frenzy'].time = f;
+                return Game.Upgrades['Golden switch [on]'].getPrice() / 7;
+            }, frames);
+            await game.advanceSeconds(1);
+            const off = await game.eval(switchNow);
+            const paid = off.report.spentOnSwitch - waiting.report.spentOnSwitch;
+            assert.equal(off.on, false, JSON.stringify(off.report));
+            assert.ok(paid < 1.01 * waiting.priceWithout, `the Frenzy ending ${frames} frames on: paid ${paid}, ${(paid / waiting.priceWithout).toFixed(2)}x the price without it`);
+        }
+        assert.deepEqual(game.errors, []);
+    } finally {
+        await game.close();
+    }
+});
+
+// Nothing else turns the switch off: left on, it would stop golden cookies for good.
+test('turns off the Golden switch it turned on for a click buff when Auto-Golden Switch is turned off, and leaves one the player turned on', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openBakery(game);
+        await game.eval(clicking, MICE);
+        await game.eval(goldenSwitch);
+        await game.eval(() => {
+            FrozenCookies.autoGS = 1;
+            Game.gainBuff('click frenzy', 26, 777);
+        });
+        await game.advanceSeconds(1);
+        const on = await game.eval(switchNow);
+        assert.equal(on.on, true, JSON.stringify(on.report));
+        await game.eval(() => {
+            FrozenCookies.autoGS = 0;
+        });
+        await game.advanceSeconds(1);
+        const off = await game.eval(switchNow);
+        assert.equal(off.on, false, `left on: ${JSON.stringify(off.report)}`);
+        assert.equal(off.report.switchedOff, 1);
+        assert.equal(await game.eval(() => Game.shimmerTypes.golden.spawnConditions()), true);
+
+        // The player's own switch is the player's.
+        await game.eval(() => {
+            Game.Upgrades['Golden switch [off]'].buy();
+            Game.gainBuff('click frenzy', 26, 777);
+        });
+        await game.advanceSeconds(30);
+        const mine = await game.eval(switchNow);
+        assert.equal(mine.on, true, JSON.stringify(mine.report));
+        assert.equal(mine.report.switchedOff, 1);
         assert.deepEqual(game.errors, []);
     } finally {
         await game.close();

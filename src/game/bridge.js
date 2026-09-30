@@ -106,7 +106,8 @@ export function startSystems({ game, loop, legacy, log, guard }) {
     const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
     // The dragon trains before the gods pick auras; `dragon` tells them when a level is gained.
     const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve() });
-    const gods = createGods({ game, settings, loop, log, buyer, dragon });
+    // The gods are judged with the Golden switch as it will be once a click buff it is on for is over.
+    const gods = createGods({ game, settings, loop, log, buyer, dragon, passingSwitch: () => (combos ? combos.switchPassing() : false) });
     // Leaving the Golden switch on for good is judged over the run's expected length, as played.
     combos = createCombos({ game, settings, loop, log, buyer, runSeconds: () => ascension.runSeconds() });
     return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, shimmers, clicker, wrinklers, heavenly, combos };

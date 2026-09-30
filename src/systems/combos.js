@@ -14,7 +14,7 @@
 // can spawn (src/game/measure.js), and the price of turning the switch off on top.
 import { simulate } from '../core/sim.js';
 import { estimateIncome } from '../core/income.js';
-import { classifyBuffs, KINDS } from '../core/buffs.js';
+import { classifyBuffs, unbuffedFactors, KINDS } from '../core/buffs.js';
 import {
     planSale,
     saleOptions,
@@ -234,7 +234,17 @@ export function createCombos({ game, settings, loop, buyer = null, runSeconds = 
         return measured.value;
     }
 
+    // Each frame the game recalculates CpS (main.js:16274) before it ends the buffs that ran out
+    // (main.js:13809-13822), so on the frame a Frenzy ends either toggle's price, an hour of CpS
+    // (main.js:10679, 10694), still carries its x7. Game.cookiesPs is Game.unbuffedCps times the
+    // buffs it was computed with (main.js:5155-5162); above that times the buffs running now, the
+    // price is one the next frame lowers.
+    function priceFalling() {
+        return game.cookiesPs > game.unbuffedCps * unbuffedFactors(game.buffs).cps * (1 + 1e-9);
+    }
+
     function buySwitch(upgrade) {
+        if (priceFalling()) return false;
         const price = upgrade.getPrice();
         if (!upgrade.buy()) return false;
         state.spentOnSwitch += price;
@@ -303,7 +313,12 @@ export function createCombos({ game, settings, loop, buyer = null, runSeconds = 
         const hold = state.heldBefore + plan.priceOff;
         if (hold > state.hold * 1.1) invalidate(); // the buyer re-ranks, and holds it
         state.hold = hold;
-        if (plan.offAt > 0 || !turnOff.unlocked || turnOff.bought) return;
+        if (plan.offAt > 0) return;
+        turnOffNow(turnOff);
+    }
+
+    function turnOffNow(turnOff) {
+        if (!turnOff.unlocked || turnOff.bought) return;
         if (game.cookies < turnOff.getPrice() || !buySwitch(turnOff)) return;
         state.mode = null;
         state.heldBefore = 0;
@@ -312,6 +327,25 @@ export function createCombos({ game, settings, loop, buyer = null, runSeconds = 
         invalidate();
         state.last = 'Golden switch off';
         log(`combos: ${state.last}`);
+    }
+
+    // Auto-Golden Switch turned off while the switch is on for a click buff: nothing else would
+    // turn it off, and no golden cookie would spawn again (main.js:5673-5676). It goes off as soon
+    // as the bank covers it, the buyer holding the way back meanwhile. A switch the player turned
+    // on, or one left on for good, stays as it is.
+    function releaseSwitch() {
+        if (state.mode !== 'combo') {
+            state.hold = 0;
+            return;
+        }
+        const turnOff = game.Upgrades[SWITCH_OFF];
+        if (!game.Has(SWITCH_ON) || !turnOff) {
+            state.mode = null;
+            state.heldBefore = 0;
+            state.hold = 0;
+            return;
+        }
+        turnOffNow(turnOff);
     }
 
     function goldenSwitch(frame, buffs) {
@@ -332,17 +366,24 @@ export function createCombos({ game, settings, loop, buyer = null, runSeconds = 
         if (!clickBuffsOf(buffs).length) state.freshMult = 1;
         // The switch first: what it adds to clicks is what Devastation multiplies.
         if (goldenSwitchOn(settings)) goldenSwitch(frame, buffs);
-        else state.hold = 0;
+        else releaseSwitch();
         if (godzamokOn(settings)) godzamok(frame, buffs);
     }
 
-    loop.add('combos', tick, { everyFrames: TICK_EVERY, enabled: () => godzamokOn(settings) || goldenSwitchOn(settings) });
+    loop.add('combos', tick, { everyFrames: TICK_EVERY, enabled: () => godzamokOn(settings) || goldenSwitchOn(settings) || state.mode === 'combo' });
 
     return {
         options,
         /** Cookies the buyer must hold for the switch: what it held before, and the way back. */
         hold() {
-            return goldenSwitchOn(settings) && game.Has(SWITCH_ON) ? state.hold : 0;
+            return (goldenSwitchOn(settings) || state.mode === 'combo') && game.Has(SWITCH_ON) ? state.hold : 0;
+        },
+        /**
+         * The switch is on only for a click buff, and this system turns it off once the buff has
+         * paid: other systems judge the bakery as it will be then (src/systems/gods.js).
+         */
+        switchPassing() {
+            return state.mode === 'combo' && !!game.Has(SWITCH_ON);
         },
         /** What would be done now, without doing it: for the console and the tests. */
         plan() {
