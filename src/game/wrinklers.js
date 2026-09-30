@@ -39,11 +39,11 @@ export function heldValue(game) {
     return total;
 }
 
-/** Spawn chance of an empty slot, per second (main.js:14361-14373). */
-export function spawnPerSecond(game) {
+/** Spawn chance of an empty slot, per second (main.js:14361-14373), at `elderWrath` (the stage now by default). */
+export function spawnPerSecond(game, elderWrath = game.elderWrath) {
     return (
         spawnChance({
-            elderWrath: game.elderWrath,
+            elderWrath,
             wrinklerSpawn: game.eff('wrinklerSpawn'),
             unholyBait: game.Has('Unholy bait'),
             scorn: god(game, 'scorn'),
