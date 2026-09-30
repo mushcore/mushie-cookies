@@ -48,7 +48,8 @@ test('the Autopilot never runs two systems that act on the same thing', () => {
     // Each pair: the new system, and the inherited one it replaces.
     const pairs = [
         ['autoGods', ['autoWorshipToggle', 'autoWorship0', 'autoWorship1', 'autoWorship2', 'autoCyclius', 'autoDragonToggle', 'autoDragonAura0', 'autoDragonAura1', 'dragonsCurve']],
-        ['autoFate', ['autoCasting', 'autoFTHOFCombo', 'auto100ConsistencyCombo']],
+        // Double Cast FTHOF (autoFTHOFCombo) is part of forecast casting, not a rival to it.
+        ['autoFate', ['autoCasting', 'auto100ConsistencyCombo']],
     ];
     for (const [modern, legacy] of pairs) {
         if (!AUTOPILOT[modern]) continue;

@@ -240,13 +240,6 @@ function setOverrides(gameSaveData) {
 
         // Restore some possibly broken settings
         if (
-            !FrozenCookies.autoFTHOFCombo &&
-            autoFTHOFComboAction.autobuyyes == 1
-        ) {
-            FrozenCookies.autoBuy = 1;
-            autoFTHOFComboAction.autobuyyes = 0;
-        }
-        if (
             !FrozenCookies.auto100ConsistencyCombo &&
             auto100ConsistencyComboAction.autobuyyes == 1
         ) {
@@ -1433,11 +1426,6 @@ function FCStart() {
         FrozenCookies.autoFortuneBot = 0;
     }
 
-    if (FrozenCookies.autoFTHOFComboBot) {
-        clearInterval(FrozenCookies.autoFTHOFComboBot);
-        FrozenCookies.autoFTHOFComboBot = 0;
-    }
-
     if (FrozenCookies.auto100ConsistencyComboBot) {
         clearInterval(FrozenCookies.auto100ConsistencyComboBot);
         FrozenCookies.auto100ConsistencyComboBot = 0;
@@ -1575,12 +1563,7 @@ function FCStart() {
         );
     }
 
-    if (FrozenCookies.autoFTHOFCombo) {
-        FrozenCookies.autoFTHOFComboBot = setInterval(
-            MushieCookies.guard("legacy:autoFTHOFComboAction", autoFTHOFComboAction),
-            FrozenCookies.frequency * 2
-        );
-    }
+    // Double Cast FTHOF (autoFTHOFCombo) is the forecast casting system's now (src/systems/grimoire.js).
 
     if (FrozenCookies.auto100ConsistencyCombo) {
         FrozenCookies.auto100ConsistencyComboBot = setInterval(
