@@ -43,7 +43,9 @@ export const AUTOPILOT = Object.freeze({
     autoGods: 1,
     autoCasting: 0,
     towerLimit: 0,
-    autoFTHOFCombo: 0,
+    // Double casting is forecast casting's (src/systems/grimoire.js), not the inherited combo.
+    // Paired runs never did worse than casting alone (tools/dev/doublecast.mjs).
+    autoFTHOFCombo: 1,
     auto100ConsistencyCombo: 0,
     autoSugarFrenzy: 0,
     autoWorshipToggle: 0,

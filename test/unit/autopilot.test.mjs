@@ -58,6 +58,14 @@ test('the Autopilot never runs two systems that act on the same thing', () => {
     }
 });
 
+test('the Autopilot double-casts Force the Hand of Fate within forecast casting', () => {
+    // Measured with tools/dev/doublecast.mjs from a late bakery, paired by seed: never below casting
+    // alone, 3.1 to 16.8 times the cookies over 8 hours without natural golden cookies (4 seeds),
+    // 1.00 to 1.22 with them (4 seeds of 4 hours, where natural boosts leave it nothing to add).
+    assert.equal(AUTOPILOT.autoFTHOFCombo, 1);
+    assert.equal(AUTOPILOT.autoFate, 1);
+});
+
 test('applying the Autopilot sets every value and reports only what changed', () => {
     const settings = { autoBuy: 1, numberDisplay: 3 };
     const changed = applyAutopilot(settings);
