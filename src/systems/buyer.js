@@ -30,7 +30,9 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
     // The reserve is kept only once the best purchase repays more slowly than this (seconds).
     // Measured over six game hours on two seeds: with 0 the reserve engages around hour four or
     // five and was never behind holding none; with 6000 or more it never engaged in that span.
-    const options = { reserveMinPayback: 0 };
+    // clickPriority: stand aside while a click buff runs (see clickBuff below); off only to
+    // measure what that is worth.
+    const options = { reserveMinPayback: 0, clickPriority: true };
     const state = {
         ranked: [],
         income: null,
@@ -54,7 +56,7 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
     // timer waits: in the game's runtime, buying from a rich bank cut 41 accepted clicks a second
     // to between 5 and 22. So buying and ranking wait the buff out (Click frenzy lasts 13 s,
     // Dragonflight and Cursed finger 10 s, times the golden cookie duration upgrades).
-    const clickBuff = () => clickBuffRunning(game.buffs);
+    const clickBuff = () => options.clickPriority && clickBuffRunning(game.buffs);
 
     // Anything here changing means the ranking may be wrong.
     const stampOf = () =>

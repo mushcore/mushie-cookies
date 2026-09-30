@@ -141,6 +141,17 @@ test('during a click frenzy the buyer neither buys nor re-ranks; it catches up w
         assert.deepEqual(c.buffs, []);
         assert.ok(c.purchases - b.purchases > 0, 'buying resumes');
         assert.ok(c.ranks - b.ranks > 0, 'and ranking');
+
+        // The option the measurement tool compares against: buying through click buffs.
+        await game.eval(() => {
+            MushieCookies.buyer.options.clickPriority = false;
+            Game.Earn(1e12);
+            Game.gainBuff('click frenzy', 13, 777);
+        });
+        const d = await game.eval(() => MushieCookies.buyer.activity());
+        await game.advanceSeconds(5);
+        const e = await game.eval(() => MushieCookies.buyer.activity());
+        assert.ok(e.purchases - d.purchases > 0, 'with click priority off, it buys during the frenzy');
     }));
 
 test('during a CpS buff the buyer keeps buying from the last ranking and re-ranks after it', { skip }, () =>

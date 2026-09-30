@@ -117,7 +117,7 @@ test('a fortune upgrade is taken on sight; the hour of CpS waits for a bank that
         assert.ok(late.bank > out * 1.4, 'it paid the full hour');
     }));
 
-test('a cast of Force the Hand of Fate and the shimmer clicker never both pop one cookie', { skip }, () =>
+test('a cast of Force the Hand of Fate and the shimmer clicker never both pop one cookie, nor does a forecast see one', { skip }, () =>
     withGame(async (game) => {
         await game.eval(() => {
             Game.Earn(1e15);
@@ -127,7 +127,17 @@ test('a cast of Force the Hand of Fate and the shimmer clicker never both pop on
         });
         await game.waitFor(() => !!(Game.Objects['Wizard tower'].minigame && Game.Objects['Wizard tower'].minigame.spells));
         await game.eval(() => {
-            Game.Objects['Wizard tower'].minigame.computeMagicM();
+            const M = Game.Objects['Wizard tower'].minigame;
+            M.computeMagicM();
+            // The forecast reads the live fail chance, 15% higher for each golden cookie on screen
+            // (minigameGrimoire.js:44-47): count the readings taken with one there.
+            window.__readings = { all: 0, withCookie: 0 };
+            const failChance = M.getFailChance;
+            M.getFailChance = function () {
+                window.__readings.all++;
+                if (Game.shimmerTypes.golden.n > 0) window.__readings.withCookie++;
+                return failChance.apply(this, arguments);
+            };
             window.__pops = new Map();
             const pop = Game.shimmer.prototype.pop;
             Game.shimmer.prototype.pop = function () {
@@ -145,9 +155,12 @@ test('a cast of Force the Hand of Fate and the shimmer clicker never both pop on
             twice: [...window.__pops.values()].filter((n) => n > 1).length,
             popped: window.__pops.size,
             missed: window.__missed,
+            readings: window.__readings,
             failures: Object.entries(MushieCookies.status()).filter(([, s]) => s.failures > 0).map(([n, s]) => `${n}: ${s.lastError}`),
         }));
         assert.ok(out.casts > 0, 'the grimoire should have cast');
+        assert.ok(out.readings.all > 1000, `${out.readings.all} forecasts`);
+        assert.equal(out.readings.withCookie, 0, 'the shimmer system runs first: no forecast sees a golden cookie');
         assert.ok(out.popped > out.casts, 'natural cookies were popped too');
         assert.equal(out.twice, 0);
         assert.equal(out.missed, 0);
