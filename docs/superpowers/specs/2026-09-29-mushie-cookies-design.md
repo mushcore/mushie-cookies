@@ -202,7 +202,7 @@ Status: single-cast forecasting done 2026-09-29; dual-casting, Godzamok, Golden 
 
 Verified by: time to a full seed log in the harness, against published figures for existing garden bots.
 
-Status: unlock loop and sacrifice implemented 2026-09-29. Mutation rules are asked of the game's own `getMuts`; a layout optimiser places parents; sprouts of locked plants are kept until mature, which unlocks the seed, and a secured target frees the rest of the plot for the next. From a fresh log with a full plot: 7 of 34 seeds in 6 game hours. The time to a full log is being measured.
+Status: unlock loop and sacrifice implemented 2026-09-29. Mutation rules are asked of the game's own `getMuts`; a layout optimiser places parents; sprouts of locked plants are kept until mature, which unlocks the seed, and a secured target frees the rest of the plot for the next. From a fresh log with a full plot: 7 of 34 seeds in 6 game hours, 22 by 30 hours and 27 by 48 hours (`test/baselines/m6-garden-48h.log`; measured on the build before the M2–M4 review fixes, which did not touch the garden). The last seven are the slow ones (everdaisy, the juicy queenbeet, the duketater and shriekbulb line), so a full log is likely a few game days out, in the range of the published figure for garden-gnome (mean about 5.7 days). No steady-state CpS layout between sacrifices yet.
 
 ### M7 — Stock market
 
@@ -211,12 +211,16 @@ Status: unlock loop and sacrifice implemented 2026-09-29. Mutation rules are ask
 
 Verified by: profit per day in the market simulator against the three published strategies (fixed percentages of resting value, quantiles, mode transitions).
 
+Status: done 2026-09-29. The price model is ported line for line and a harness test holds it bit-for-bit identical to the game's tick over 300 ticks of all 18 goods. Thresholds per good, bank level and broker overhead come from a grid search over simulated histories; on a fresh history the search never saw, they earn 1.92× the fixed-percentage rule (buy at 50%, sell at 125% of resting value). The quantile and mode-transition strategies were not implemented for comparison. Loans are still the inherited code's.
+
 ### M8 — Pantheon and dragon
 
 - Gods and auras swapped by situation, within the swap budget.
 - Cyclius computed from the game's formula, not from a timetable.
 
 Verified by: income per day in the harness against static slotting.
+
+Status: implemented 2026-09-29, verified for behaviour, not yet for income per day. Gods and auras are chosen by what-if against the income model and moved the way a player moves them (dragging a god spends a swap; an aura goes through the game's confirmation, which sacrifices a building, counted as lost output). Harness tests show gods slotted and Radiant Appetite chosen when available. Cyclius stays with the inherited timetable.
 
 ## 7. Testing
 
