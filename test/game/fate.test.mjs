@@ -178,7 +178,7 @@ test('outcome values match what the game grants', { skip }, () =>
             bank = Game.cookies;
             const drops = 3000;
             for (let i = 0; i < drops; i++) new Game.shimmer('golden', { type: 'cookie storm drop' }, 1).pop();
-            rows.push({ force: 'cookie storm drop', value, game: (Game.cookies - bank) / drops, sampled: true });
+            rows.push({ force: 'cookie storm drop', value, game: (Game.cookies - bank) / drops, sampled: drops });
             return rows;
         }, popForced.toString());
         // The ×1.1 pass has to reach durations that are not whole seconds before rounding.
@@ -186,8 +186,10 @@ test('outcome values match what the game grants', { skip }, () =>
         assert.equal(seconds['frenzy at ×1.1'], 85);
         assert.equal(seconds['click frenzy at ×1.1'], 15);
         for (const r of out) {
-            // 3000 draws of 1 to 7 put the sampled mean within 2% of the true one (4 sd).
-            const tolerance = r.sampled ? 0.02 : 1e-6;
+            // A draw of 1 to 7 has mean 4 and sd 2 (variance (7² - 1) / 12 = 4), so the mean of n
+            // draws has an sd of 2 / √n, which is 0.5 / √n of 4: 0.91% for 3000. Allow 4.5 sd
+            // (4.1%), a chance miss about once in 150,000 runs; a value off by half a minute is 12.5%.
+            const tolerance = r.sampled ? (4.5 * 0.5) / Math.sqrt(r.sampled) : 1e-6;
             assert.ok(Math.abs(r.value - r.game) <= tolerance * Math.abs(r.game), `${r.force}: valued at ${r.value}, the game gives ${r.game}`);
         }
     }));
