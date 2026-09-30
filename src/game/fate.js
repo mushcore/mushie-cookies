@@ -8,7 +8,7 @@
 const FATE = 'hand of fate';
 
 /** A generator seeded like the game's, without disturbing Math.random. */
-function privateGenerator(seed) {
+export function privateGenerator(seed) {
     const live = Math.random;
     try {
         Math.seedrandom(seed);

@@ -21,12 +21,25 @@ export { listCandidates, NEVER_BUY } from './game/candidates.js';
 export { estimateIncome } from './core/income.js';
 export { rankCandidates, chooseReserve, decide } from './core/buyer.js';
 export { shouldAscend } from './core/ascension.js';
+export {
+    KINDS as BUFF_KINDS,
+    BUFF_TYPES,
+    classifyBuff,
+    classifyBuffs,
+    cpsMultOf,
+    clickMultOf,
+    incomeSpikeRunning,
+    longestSpikeSecondsLeft,
+    unbuffedFactors,
+    worthFinishing,
+} from './core/buffs.js';
 export { nextLevelUp } from './core/lumps.js';
 export { forecastFate, forecastMany } from './game/fate.js';
 export { outcomeValue, decideCast } from './core/grimoire.js';
 export { optimizeLayout } from './core/garden.js';
 export { tickMarket, restingValue, tradeDecision } from './core/market.js';
-export { gardenOf, plotTiles, chanceFunction, findRecipe } from './game/garden.js';
+export { levelCost, rebuyCost, trainableChain, chooseTarget, magicCap } from './core/dragon.js';
+export { gardenOf, plotTiles, chanceFunction, findRecipe, findRecipes } from './game/garden.js';
 export { rankHeavenly, planChips } from './core/heavenly.js';
 export { AUTOPILOT, applyAutopilot, isAutopilotSetting } from './core/autopilot.js';
 export { heavenlyCandidates, planHeavenly, slotCandidates, fillPermanentSlots, rankPermanentSlots, assignPermanentSlots } from './game/prestige.js';
@@ -45,6 +58,7 @@ export let grimoire = null;
 export let garden = null;
 export let market = null;
 export let gods = null;
+export let dragon = null;
 export let wrinklers = null;
 
 const guards = createGuard({
@@ -94,6 +108,7 @@ const runtime = {
         garden = systems.garden;
         market = systems.market;
         gods = systems.gods;
+        dragon = systems.dragon;
         wrinklers = systems.wrinklers;
     },
     save: () => window.saveFCData(),
