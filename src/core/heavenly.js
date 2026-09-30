@@ -196,6 +196,15 @@ function typeRoll(loops, sucralosia, elderWrath) {
  * @param {number} [args.curve]        Dragon's Curve aura strength: 1 + curve rolls, floored at random
  */
 export function lumpsPerHarvest({ sucralosia = false, elderWrath = 0, curve = 0 } = {}) {
+    // A plan asks the same few questions thousands of times; the enumeration is the cost.
+    const key = `${sucralosia ? 1 : 0}/${elderWrath}/${curve}`;
+    if (!harvestCache.has(key)) harvestCache.set(key, meanHarvest(!!sucralosia, elderWrath, curve));
+    return harvestCache.get(key);
+}
+
+const harvestCache = new Map();
+
+function meanHarvest(sucralosia, elderWrath, curve) {
     const loops = 1 + Math.max(0, curve);
     const low = Math.floor(loops);
     const frac = loops - low;
