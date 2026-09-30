@@ -93,12 +93,28 @@ async function play(mod, start, seed) {
     }
 }
 
+/** A loaded machine can make a browser miss its launch timeout; that is retried, nothing else. */
+async function playWithRetry(mod, start, seed) {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            return await play(mod, start, seed);
+        } catch (error) {
+            if (attempt >= 3 || !/browserType\.launch/.test(String(error && error.message))) throw error;
+            process.stderr.write(`  launch failed (${attempt}): retrying\n`);
+        }
+    }
+}
+
 const runs = [];
 for (const start of starts) {
     for (const seed of seeds) {
         for (const [variant, mod] of Object.entries(variants)) {
             process.stderr.write(`${variant} start=${start} seed=${seed}\n`);
-            runs.push({ variant, start, seed, ...(await play(mod, start, seed)) });
+            const run = { variant, start, seed, ...(await playWithRetry(mod, start, seed)) };
+            runs.push(run);
+            // Each run as it ends, so a long comparison that stops early keeps what it measured.
+            const end = run.points[run.points.length - 1];
+            process.stderr.write(`RUN ${JSON.stringify({ variant, start, seed, projected: end.projected, ascensions: end.ascensions, heavenly: end.heavenly, owned: run.owned })}\n`);
         }
     }
 }

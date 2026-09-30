@@ -163,7 +163,7 @@ export function planTree({ tree, chips, value, saveFactor = 3, reach = 4, maxSte
 // Sugar lumps (main.js:4412-4539). The Autopilot harvests at ripe, where a harvest always pays
 // (a mature one pays half the time, main.js:4474), so lumps come once per ripening time.
 
-/** Chance of each lump type per roll, and what a harvest of it pays on average (main.js:4485-4506). */
+/** Chance of each lump type after `loops` rolls (main.js:4522-4539), by type number. */
 function typeRoll(loops, sucralosia, elderWrath) {
     const events = [
         [1, sucralosia ? 0.15 : 0.1], // bifurcated
