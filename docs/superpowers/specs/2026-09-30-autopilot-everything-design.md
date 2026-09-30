@@ -35,7 +35,7 @@ Every option starts off. One switch, **Autopilot**, automates every part of the 
 | Grimoire | grimoire | done (M5); double-cast and holding the forced cookie to add (4.9) |
 | Garden | garden | done (M6), reserve fixed in review; harvest-combo mode to add (4.10) |
 | Stock market trading | market | done (M7) |
-| Bank office, brokers, loans | market | not automated; to build (4.11) |
+| Bank office, brokers, loans | market | built on branch w2/market (4.11). Office upgrades and brokers are buyer candidates, each valued by the market profit it adds within the time the run is expected to last. The market spends only cookies above the buyer's reserve and what it has committed; so does the office's cursor rebuy. Loans are taken only on a combo. Each is valued with the combos forecast to land in its boost or its interest, and with what the run earned over the last two hours; none is taken before two hours of that record. Never taken for the run's end: measured, debt evasion gave x0.05 and x0.11 the prestige of the run without it (luck-free, two starting prestiges). Luck-free, 12 game hours: office x0.72 to x1.42 cookies earned (geometric mean x1.09, 4 seeds); brokers x1.00 (none hired, 3 seeds); the cash allocator x1.00 to x1.13 over spending all above the reserve (3 seeds). Loans: x1.82 to x2.83 (geometric mean x2.16) with a combo forced every hour, x1.00 every 30 minutes (none taken), 3 seeds, 8 h. With golden cookies over 4 h: x0.40 to x1.01 (geometric mean x0.76, 4 seeds); these runs part ways after the first difference, so they are no controlled comparison. Autopilot: office and brokers on, loans off. Logs: scratchpad logs/w2-market |
 | Godzamok, Golden switch | combos | inherited, net-negative as written; to build (4.12) |
 
 ## 4. Systems to build
