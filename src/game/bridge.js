@@ -4,6 +4,7 @@ import { createBuyer } from '../systems/buyer.js';
 import { createAscension } from '../systems/ascension.js';
 import { createLumps } from '../systems/lumps.js';
 import { createGrimoire } from '../systems/grimoire.js';
+import { createGarden } from '../systems/garden.js';
 
 const CHAIN_REACH = 15;
 
@@ -55,5 +56,6 @@ export function startSystems({ game, loop, legacy, log }) {
     });
     const lumps = createLumps({ game, settings, loop, log });
     const grimoire = createGrimoire({ game, settings, loop, log });
-    return { buyer, ascension, lumps, grimoire };
+    const garden = createGarden({ game, settings, loop, log });
+    return { buyer, ascension, lumps, grimoire, garden };
 }
