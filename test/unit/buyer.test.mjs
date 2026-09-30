@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { payback, rankCandidates, chooseReserve, decide, withoutBought } from '../../src/core/buyer.js';
+import { payback, rankCandidates, chooseReserve, decide } from '../../src/core/buyer.js';
 
 const income = { total: 100, basket: 1000 };
 
@@ -82,23 +82,4 @@ test('decide skips candidates with no gain', () => {
         { key: 'useless', price: 1, payback: Infinity },
     ];
     assert.equal(decide({ ranked, reserve: 0, bank: 1e9 }), null);
-});
-
-test('a ranking kept through a CpS buff drops what a purchase left out of date', () => {
-    const farm = { name: 'Farm' };
-    const mine = { name: 'Mine' };
-    const kitten = { id: 31 };
-    const hoes = { id: 12 };
-    const ranked = [
-        { key: 'building:Farm', kind: 'building', building: farm },
-        { key: 'building:Mine', kind: 'building', building: mine },
-        { key: 'upgrade:31', kind: 'upgrade', upgrade: kitten },
-        { key: 'chain:12', kind: 'chain', upgrade: hoes, steps: [{ building: farm, missing: 5 }] },
-    ];
-    // Farms bought: the farm candidate and the chain that counted the farms it lacked go.
-    assert.deepEqual(withoutBought(ranked, ranked[0]).map((c) => c.key), ['building:Mine', 'upgrade:31']);
-    // An upgrade bought: only it goes.
-    assert.deepEqual(withoutBought(ranked, ranked[2]).map((c) => c.key), ['building:Farm', 'building:Mine', 'chain:12']);
-    // A chain bought: its buildings and its upgrade go.
-    assert.deepEqual(withoutBought(ranked, ranked[3]).map((c) => c.key), ['building:Mine', 'upgrade:31']);
 });

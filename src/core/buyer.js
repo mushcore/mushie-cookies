@@ -86,17 +86,3 @@ export function decide({ ranked, reserve, bank }) {
     if (!best) return null;
     return best.price + reserve <= bank ? best : null;
 }
-
-/**
- * A ranking with a purchase taken out, for buying on from it without ranking again: the candidate
- * bought, and every candidate that buys one of the same buildings or the same upgrade, since its
- * price and gain were measured before the purchase.
- */
-export function withoutBought(ranked, bought) {
-    const buildings = new Set();
-    const upgrades = new Set();
-    const touches = (c) => [c.building].concat((c.steps || []).map((s) => s.building)).filter(Boolean);
-    for (const b of touches(bought)) buildings.add(b);
-    if (bought.upgrade) upgrades.add(bought.upgrade);
-    return ranked.filter((c) => c !== bought && !upgrades.has(c.upgrade) && !touches(c).some((b) => buildings.has(b)));
-}

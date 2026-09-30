@@ -2,14 +2,16 @@
 import { outcomeProbabilities } from '../core/goldenPool.js';
 import { simulateEach } from '../core/sim.js';
 import { modelClickRate } from '../core/clicker.js';
+import { unbuffedFactors } from '../core/buffs.js';
 
 /** The game rejects clicks less than 20 ms apart (main.js:4770), so 50 a second is the most that count. */
 export const MAX_CLICKS_PER_SECOND = 50;
 
 // Accepted clicks a second as the clicker measures them (src/systems/clicker.js), or null.
-// The real rate is below the cap: 20 to 45 a second in the game's own runtime, 5 to 8 with the
-// window minimized; counting 50 overstated every click term the buyer, the spell forecast, the
-// aura choice and the heavenly planner weigh.
+// The real rate is below the cap: in the game's own runtime about 44 a second with the window
+// shown and about 30 (14 to 41) minimized (tools/dev/clicker.mjs, spec section 3); counting 50
+// overstated every click term the buyer, the spell forecast, the aura choice and the heavenly
+// planner weigh.
 let clickRateSource = () => null;
 /** Where the measured click rate comes from. */
 export function useClickRate(source) {
@@ -136,11 +138,29 @@ function goldenState(game, settings) {
     };
 }
 
-/** Cookies per click with every click buff divided out. */
+/**
+ * Cookies per click as if no buff were running. Click buffs multiply a click (main.js:4732-4735)
+ * and divide back out. CpS buffs do not: each mouse upgrade adds 1% of Game.cookiesPs, which
+ * already carries every CpS buff (4692-4706, 5159-5167), and a Cursed finger replaces the whole
+ * click (4744). So under either the click is recomputed by the game's own Game.mouseCps with
+ * cookiesPs at Game.unbuffedCps and the finger unseen, both put back before returning; nothing
+ * else runs in between. The comment on unbuffedFactors (src/core/buffs.js) says why.
+ */
 function unbuffedClickPower(game) {
-    let mult = 1;
-    for (const buff of Object.values(game.buffs)) if (buff.multClick) mult *= buff.multClick;
-    return game.computedMouseCps / mult;
+    const { click, fixedClick } = unbuffedFactors(game.buffs);
+    const buffedCps = game.cookiesPs;
+    if (buffedCps === game.unbuffedCps && fixedClick === null) return game.computedMouseCps / click;
+    const hasBuff = game.hasBuff;
+    let power;
+    try {
+        game.cookiesPs = game.unbuffedCps;
+        game.hasBuff = (what) => (what === 'Cursed finger' ? 0 : hasBuff(what));
+        power = game.mouseCps();
+    } finally {
+        game.cookiesPs = buffedCps;
+        game.hasBuff = hasBuff;
+    }
+    return power / click;
 }
 
 /** Payout multiplier per wrinkler (main.js:14467-14479). */
