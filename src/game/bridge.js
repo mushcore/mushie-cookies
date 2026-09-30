@@ -7,6 +7,7 @@ import { createGrimoire } from '../systems/grimoire.js';
 import { createGarden } from '../systems/garden.js';
 import { createMarket } from '../systems/market.js';
 import { createGods } from '../systems/gods.js';
+import { createHeavenly } from '../systems/heavenly.js';
 
 const CHAIN_REACH = 15;
 
@@ -54,12 +55,14 @@ export function startSystems({ game, loop, legacy, log }) {
         policy: () => policyFrom(game, settings, legacy.blacklistPresets, legacy.prerequisites),
         extraReserve: () => extraReserveFrom(settings, legacy),
     });
+    const heavenly = createHeavenly({ game, settings, loop });
     const ascension = createAscension({
         game,
         settings,
         loop,
         log,
         buyer,
+        heavenly,
         extras: () => legacy.wrinklerValue() + legacy.chocolateValue(),
         prepare: () => legacy.prepareForAscension(),
     });
@@ -68,5 +71,5 @@ export function startSystems({ game, loop, legacy, log }) {
     const garden = createGarden({ game, settings, loop, log });
     const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
     const gods = createGods({ game, settings, loop, log, buyer });
-    return { buyer, ascension, lumps, grimoire, garden, market, gods };
+    return { buyer, ascension, lumps, grimoire, garden, market, gods, heavenly };
 }

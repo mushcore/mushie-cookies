@@ -27,7 +27,7 @@ export { outcomeValue, decideCast } from './core/grimoire.js';
 export { optimizeLayout } from './core/garden.js';
 export { tickMarket, restingValue, tradeDecision } from './core/market.js';
 export { gardenOf, plotTiles, chanceFunction, findRecipe } from './game/garden.js';
-export { rankHeavenly, planChips } from './core/heavenly.js';
+export { rankHeavenly, planChips, planTree, rankSlots } from './core/heavenly.js';
 export { AUTOPILOT, applyAutopilot, isAutopilotSetting } from './core/autopilot.js';
 export { heavenlyCandidates, planHeavenly, slotCandidates, fillPermanentSlots, rankPermanentSlots, assignPermanentSlots } from './game/prestige.js';
 
@@ -44,6 +44,7 @@ export let grimoire = null;
 export let garden = null;
 export let market = null;
 export let gods = null;
+export let heavenly = null;
 
 const guards = createGuard({
     maxFailures: 5,
@@ -92,6 +93,7 @@ const runtime = {
         garden = systems.garden;
         market = systems.market;
         gods = systems.gods;
+        heavenly = systems.heavenly;
     },
     save: () => window.saveFCData(),
     load: (data) => window.setOverrides(data),
