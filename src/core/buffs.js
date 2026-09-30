@@ -148,7 +148,9 @@ export function longestSpikeSecondsLeft(buffs, { fps } = {}) {
 
 /**
  * The products the running buffs multiply CpS and click power by (main.js:5159-5163, 4732-4735):
- * divide Game.cookiesPs by `cps` and the click power by `click` to get the unbuffed values.
+ * divide Game.cookiesPs by `cps` to get the unbuffed CpS. Click power cannot simply be divided
+ * by `click`: each mouse upgrade adds 1% of the already buffed CpS to every click (4692-4706,
+ * 5163-5167), so under a Frenzy that part of a click is 7× bigger while `click` is 1.
  * Under a Cursed finger `cps` is 0, so CpS cannot be divided back (use Game.unbuffedCps), and
  * every click pays `fixedClick` instead of a multiple of click power; otherwise it is null.
  */
