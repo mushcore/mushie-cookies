@@ -50,9 +50,12 @@ test('golden cookies are clicked when an option clicks them and something makes 
     assert.equal(goldenCookiesClicked({ autoFate: 1 }, false), true);
     assert.equal(goldenCookiesClicked({ autoGC: 1, autoCasting: 3 }, false), true);
     assert.equal(goldenCookiesClicked({ autoGC: 0, autoCasting: 3 }, false), false, 'nothing clicks what the inherited modes cast');
-    // Forecast casting stands aside for the inherited casting modes and combos.
+    // Forecast casting stands aside for the inherited casting modes and the 100% combo.
     assert.equal(goldenCookiesClicked({ autoFate: 1, autoCasting: 2 }, false), false);
-    assert.equal(goldenCookiesClicked({ autoFate: 1, autoFTHOFCombo: 1 }, false), false);
+    assert.equal(goldenCookiesClicked({ autoFate: 1, auto100ConsistencyCombo: 1 }, false), false);
+    // Double Cast FTHOF is forecast casting with double casts, on its own switch or beside it.
+    assert.equal(goldenCookiesClicked({ autoFate: 1, autoFTHOFCombo: 1 }, false), true);
+    assert.equal(goldenCookiesClicked({ autoFTHOFCombo: 1 }, false), true);
     // A setting missing from an old save is off.
     assert.equal(goldenCookiesClicked({ autoGC: undefined, autoFate: undefined }, true), false);
 });
@@ -72,7 +75,8 @@ test('stands aside for every inherited option that slots gods or picks auras, an
         ['autoDragonToggle', 1, false, true],
         ['autoDragonOrbs', 1, false, true],
         ['auto100ConsistencyCombo', 1, true, true],
-        ['autoFTHOFCombo', 1, true, true],
+        // The double cast is forecast casting's (src/systems/grimoire.js): it reads no god or aura.
+        ['autoFTHOFCombo', 1, false, false],
     ];
     for (const [name, value, gods, auras] of cases) {
         const settings = { [name]: value };

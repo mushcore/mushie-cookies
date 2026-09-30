@@ -114,7 +114,7 @@ export function startSystems({ game, loop, legacy, log, guard }) {
         // From the wrinkler pop on: the ascension collects a golden lump itself from here.
         ascending: () => settings.autoAscendToggle == 1 && ascension.phase() !== 'playing',
     });
-    const grimoire = createGrimoire({ game, settings, loop, log });
+    const grimoire = createGrimoire({ game, settings, loop, log, buyer });
     const garden = createGarden({ game, settings, loop, log, reserve: () => buyer.reserve() });
     market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve(), buyer, ascension });
     // The dragon trains before the gods pick auras; `dragon` tells them when a level is gained.

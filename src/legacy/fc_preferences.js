@@ -257,7 +257,7 @@ FrozenCookies.preferenceValues = {
         hint: "Only one combo can be active at a time. See readme.",
     },
     autoFTHOFCombo: {
-        hint: "Auto double-cast FTHOF combos (needs enough mana).",
+        hint: "Forecast casting, plus a second Force the Hand of Fate straight after the first when the pair pays: Wizard towers are sold between the casts and bought back. Needs about 300 Wizard towers.",
         display: ["Double Cast FTHOF OFF", "Double Cast FTHOF ON"],
         default: 0,
     },

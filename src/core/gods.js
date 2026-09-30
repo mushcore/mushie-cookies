@@ -11,8 +11,8 @@ const on = (value) => Number(value) > 0; // a setting missing from an old save i
 // Inherited options that run combos around the gods and auras they set: the 100% consistency
 // combo switches the inherited pantheon and aura options off mid-combo, then sets Radiant
 // Appetite and Dragon's Fortune and swaps Godzamok and Mokalsium itself (fc_spells.js:1334-1347,
-// 1400-1424, 1518, 1542); the FTHOF combo reads the auras to time its casts (fc_spells.js:803).
-const combo = (s) => on(s.auto100ConsistencyCombo) || on(s.autoFTHOFCombo);
+// 1400-1424, 1518, 1542). Double Cast FTHOF is forecast casting's now and reads no god or aura.
+const combo = (s) => on(s.auto100ConsistencyCombo);
 
 /** Inherited options that slot gods themselves or need the gods they slotted left in place. */
 export function inheritedGodsOn(s) {
@@ -54,14 +54,15 @@ export function skippedGods(s) {
  * Golden cookies are clicked as they appear: by golden cookie clicking, which clicks every one
  * on screen (fc_main.js:1311-1315), natural ones (which spawn only while the Golden switch is
  * off, main.js:5673-5676) and those Force the Hand of Fate makes, which every inherited casting
- * mode casts for a free lump (fc_spells.js:313-330); or by forecast casting, which clicks the
- * one it casts (src/systems/grimoire.js:91-93) and stands aside for those modes and the combos.
+ * mode casts for a free lump (fc_spells.js:313-330); or by forecast casting (on with Forecast
+ * Casting or Double Cast FTHOF), which clicks the ones it casts (src/systems/grimoire.js castFate)
+ * and stands aside for those modes and the 100% combo.
  * @param {object} s  the mod's settings
  * @param {boolean} naturalSpawns  golden cookies spawn on their own (the Golden switch is off)
  */
 export function goldenCookiesClicked(s, naturalSpawns) {
     if (on(s.autoGC) && (naturalSpawns || on(s.autoCasting))) return true;
-    return on(s.autoFate) && !on(s.autoCasting) && !combo(s);
+    return (on(s.autoFate) || on(s.autoFTHOFCombo)) && !on(s.autoCasting) && !combo(s);
 }
 
 /**

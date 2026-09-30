@@ -32,11 +32,12 @@ export function devastationPerBuilding(level) {
 
 /**
  * Inherited combos that sell buildings and toggle the switch themselves: the 100% consistency
- * combo sells and buys buildings and turns the switch on and off (fc_spells.js:1427-1435,
- * 1449-1536, 1763-1771); the FTHOF combo sells and buys Wizard towers (fc_spells.js:1109-1151).
+ * combo sells and buys buildings and turns the switch on and off. autoFTHOFCombo is no longer
+ * one: its inherited code is gone, and the setting now turns on the forecast casting system's
+ * double cast (src/systems/grimoire.js), which sells only Wizard towers, never sold here.
  */
 export function inheritedCombosOn(s) {
-    return on(s.auto100ConsistencyCombo) || on(s.autoFTHOFCombo);
+    return on(s.auto100ConsistencyCombo);
 }
 
 /** Godzamok is played: Devastation multiplies clicks, so only while clicking. */

@@ -9,6 +9,7 @@ import {
     planSale,
     comboOverBuff,
     godzamokOn,
+    goldenSwitchOn,
     inheritedCombosOn,
     buffProduct,
     devastationGainPerUnit,
@@ -176,7 +177,10 @@ test('Godzamok is played only while clicking, and never beside an inherited comb
     assert.equal(godzamokOn({ autoGodzamok: 1, autoClick: 0 }), false, 'Devastation multiplies clicks');
     assert.equal(godzamokOn({ autoGodzamok: 0, autoClick: 1 }), false);
     assert.equal(godzamokOn({ autoGodzamok: 1, autoClick: 1, auto100ConsistencyCombo: 1 }), false);
-    assert.equal(godzamokOn({ autoGodzamok: 1, autoClick: 1, autoFTHOFCombo: 1 }), false);
+    // Double Cast FTHOF is forecast casting's now, selling only the Wizard towers Godzamok leaves.
+    assert.equal(godzamokOn({ autoGodzamok: 1, autoClick: 1, autoFTHOFCombo: 1 }), true);
+    assert.equal(goldenSwitchOn({ autoGS: 1, autoFTHOFCombo: 1 }), true);
+    assert.equal(inheritedCombosOn({ autoFTHOFCombo: 1 }), false);
     assert.equal(inheritedCombosOn({ auto100ConsistencyCombo: 1 }), true);
     assert.equal(inheritedCombosOn({}), false);
 });

@@ -64,6 +64,22 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         return out;
     };
 
+    // Other systems' claims on the store and the bank, by holder. A hold stops buying and
+    // re-ranking for a few frames (a double cast sells Wizard towers between its casts and buys
+    // them back); it lapses on its own, so a holder that fails cannot stop the buyer for good.
+    // A keep is cookies left in the bank on top of the reserve for a spend that is coming.
+    const holds = new Map(); // holder -> frame the hold lapses
+    const keeps = new Map(); // holder -> cookies
+    const held = () => {
+        for (const [holder, until] of holds) if (until <= state.frame) holds.delete(holder);
+        return holds.size > 0;
+    };
+    const holding = () => {
+        let kept = 0;
+        for (const amount of keeps.values()) kept += amount;
+        return state.reserve + kept;
+    };
+
     // CpS buffs need no care: readState reads every income unbuffed (src/game/measure.js), so a
     // ranking made during a Frenzy is the one made without it, and the buyer ranks and buys
     // through CpS buffs as between them. Buying on down the ranking it had through a short CpS
@@ -119,6 +135,7 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
     }
 
     function refreshIfStale(frame) {
+        if (held()) return;
         const due = state.stale || !state.income || frame - state.rankedAt >= RERANK_FRAMES || state.stamp !== stampOf();
         if (!due) return;
         if (state.income && clickBuff()) return; // even a stale ranking waits for the clicks
@@ -136,7 +153,7 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         if (candidate.kind === 'building') {
             // Ten at once only when the bank covers all ten above the reserve and the limit allows.
             const ten = candidate.building.getSumPrice(BULK);
-            const n = game.cookies - ten >= state.reserve && room(candidate.building) >= BULK ? BULK : 1;
+            const n = game.cookies - ten >= holding() && room(candidate.building) >= BULK ? BULK : 1;
             if (room(candidate.building) >= 1) buyBuilding(candidate.building, n);
         } else if (candidate.kind === 'upgrade') {
             // bypass: the game's confirmation prompt ("One mind", ...) is the player saying yes.
@@ -182,7 +199,7 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         for (const upgrade of game.UpgradesInStore) {
             if (!ENABLERS.has(upgrade.name) || upgrade.bought || excluded.has(upgrade.id)) continue;
             const price = upgrade.getPrice();
-            if (price <= minute && game.cookies - price >= state.reserve) {
+            if (price <= minute && game.cookies - price >= holding()) {
                 upgrade.buy(1);
                 log(`bought ${upgrade.name} (enabler)`);
             }
@@ -191,11 +208,12 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
 
     function tick(frame) {
         state.frame = frame;
+        if (held()) return;
         if (state.income && clickBuff()) return;
         refreshIfStale(frame);
         for (let i = 0; i < PURCHASES_PER_TICK; i++) {
-            const choice = decide({ ranked: state.ranked, reserve: state.reserve, bank: game.cookies });
-            state.last = { choice, reserve: state.reserve };
+            const choice = decide({ ranked: state.ranked, reserve: holding(), bank: game.cookies });
+            state.last = { choice, reserve: holding() };
             if (!choice) break;
             if (!buy(choice)) break;
             rank(frame);
@@ -224,12 +242,28 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
             return state.income;
         },
         /**
-         * What the buyer holds back, which every other system leaves alone. With Autobuy off
-         * nothing ranks on the buyer's own tick, so the reserve is brought up to date here.
+         * Cookies no other system may spend: the reserve and what others asked to keep. With
+         * Autobuy off nothing ranks on the buyer's own tick, so the reserve is brought up to date here.
          */
         reserve() {
             if (!settings.autoBuy) refreshIfStale(state.frame);
-            return state.reserve;
+            return holding();
+        },
+        /** No purchase and no re-rank for up to `frames` frames, or until release(holder). */
+        hold(holder, frames = 30) {
+            holds.set(holder, state.frame + frames);
+        },
+        release(holder) {
+            holds.delete(holder);
+        },
+        held,
+        /** Leaves `amount` cookies in the bank on top of the reserve for `holder`; 0 lets them go. */
+        keep(holder, amount) {
+            if (amount > 0) keeps.set(holder, amount);
+            else keeps.delete(holder);
+        },
+        kept(holder) {
+            return keeps.get(holder) || 0;
         },
         /**
          * What the buyer is saving for above its reserve: the price of its next purchase, from the

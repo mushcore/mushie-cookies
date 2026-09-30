@@ -49,7 +49,8 @@ test('the Autopilot never runs two systems that act on the same thing', () => {
     // Each pair: the new system, and the inherited one it replaces.
     const pairs = [
         ['autoGods', ['autoWorshipToggle', 'autoWorship0', 'autoWorship1', 'autoWorship2', 'autoCyclius', 'autoDragonToggle', 'autoDragonAura0', 'autoDragonAura1']],
-        ['autoFate', ['autoCasting', 'autoFTHOFCombo', 'auto100ConsistencyCombo']],
+        // Double Cast FTHOF (autoFTHOFCombo) is part of forecast casting, not a rival to it.
+        ['autoFate', ['autoCasting', 'auto100ConsistencyCombo']],
         ['sugarFrenzy', ['autoSugarFrenzy']],
     ];
     for (const [modern, legacy] of pairs) {
@@ -86,6 +87,14 @@ test('the Autopilot plays Godzamok and the Golden switch through the combo syste
     // Measured against the Autopilot without them (spec 4.12): ahead on every seed.
     assert.equal(godzamokOn(AUTOPILOT), true, 'Godzamok on, with the clicker he needs');
     assert.equal(goldenSwitchOn(AUTOPILOT), true);
+});
+
+test('the Autopilot double-casts Force the Hand of Fate within forecast casting', () => {
+    // Measured with tools/dev/doublecast.mjs from a late bakery, paired by seed: never below casting
+    // alone, 3.1 to 16.8 times the cookies over 8 hours without natural golden cookies (4 seeds),
+    // 1.00 to 1.22 with them (4 seeds of 4 hours, where natural boosts leave it nothing to add).
+    assert.equal(AUTOPILOT.autoFTHOFCombo, 1);
+    assert.equal(AUTOPILOT.autoFate, 1);
 });
 
 test('applying the Autopilot sets every value and reports only what changed', () => {

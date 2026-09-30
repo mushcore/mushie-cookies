@@ -253,13 +253,6 @@ function setOverrides(gameSaveData) {
         // Auto Rigidel (autoSL 2) is gone; a player who chose it still wants the harvest.
         if (FrozenCookies.autoSL == 2) FrozenCookies.autoSL = 1;
         if (
-            !FrozenCookies.autoFTHOFCombo &&
-            autoFTHOFComboAction.autobuyyes == 1
-        ) {
-            FrozenCookies.autoBuy = 1;
-            autoFTHOFComboAction.autobuyyes = 0;
-        }
-        if (
             !FrozenCookies.auto100ConsistencyCombo &&
             auto100ConsistencyComboAction.autobuyyes == 1
         ) {
@@ -1167,10 +1160,6 @@ function FCStart() {
         clearInterval(FrozenCookies.autoCastingBot);
         FrozenCookies.autoCastingBot = 0;
     }
-    if (FrozenCookies.autoFTHOFComboBot) {
-        clearInterval(FrozenCookies.autoFTHOFComboBot);
-        FrozenCookies.autoFTHOFComboBot = 0;
-    }
 
     if (FrozenCookies.auto100ConsistencyComboBot) {
         clearInterval(FrozenCookies.auto100ConsistencyComboBot);
@@ -1236,12 +1225,7 @@ function FCStart() {
         );
     }
 
-    if (FrozenCookies.autoFTHOFCombo) {
-        FrozenCookies.autoFTHOFComboBot = setInterval(
-            MushieCookies.guard("legacy:autoFTHOFComboAction", autoFTHOFComboAction),
-            FrozenCookies.frequency * 2
-        );
-    }
+    // Double Cast FTHOF (autoFTHOFCombo) is the forecast casting system's now (src/systems/grimoire.js).
 
     if (FrozenCookies.auto100ConsistencyCombo) {
         FrozenCookies.auto100ConsistencyComboBot = setInterval(

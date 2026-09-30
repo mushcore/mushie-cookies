@@ -11,6 +11,7 @@
  * cookie buff is `add:true`). So an outcome whose buff is running does not stack on it; it is
  * that buff running on after its current time runs out.
  */
+import { cpsMultOf, clickMultOf } from './buffs.js';
 
 // The buff each outcome grants, by the name the game files it under (main.js:13869-13968).
 // A building special's name depends on the building it picks (5886-5907).
@@ -29,11 +30,13 @@ const STORM_DROP_SECONDS = 4 * 60;
 // During a cookie storm a drop appears on half of the game's frames (main.js:5257).
 const STORM_DROP_CHANCE = 0.5;
 
-const cpsMultOf = (buff) => (buff.multCpS === undefined ? 1 : buff.multCpS);
+const cpsMult = (running) => running.reduce((m, b) => m * cpsMultOf(b), 1);
+const clickMult = (running) => running.reduce((m, b) => m * clickMultOf(b), 1);
+const storming = (running) => running.some((b) => b.name === 'Cookie storm');
 
-/** Mean, over [from, to] seconds from now, of the product of the CpS multipliers of the buffs still running. */
-function meanCpsMult(buffs, from, to) {
-    const at = (t) => buffs.reduce((m, b) => (b.secondsLeft > t ? m * cpsMultOf(b) : m), 1);
+/** Mean, over [from, to] seconds from now, of `f` of the buffs still running. */
+function meanOver(buffs, from, to, f) {
+    const at = (t) => f(buffs.filter((b) => b.secondsLeft > t));
     if (!(to > from)) return at(from);
     const ends = buffs.map((b) => b.secondsLeft).filter((s) => s > from && s < to).sort((a, b) => a - b);
     let sum = 0;
@@ -44,6 +47,9 @@ function meanCpsMult(buffs, from, to) {
     }
     return sum / (to - from);
 }
+
+/** Mean, over [from, to] seconds from now, of the product of the CpS multipliers of the buffs still running. */
+const meanCpsMult = (buffs, from, to) => meanOver(buffs, from, to, cpsMult);
 
 /**
  * Where a buff called `name` would take effect: from now if it is not running; otherwise when the
@@ -75,27 +81,37 @@ export function outcomeValue(outcome, ctx) {
         gainMult = 1, // what storm drops pay is multiplied by it
         stormReach = 1, // the share of storm drops clicked before they fade: all, clicked on sight
     } = ctx;
-    const base = passive + click;
     // The game rounds buff durations up to whole seconds (main.js:5494-5595).
     const d = (seconds) => Math.ceil(seconds * durationMult);
     const cpsNow = meanCpsMult(buffs, 0, 0);
-    // What raising `perSecond` by `mult` for `seconds` adds, as a buff called `name`.
-    const boost = (perSecond, name, seconds, mult, key = 'multCpS') => {
+    // Seconds of unbuffed CpS a running storm pays each second: the drops reached, minutes of
+    // CpS each (main.js:5257, 5599).
+    const stormSecondsPerSecond = fps * STORM_DROP_CHANCE * stormReach * STORM_DROP_SECONDS * gainMult;
+    // What a CpS multiplier multiplies each second, given the other buffs running: buildings;
+    // clicks, which Plastic mouse and its kind pay a share of buffed CpS (main.js:4692-4708) under
+    // any click buff; and a storm's drops, minutes of buffed CpS each (5599).
+    const cpsScaled = (running) =>
+        cpsMult(running) * (passive + click * clickMult(running) + (storming(running) ? passive * stormSecondsPerSecond : 0));
+    // What a click multiplier multiplies: clicks, under every other buff (4732-4735).
+    const clickScaled = (running) => click * cpsMult(running) * clickMult(running);
+    // What raising CpS or clicks by `mult` for `seconds` adds, as a buff called `name`.
+    const boost = (name, seconds, mult, key = 'multCpS') => {
         const at = landing(buffs, name);
         const m = at.own ? (at.own[key] === undefined ? 1 : at.own[key]) : mult;
-        return perSecond * (m - 1) * d(seconds) * meanCpsMult(at.others, at.from, at.from + d(seconds));
+        const scaled = key === 'multClick' ? clickScaled : cpsScaled;
+        return (m - 1) * d(seconds) * meanOver(at.others, at.from, at.from + d(seconds), scaled);
     };
     switch (outcome) {
         case 'frenzy':
-            return boost(base, 'Frenzy', 77, 7);
+            return boost('Frenzy', 77, 7);
         case 'building special':
             // With no building at 10 or more the game gives a frenzy instead (main.js:5501).
             if (!buildingSpecials.length) return outcomeValue('frenzy', ctx);
-            return buildingSpecials.reduce((sum, s) => sum + boost(base, s.name, 30, s.mult), 0) / buildingSpecials.length;
+            return buildingSpecials.reduce((sum, s) => sum + boost(s.name, 30, s.mult), 0) / buildingSpecials.length;
         case 'click frenzy':
-            return boost(click, 'Click frenzy', 13, 777, 'multClick');
+            return boost('Click frenzy', 13, 777, 'multClick');
         case 'blood frenzy':
-            return boost(base, 'Elder frenzy', 6, 666);
+            return boost('Elder frenzy', 6, 666);
         case 'multiply cookies':
             return Math.min(0.15 * bank, 900 * passive * cpsNow) + 13;
         case 'cookie storm': {
@@ -114,7 +130,7 @@ export function outcomeValue(outcome, ctx) {
             return clicksPerSecond * d(10) * perClick - passive * d(10) * meanCpsMult(at.others, at.from, at.from + d(10));
         }
         case 'clot':
-            return boost(base, 'Clot', 66, 0.5);
+            return boost('Clot', 66, 0.5);
         case 'ruin cookies':
             return -(Math.min(0.05 * bank, 600 * passive * cpsNow) + 13);
         case 'free sugar lump':
@@ -124,8 +140,55 @@ export function outcomeValue(outcome, ctx) {
     }
 }
 
+/**
+ * What an outcome landing now leaves for a cast right after it, as [{ weight, ctx }]: its buff
+ * running, or the running buff of its name lengthened with its own multiplier kept (main.js:
+ * 13765-13771), and its payout in the bank. A building special may leave any one of its picks.
+ */
+export function afterOutcome(outcome, ctx) {
+    const buffs = ctx.buffs || [];
+    const specials = ctx.buildingSpecials || [];
+    const d = (seconds) => Math.ceil(seconds * ctx.durationMult);
+    const cpsNow = meanCpsMult(buffs, 0, 0);
+    const only = (next) => [{ weight: 1, ctx: next }];
+    const withBuff = (name, seconds, multCpS = 1, multClick = 1, extra = {}) => {
+        const own = buffs.find((b) => b.name === name);
+        const next = own
+            ? buffs.map((b) => (b === own ? { ...b, secondsLeft: b.secondsLeft + d(seconds) } : b))
+            : buffs.concat([{ name, multCpS, multClick, secondsLeft: d(seconds), ...extra }]);
+        return { ...ctx, buffs: next };
+    };
+    const banked = (delta) => ({ ...ctx, bank: Math.max(0, ctx.bank + delta) });
+    // Buffs and payouts as main.js:5493-5602 grants them.
+    switch (outcome) {
+        case 'frenzy':
+            return only(withBuff('Frenzy', 77, 7));
+        case 'blood frenzy':
+            return only(withBuff('Elder frenzy', 6, 666));
+        case 'clot':
+            return only(withBuff('Clot', 66, 0.5));
+        case 'click frenzy':
+            return only(withBuff('Click frenzy', 13, 1, 777));
+        case 'cookie storm':
+            return only(withBuff('Cookie storm', 7));
+        case 'cursed finger':
+            return only(withBuff('Cursed finger', 10, 0, 1, { power: ctx.passive * cpsNow * d(10) }));
+        case 'building special':
+            if (!specials.length) return afterOutcome('frenzy', ctx);
+            return specials.map((s) => ({ weight: 1 / specials.length, ctx: withBuff(s.name, 30, s.mult) }));
+        case 'multiply cookies':
+            return only(banked(Math.min(0.15 * ctx.bank, 900 * ctx.passive * cpsNow) + 13));
+        case 'ruin cookies':
+            return only(banked(-(Math.min(0.05 * ctx.bank, 600 * ctx.passive * cpsNow) + 13)));
+        case 'cookie storm drop':
+            return only(banked(ctx.passive * STORM_DROP_SECONDS * (ctx.gainMult === undefined ? 1 : ctx.gainMult) * cpsNow));
+        default:
+            return only(ctx);
+    }
+}
+
 /** The buffs still running `t` seconds from now, with the time they will have left then. */
-const runningAfter = (buffs, t) => buffs.filter((b) => b.secondsLeft > t).map((b) => ({ ...b, secondsLeft: b.secondsLeft - t }));
+export const runningAfter = (buffs, t) => buffs.filter((b) => b.secondsLeft > t).map((b) => ({ ...b, secondsLeft: b.secondsLeft - t }));
 
 /**
  * What an outcome would be worth held until each running debuff (a CpS multiplier below 1) ends,
@@ -170,6 +233,21 @@ function landsOnBoost(buffs, name, seconds) {
 }
 
 /**
+ * The boost an outcome held for a buff is cast on, among the buffs running now, or null: one that
+ * covers at least half of it (landsOnBoost). A building special needs half of its picks to land.
+ * @returns {{mult: number, stacked: true} | null}
+ */
+export function boostLandedOn(outcome, ctx) {
+    const buffs = ctx.buffs || [];
+    const specials = ctx.buildingSpecials || [];
+    const effect = outcome === 'building special' && !specials.length ? 'frenzy' : outcome;
+    const seconds = EFFECT_SECONDS[effect] && EFFECT_SECONDS[effect] * ctx.durationMult;
+    const picks = effect === 'building special' ? specials.map((s) => landsOnBoost(buffs, s.name, seconds)) : [landsOnBoost(buffs, OUTCOME_BUFF[effect], seconds)];
+    const landed = picks.filter((p) => p.stacked);
+    return landed.length && landed.length * 2 >= picks.length ? landed[0] : null;
+}
+
+/**
  * @param {object} args
  * @param {{success: boolean, outcome: string}} args.next   the forecast for the next cast
  * @param {number} args.mana
@@ -206,16 +284,8 @@ export function decideCast({ next, mana, maxMana, fateCost, skipCost, ctx }) {
     }
     if (later) return out('wait', holding(later));
 
-    const buffs = ctx.buffs || [];
-    const specials = ctx.buildingSpecials || [];
-    const outcome = next.outcome === 'building special' && !specials.length ? 'frenzy' : next.outcome;
-    const seconds = EFFECT_SECONDS[outcome] && EFFECT_SECONDS[outcome] * ctx.durationMult;
-    // A building special lands on a boost if at least half the buildings it may pick would.
-    const picks = outcome === 'building special' ? specials.map((s) => landsOnBoost(buffs, s.name, seconds)) : [landsOnBoost(buffs, OUTCOME_BUFF[outcome], seconds)];
-    const landed = picks.filter((p) => p.stacked);
-    if (landed.length && landed.length * 2 >= picks.length) {
-        return out('cast', `${next.outcome} on a running ×${landed[0].mult.toFixed(1)} buff`);
-    }
+    const landed = boostLandedOn(next.outcome, ctx);
+    if (landed) return out('cast', `${next.outcome} on a running ×${landed.mult.toFixed(1)} buff`);
     if (full) return out('cast', `${next.outcome}, mana is full`);
     return out('wait', `holding ${next.outcome} for a buff`);
 }
