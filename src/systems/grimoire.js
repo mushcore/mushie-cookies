@@ -214,7 +214,12 @@ export function createGrimoire({ game, settings, loop, buyer = null, log = () =>
         const amount = t.amount;
         if (buyer) buyer.hold(HOLDER);
         if (plan.sale.sell) t.sell(plan.sale.sell);
-        state.sequence = { first: next.outcome, second: plan.second, amount, sold: amount - t.amount, gain: plan.gain, frames: 0 };
+        const sold = amount - t.amount;
+        // The refund is in the bank now. Until the towers are back, their whole price is spoken
+        // for (main.js:7797-7806), or another spender could take the refund and leave the
+        // buy-back short.
+        if (buyer && sold > 0) buyer.keep(HOLDER, t.getSumPrice(sold));
+        state.sequence = { first: next.outcome, second: plan.second, amount, sold, gain: plan.gain, frames: 0 };
         // With nothing sold, max magic already fits and the second cast can follow now.
         step(grimoire);
     }

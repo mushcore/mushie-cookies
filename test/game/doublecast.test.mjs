@@ -229,6 +229,49 @@ test('the buyer buys nothing between the sale and the buy-back, and buys again a
         assert.deepEqual(game.errors, []);
     }));
 
+test('while the towers are sold, every spender is kept off the whole buy-back, the refund included', { skip }, () =>
+    withLateBakery(async (game) => {
+        await game.eval(burnTo, ['frenzy', 'click frenzy']);
+        await game.eval(instrument);
+        await game.eval(settings, {});
+        const cast = await stepUntil(game, () => window.__log.some((e) => e.kind === 'cast'), 45);
+        assert.ok(cast, 'the first cast should have been made');
+        // Hold max magic where it was, so the towers stay sold for a few frames.
+        await game.eval(() => {
+            const M = Game.Objects['Wizard tower'].minigame;
+            window.__compute = M.computeMagicM;
+            M.computeMagicM = () => {};
+        });
+        await game.advance(3);
+        const mid = await game.eval(() => {
+            const t = Game.Objects['Wizard tower'];
+            const sale = window.__log.find((e) => e.kind === 'sell');
+            return {
+                sold: sale.before - sale.after,
+                towers: t.amount,
+                // What buying them back costs now (main.js:7797-7806).
+                price: t.getSumPrice(sale.before - sale.after),
+                kept: MushieCookies.buyer.kept('grimoire'),
+                reserve: MushieCookies.buyer.reserve(),
+            };
+        });
+        assert.ok(mid.sold > 0 && mid.towers === 400 - mid.sold, JSON.stringify(mid));
+        // The sale's refund is in the bank: keeping only what the round trip loses would let another
+        // spender (garden, market, dragon) take the refund, and the buy-back would come up short.
+        assert.ok(mid.kept >= mid.price, `kept ${mid.kept}, buying back costs ${mid.price}`);
+        assert.ok(mid.reserve >= mid.kept);
+        await game.eval(() => {
+            Game.Objects['Wizard tower'].minigame.computeMagicM = window.__compute;
+        });
+        const done = await stepUntil(game, () => MushieCookies.grimoire.report().doubles === 1, 10);
+        const out = await read(game);
+        assert.ok(done, JSON.stringify(out.report));
+        assert.equal(out.towers, 400);
+        assert.equal(await game.eval(() => MushieCookies.buyer.kept('grimoire')), 0, 'let go once the towers are back');
+        assert.deepEqual(out.status, []);
+        assert.deepEqual(game.errors, []);
+    }));
+
 test('while a double cast is forecast and mana fills, the buyer keeps the cookies the buy-back needs', { skip }, () =>
     withLateBakery(async (game) => {
         await game.eval(burnTo, ['frenzy', 'click frenzy']);
