@@ -95,20 +95,17 @@ function chainCandidate(game, building, reach) {
  */
 export function listCandidates(game, policy) {
     const out = [];
-    const buildings = game.ObjectsById.filter((b) => !policy.excludedBuildings.has(b.id));
-    if (policy.excludedBuildings !== 'all') {
-        for (const building of buildings) out.push(buildingCandidate(game, building));
-    }
+    const buildings =
+        policy.excludedBuildings === 'all' ? [] : game.ObjectsById.filter((b) => !policy.excludedBuildings.has(b.id));
+    for (const building of buildings) out.push(buildingCandidate(game, building));
     if (policy.excludedUpgrades !== 'all') {
         for (const upgrade of game.UpgradesInStore) {
             if (!STORE_POOLS.has(upgrade.pool) || NEVER_BUY.has(upgrade.id) || policy.excludedUpgrades.has(upgrade.id)) continue;
             out.push(upgradeCandidate(game, upgrade));
         }
-        if (policy.excludedBuildings !== 'all') {
-            for (const building of buildings) {
-                const chain = chainCandidate(game, building, policy.chainReach);
-                if (chain) out.push(chain);
-            }
+        for (const building of buildings) {
+            const chain = chainCandidate(game, building, policy.chainReach);
+            if (chain) out.push(chain);
         }
     }
     return out;

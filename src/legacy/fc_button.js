@@ -184,119 +184,82 @@ function FCMenu() {
                         )
                 );
 
-        // --- AUTOBUY INFO SECTION ---
-        (subsection = $("<div>")
-            .addClass("subsection")
-            .append($("<div>").addClass("title").text("Autobuy Information"))),
-            (recommendation = nextPurchase()),
-            (chainRecommendation = nextChainedPurchase()),
-            (isChained = !(
-                recommendation.id == chainRecommendation.id &&
-                recommendation.type == chainRecommendation.type
-            )),
-            (currentFrenzy = cpsBonus() * clickBuffBonus()),
-            (bankLevel = bestBank(chainRecommendation.efficiency)),
-            (actualCps =
-                Game.cookiesPs +
-                Game.mouseCps() *
-                    FrozenCookies.cookieClickSpeed *
-                    FrozenCookies.autoClick),
-            (chocolateRecoup =
-                (recommendation.type == "upgrade"
-                    ? recommendation.cost
-                    : recommendation.cost * 0.425) /
-                (recommendation.delta_cps * 21));
-
+        // --- BUYING SECTION ---
         function buildListing(label, name) {
             return $("<div>")
                 .addClass("listing")
                 .append($("<b>").text(label + ":"), " ", name);
         }
-
-        subsection.append(
-            buildListing("Next Purchase", recommendation.purchase.name)
-        );
-        if (isChained) {
+        var report = MushieCookies.buyer ? MushieCookies.buyer.report() : null;
+        subsection = $("<div>")
+            .addClass("subsection")
+            .append($("<div>").addClass("title").text("Buying"));
+        if (report && report.income) {
+            var income = report.income;
+            var next = report.next;
             subsection.append(
-                buildListing(
-                    "Building Chain to",
-                    chainRecommendation.purchase.name
-                )
+                buildListing("Next purchase", next ? next.name : "nothing worth buying")
             );
-        }
-        subsection.append(
-            buildListing(
-                "Time til completion",
-                timeDisplay(
-                    divCps(
-                        recommendation.cost + bankLevel.cost - Game.cookies,
-                        actualCps
-                    )
-                )
-            )
-        );
-        if (isChained) {
-            subsection.append(
-                buildListing(
-                    "Time til Chain completion",
-                    timeDisplay(
-                        divCps(
-                            Math.max(
-                                0,
-                                chainRecommendation.cost +
-                                    bankLevel.cost -
-                                    Game.cookies
-                            ),
-                            actualCps
+            if (next) {
+                subsection.append(buildListing("Cost", Beautify(next.price)));
+                subsection.append(
+                    buildListing("Adds per second", Beautify(next.deltaIncome))
+                );
+                subsection.append(
+                    buildListing("Pays back in", timeDisplay(next.payback))
+                );
+                subsection.append(
+                    buildListing(
+                        "Ready in",
+                        timeDisplay(
+                            divCps(
+                                Math.max(0, next.price + report.reserve - Game.cookies),
+                                income.total
+                            )
                         )
                     )
-                )
+                );
+            }
+            subsection.append(
+                buildListing("Golden cookie reserve", Beautify(report.reserve))
             );
-        }
-        if (Game.HasUnlocked("Chocolate egg") && !Game.Has("Chocolate egg")) {
             subsection.append(
                 buildListing(
-                    "Time to Recoup Chocolate",
-                    timeDisplay(
-                        divCps(
-                            recommendation.cost + bankLevel.cost - Game.cookies,
-                            effectiveCps()
-                        ) + chocolateRecoup
+                    "Income per second",
+                    Beautify(income.total) +
+                        " (" +
+                        Beautify(income.passive) +
+                        " buildings, " +
+                        Beautify(income.click) +
+                        " clicks, " +
+                        Beautify(income.golden) +
+                        " golden cookies)"
+                )
+            );
+            subsection.append(buildListing("Purchases this session", report.purchases));
+            var table = $("<table>")
+                .prop("id", "fcEfficiencyTable")
+                .append(
+                    $("<tr>").append(
+                        $("<th>").text("Candidate"),
+                        $("<th>").text("Cost"),
+                        $("<th>").text("Adds / s"),
+                        $("<th>").text("Pays back")
                     )
-                )
-            );
-        }
-        subsection.append(buildListing("Cost", Beautify(recommendation.cost)));
-        subsection.append(
-            buildListing("Golden Cookie Bank", Beautify(bankLevel.cost))
-        );
-        subsection.append(
-            buildListing("Base Δ CPS", Beautify(recommendation.base_delta_cps))
-        );
-        subsection.append(
-            buildListing("Full Δ CPS", Beautify(recommendation.delta_cps))
-        );
-        subsection.append(
-            buildListing(
-                "Purchase Efficiency",
-                Beautify(recommendation.efficiency)
-            )
-        );
-        if (isChained) {
-            subsection.append(
-                buildListing(
-                    "Chain Efficiency",
-                    Beautify(chainRecommendation.efficiency)
-                )
-            );
-        }
-        if (bankLevel.efficiency > 0) {
-            subsection.append(
-                buildListing(
-                    "Golden Cookie Efficiency",
-                    Beautify(bankLevel.efficiency)
-                )
-            );
+                );
+            report.top.forEach(function (c) {
+                table.append(
+                    $("<tr>").append(
+                        $("<td>").append($("<b>").text(c.name)),
+                        $("<td>").text(Beautify(c.price)),
+                        $("<td>").text(Beautify(c.deltaIncome)),
+                        $("<td>").text(isFinite(c.payback) ? timeDisplay(c.payback) : "never")
+                    )
+                );
+            });
+            subsection.append($("<div>").addClass("listing").append(table));
+        } else {
+            subsection.append(buildListing("Next purchase", "not ranked yet"));
         }
         menu.append(subsection);
 
@@ -418,118 +381,6 @@ function FCMenu() {
             });
             menu.append(subsection);
         }
-
-        // --- GOLDEN COOKIE INFO SECTION ---
-        subsection = $("<div>").addClass("subsection");
-        subsection.append(
-            $("<div>").addClass("title").text("Golden Cookie Information")
-        );
-        currentCookies = Math.min(Game.cookies, FrozenCookies.targetBank.cost);
-        maxCookies = bestBank(Number.POSITIVE_INFINITY).cost;
-        isTarget =
-            FrozenCookies.targetBank.cost == FrozenCookies.currentBank.cost;
-        isMax = currentCookies == maxCookies;
-        targetTxt = isTarget ? "" : " (Building Bank)";
-        maxTxt = isMax ? " (Max)" : "";
-        subsection.append(
-            buildListing("Current Frenzy", Beautify(currentFrenzy))
-        );
-        subsection.append(
-            buildListing(
-                "Current Average Cookie Value" + targetTxt + maxTxt,
-                Beautify(cookieValue(currentCookies))
-            )
-        );
-        if (!isTarget) {
-            subsection.append(
-                buildListing(
-                    "Target Average Cookie Value",
-                    Beautify(cookieValue(FrozenCookies.targetBank.cost))
-                )
-            );
-        }
-        if (!isMax) {
-            subsection.append(
-                buildListing(
-                    "Max Average Cookie Value",
-                    Beautify(cookieValue(maxCookies))
-                )
-            );
-        }
-        subsection.append(
-            buildListing("Max Lucky Cookie Value", Beautify(maxLuckyValue()))
-        );
-        subsection.append(
-            buildListing(
-                "Cookie Bank Required for Max Lucky",
-                Beautify(maxLuckyValue() * 10)
-            )
-        );
-        subsection.append(
-            buildListing(
-                "Max Chain Cookie Value",
-                Beautify(
-                    calculateChainValue(
-                        chainBank(),
-                        Game.cookiesPs,
-                        7 - Game.elderWrath / 3
-                    )
-                )
-            )
-        );
-        subsection.append(
-            buildListing(
-                "Cookie Bank Required for Max Chain",
-                Beautify(chainBank())
-            )
-        );
-        subsection.append(
-            buildListing(
-                "Estimated Cookie CPS",
-                Beautify(gcPs(cookieValue(currentCookies)))
-            )
-        );
-        subsection.append(
-            buildListing("Golden Cookie Clicks", Beautify(Game.goldenClicks))
-        );
-        if (FrozenCookies.showMissedCookies == 1) {
-            subsection.append(
-                buildListing(
-                    "Missed Golden Cookie Clicks",
-                    Beautify(Game.missedGoldenClicks)
-                )
-            );
-        }
-        subsection.append(
-            buildListing(
-                "Last Golden Cookie Effect",
-                Game.shimmerTypes.golden.last
-            )
-        );
-        menu.append(subsection);
-
-        // --- FRENZY TIMES SECTION ---
-        subsection = $("<div>").addClass("subsection");
-        subsection.append($("<div>").addClass("title").text("Frenzy Times"));
-        $.each(
-            Object.keys(FrozenCookies.frenzyTimes)
-                .sort((a, b) => parseInt(a) - parseInt(b))
-                .reduce((result, rate) => {
-                    result[parseInt(rate)] =
-                        (result[parseInt(rate)] || 0) +
-                        FrozenCookies.frenzyTimes[rate];
-                    return result;
-                }, {}),
-            (rate, time) => {
-                subsection.append(
-                    buildListing(
-                        "Total Recorded Time at x" + Beautify(rate),
-                        timeDisplay(time / 1000)
-                    )
-                );
-            }
-        );
-        menu.append(subsection);
 
         // --- HEAVENLY CHIPS INFO SECTION ---
         subsection = $("<div>").addClass("subsection");
@@ -679,9 +530,9 @@ function FCMenu() {
         );
         cps =
             baseCps() +
-            baseClickingCps(
-                FrozenCookies.cookieClickSpeed * FrozenCookies.autoClick
-            );
+            (FrozenCookies.autoClick
+                ? Game.computedMouseCps * Math.min(FrozenCookies.cookieClickSpeed, 50)
+                : 0);
         baseChosen = Game.hasBuff("Frenzy") ? "" : " (*)";
         frenzyChosen = Game.hasBuff("Frenzy") ? " (*)" : "";
         clickStr = FrozenCookies.autoClick ? " + Autoclick" : "";
@@ -717,140 +568,6 @@ function FCMenu() {
         }
         subsection.append(buildListing("Game Seed", Game.seed));
         menu.append(subsection);
-        // --- INTERNAL INFO SECTION ---
-        subsection = $("<div>").addClass("subsection");
-        subsection.append(
-            $("<div>").addClass("title").text("Internal Information")
-        );
-        buildTable = $("<table>")
-            .prop("id", "fcEfficiencyTable")
-            .append(
-                $("<tr>").append(
-                    $("<th>").text("Building"),
-                    $("<th>").text("Eff%"),
-                    $("<th>").text("Efficiency"),
-                    $("<th>").text("Cost"),
-                    $("<th>").text("Δ CPS")
-                )
-            );
-        recommendationList().forEach(function (rec) {
-            var item = rec.purchase,
-                chainStr = item.unlocked === 0 ? " (C)" : "";
-            buildTable.append(
-                $("<tr>").append(
-                    $("<td>").append($("<b>").text(item.name + chainStr)),
-                    $("<td>").text(
-                        (
-                            Math.floor(rec.efficiencyScore * 10000) / 100
-                        ).toString() + "%"
-                    ),
-                    $("<td>").text(Beautify(rec.efficiency)),
-                    $("<td>").text(Beautify(rec.cost)),
-                    $("<td>").text(Beautify(rec.delta_cps))
-                )
-            );
-        });
-
-        // Table Dividers
-        var dividers = [
-            $("<tr>").append($("<td>").attr("colspan", "5").html("&nbsp;")),
-            $("<tr>")
-                .css("border-top", "2px dashed #999")
-                .append($("<td>").attr("colspan", "5").html("&nbsp;")),
-        ];
-
-        var banks = [
-            {
-                name: "Lucky Bank",
-                cost: luckyBank(),
-                efficiency: cookieEfficiency(Game.cookies, luckyBank()),
-            },
-            {
-                name: "Lucky Frenzy Bank",
-                cost: luckyFrenzyBank(),
-                efficiency: cookieEfficiency(Game.cookies, luckyFrenzyBank()),
-            },
-            {
-                name: "Chain Bank",
-                cost: chainBank(),
-                efficiency: cookieEfficiency(Game.cookies, chainBank()),
-            },
-        ];
-
-        var elderWrathLevels = [
-            {
-                name: "Pledging/Appeased",
-                level: 0,
-            },
-            {
-                name: "One Mind/Awoken",
-                level: 1,
-            },
-            {
-                name: "Displeased",
-                level: 2,
-            },
-            {
-                name: "Full Wrath/Angered",
-                level: 3,
-            },
-        ];
-        buildTable.append(dividers);
-        banks.forEach(function (bank) {
-            var deltaCps = effectiveCps(bank.cost) - effectiveCps();
-            buildTable.append(
-                $("<tr>").append(
-                    $("<td>")
-                        .attr("colspan", "2")
-                        .append(
-                            $("<b>").text(
-                                bank.name + (bank.deltaCps === 0 ? " (*)" : "")
-                            )
-                        ),
-                    $("<td>").text(Beautify(bank.efficiency)),
-                    $("<td>").text(
-                        Beautify(Math.max(0, bank.cost - Game.cookies))
-                    ),
-                    $("<td>").text(Beautify(deltaCps))
-                )
-            );
-        });
-
-        buildTable.append(dividers);
-        elderWrathLevels.forEach(function (wrath) {
-            buildTable.append(
-                $("<tr>").append(
-                    $("<td>")
-                        .attr("colspan", "2")
-                        .append(
-                            $("<b>").text(
-                                wrath.name +
-                                    (Game.elderWrath === wrath.level
-                                        ? " (*)"
-                                        : "")
-                            )
-                        ),
-                    $("<td>")
-                        .attr("colspan", "2")
-                        .attr("title", "Ratio of Effective CPS vs Base CPS")
-                        .text(
-                            Beautify(
-                                effectiveCps(Game.cookies, wrath.level) /
-                                    baseCps()
-                            )
-                        ),
-                    $("<td>").text(
-                        Beautify(
-                            effectiveCps(Game.cookies, wrath.level) -
-                                effectiveCps()
-                        )
-                    )
-                )
-            );
-        });
-        subsection.append($("<div>").addClass("listing").append(buildTable));
-        menu.append(subsection);
-
         if (!Game.HasAchiev("Olden days"))
             subsection.append(
                 $(

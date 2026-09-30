@@ -4,8 +4,13 @@ const SCALARS = [
     'UpgradesOwned',
     'AchievementsOwned',
     'season',
+    'seasonT',
+    'seasonUses',
     'elderWrath',
     'pledges',
+    'pledgeT',
+    'researchT',
+    'nextResearch',
 ];
 
 // The game keeps buildings in an array, and upgrades and achievements in objects keyed by id.

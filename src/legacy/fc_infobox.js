@@ -229,8 +229,8 @@ function buffDuration(buffName) {
     return buff ? buff.time : 0;
 }
 
+// Works out what the infobox shows. Runs on the loop a few times a second; drawInfobox draws it.
 function updateTimers() {
-    // update infobox calculations and assemble output -- called every draw tick
     var chainPurchase,
         bankPercent,
         purchasePercent,
@@ -239,17 +239,16 @@ function updateTimers() {
         t_draw,
         maxColor,
         height,
+        // The next golden cookie is expected about 86% of the way from the shortest to the longest wait.
         gc_delay =
-            (probabilitySpan("golden", Game.shimmerTypes.golden.time, 0.5) -
+            (Game.shimmerTypes.golden.minTime +
+                0.86 * (maxCookieTime() - Game.shimmerTypes.golden.minTime) -
                 Game.shimmerTypes.golden.time) /
             maxCookieTime(),
         gc_max_delay =
-            (probabilitySpan("golden", Game.shimmerTypes.golden.time, 0.99) -
-                Game.shimmerTypes.golden.time) /
-            maxCookieTime(),
+            (maxCookieTime() - Game.shimmerTypes.golden.time) / maxCookieTime(),
         gc_min_delay =
-            (probabilitySpan("golden", Game.shimmerTypes.golden.time, 0.01) -
-                Game.shimmerTypes.golden.time) /
+            (Game.shimmerTypes.golden.minTime - Game.shimmerTypes.golden.time) /
             maxCookieTime(),
         clot_delay = buffDuration("Clot") / maxCookieTime(),
         elder_frenzy_delay = buffDuration("Elder frenzy") / maxCookieTime(),
@@ -272,17 +271,6 @@ function updateTimers() {
         chainFinished,
         chainCompletion = 0;
     c = $("#backgroundLeftCanvas");
-    if (nextChainedPurchase().cost > nextPurchase().cost) {
-        chainPurchase = nextChainedPurchase().purchase;
-        chainTotal =
-            upgradePrereqCost(chainPurchase, true) - chainPurchase.getPrice();
-        chainFinished =
-            chainTotal -
-            (upgradePrereqCost(chainPurchase) - chainPurchase.getPrice());
-        chainCompletion =
-            (chainFinished + Math.max(Game.cookies - bankTotal, 0)) /
-            (bankTotal + chainTotal);
-    }
     bankPercent =
         Math.min(Game.cookies, bankTotal) / (bankTotal + purchaseTotal);
     purchasePercent = purchaseTotal / (purchaseTotal + bankTotal);
@@ -458,11 +446,23 @@ function updateTimers() {
             display: timeDisplay(buffDuration("Cookie storm") / Game.fps),
         });
     }
-    height = $("#backgroundLeftCanvas").height() - 140;
-    drawCircles(t_draw, 20, height);
+    FrozenCookies.infoboxFrame = {
+        t_draw: t_draw,
+        frenzy: cpsBonus() * clickBuffBonus(),
+    };
+}
+
+// Draws the last computed infobox. Runs from the game's draw hook, which comes after the game
+// has cleared the left canvas; drawing any earlier is erased before the frame is shown.
+function drawInfobox() {
+    var frame = FrozenCookies.infoboxFrame;
+    if (!frame) return;
+    var c = $("#backgroundLeftCanvas");
+    var height = c.height() - 140;
+    drawCircles(frame.t_draw, 20, height);
 
     // Calculate currentFrenzy before drawing it
-    var currentFrenzy = cpsBonus() * clickBuffBonus();
+    var currentFrenzy = frame.frenzy;
     // Draw the current frenzy at the bottom of the canvas
     if (FrozenCookies.fancyui && typeof c.drawText === "function") {
         c.removeLayer && c.removeLayer("fcCurrentFrenzyText");

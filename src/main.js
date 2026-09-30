@@ -2,6 +2,7 @@
 import { createGuard } from './core/guard.js';
 import { createLoop } from './core/loop.js';
 import { register } from './game/boot.js';
+import { startSystems } from './game/bridge.js';
 
 export { simulate, simulateEach, takeSnapshot, diffSnapshots } from './core/sim.js';
 export { readState, measureCandidates } from './game/measure.js';
@@ -13,6 +14,10 @@ export { rankCandidates, chooseReserve, decide } from './core/buyer.js';
 export const version = __MUSHIE_VERSION__;
 
 const report = (message) => console.error(`[Mushie Cookies] ${message}`);
+const log = (message) => console.log(`[Mushie Cookies] ${message}`);
+
+/** The new systems, by name, once the mod has started. */
+export let buyer = null;
 
 const guards = createGuard({
     maxFailures: 5,
@@ -36,7 +41,22 @@ const runtime = {
         script.remove();
         if (typeof window.legacyStart !== 'function') throw new Error('legacy code did not evaluate');
     },
-    start: (data) => window.legacyStart(data),
+    start(data) {
+        window.legacyStart(data);
+        const systems = startSystems({
+            game: window.Game,
+            loop,
+            log,
+            legacy: {
+                settings: window.FrozenCookies,
+                blacklistPresets: window.blacklist,
+                edificeBank: () => window.edificeBank(),
+                harvestBank: () => window.harvestBank(),
+                manualBank: () => window.manualBank(),
+            },
+        });
+        buyer = systems.buyer;
+    },
     save: () => window.saveFCData(),
     load: (data) => window.setOverrides(data),
 };
@@ -47,7 +67,7 @@ const booted =
               id: 'mushie_cookies',
               runtime,
               loop,
-              onError: (error) => report(`failed to start: ${error.message}`),
+              onError: (error, what) => report(`${what} failed: ${error.message}`),
           })
         : null;
 

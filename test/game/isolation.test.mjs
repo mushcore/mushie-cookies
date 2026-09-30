@@ -31,8 +31,8 @@ test('the legacy main loop survives an exception and keeps its timer', { skip },
     try {
         await game.eval(() => {
             window.__calls = 0;
-            const real = window.updateCaches;
-            window.updateCaches = function () {
+            const real = window.wrinklerValue;
+            window.wrinklerValue = function () {
                 window.__calls++;
                 if (window.__calls <= 2) throw new Error('injected');
                 return real.apply(this, arguments);

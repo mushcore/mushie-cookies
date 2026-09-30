@@ -96,6 +96,11 @@ test('every function called by bare name is defined somewhere', () => {
         const name = m[2];
         if (!defined.has(name) && !external.has(name)) missing.add(name);
     }
+    // Callbacks handed to the guard by reference: MushieCookies.guard("legacy:x", x). Strings
+    // were blanked above, so the first argument reads as ''.
+    for (const m of code.matchAll(/MushieCookies\.guard\(\s*''\s*,\s*([A-Za-z_$][\w$]*)\s*\)/g)) {
+        if (!defined.has(m[1]) && !external.has(m[1])) missing.add(m[1]);
+    }
     // Parameters and local variables that hold functions are called by bare name too.
     const locals = new Set();
     for (const m of code.matchAll(/function\s*[\w$]*\s*\(([^)]*)\)/g)) {

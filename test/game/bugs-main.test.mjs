@@ -56,25 +56,20 @@ test('the Spontaneous Edifice bank is zero when the spell cannot be cast', { ski
         assert.equal(await game.eval(() => edificeBank()), 0);
     }));
 
-test('a season switcher is not bought in a free base season with nothing left to unlock', { skip }, () =>
+test('season switchers and other toggles are never purchase candidates', { skip }, () =>
     withMod(async (game) => {
         const out = await game.eval(() => {
-            const all = ['christmas', 'halloween', 'valentines', 'easter'];
-            for (const season of all) for (const id of holidayCookies[season]) Game.UpgradesById[id].unlocked = 1;
-            Game.UpgradesById[181].unlocked = 1;
-            Game.baseSeason = 'christmas';
-            FrozenCookies.freeSeason = 1;
-            // The preferred season's own switcher is the one no other rule already excludes.
-            FrozenCookies.defaultSeason = seasons.indexOf('halloween');
-            const halloweenSwitch = Game.UpgradesById[183];
-            halloweenSwitch.unlocked = 1;
-            const complete = isUnavailable(halloweenSwitch, []);
-            Game.baseSeason = '';
-            const noBaseSeason = isUnavailable(halloweenSwitch, []);
-            return { complete, noBaseSeason };
+            Game.Earn(1e15);
+            Game.UpgradesById[181].unlocked = 1; // Season switcher
+            for (const id of [182, 183, 184, 185, 209]) Game.UpgradesById[id].unlocked = 1;
+            Game.RebuildUpgrades();
+            const inStore = Game.UpgradesInStore.map((u) => u.id);
+            const policy = { excludedBuildings: new Set(), excludedUpgrades: new Set(), chainReach: 15 };
+            const candidates = MushieCookies.listCandidates(Game, policy).filter((c) => c.kind === 'upgrade').map((c) => c.upgrade.id);
+            return { inStore, candidates };
         });
-        assert.equal(out.complete, true);
-        assert.equal(out.noBaseSeason, false, 'outside a base season the same switcher must stay available');
+        assert.ok([182, 183, 184, 185, 209].some((id) => out.inStore.includes(id)), 'the fixture should have put switchers in the store');
+        for (const id of [182, 183, 184, 185, 209]) assert.ok(!out.candidates.includes(id), `switcher ${id} was a candidate`);
     }));
 
 test('prestige-doubling ascension does not depend on the fixed-amount setting', { skip }, () =>
@@ -141,4 +136,50 @@ test('auto-ascend ascends and reincarnates without a wall-clock timer', { skip }
         assert.equal(out.onAscend, 0, 'the mod should have left the ascension screen');
         assert.ok(out.prestige >= 40);
         assert.deepEqual(game.errors, []);
+    }));
+
+test('a manual ascension is left alone even with auto-ascend switched on', { skip }, () =>
+    withMod(async (game) => {
+        await game.eval(() => {
+            Game.Earn(1e15);
+            Game.cookiesEarned = Game.HowManyCookiesReset(50);
+            FrozenCookies.autoAscendToggle = 1;
+            FrozenCookies.autoAscend = 0; // the method is off: the player ascends by hand
+            FCStart();
+            Game.Ascend(1);
+        });
+        await game.advanceSeconds(15);
+        const out = await game.eval(() => ({ onAscend: Game.OnAscend, resets: Game.resets }));
+        assert.equal(out.onAscend, 1, 'the mod must not reincarnate an ascension it did not start');
+        assert.equal(out.resets, 0, 'reincarnating is what counts a reset, and the mod must not have');
+    }));
+
+test('a save wipe is a hard reset: prestige upgrades do not survive it', { skip }, () =>
+    withMod(async (game) => {
+        const out = await game.eval(() => {
+            Game.Earn(1e15);
+            Game.Upgrades['Season switcher'].earn();
+            Game.Upgrades['Heralds'].earn();
+            Game.HardReset(2);
+            return {
+                switcher: Game.Upgrades['Season switcher'].bought,
+                heralds: Game.Upgrades['Heralds'].bought,
+                cookies: Game.cookies,
+                resets: Game.resets,
+            };
+        });
+        assert.deepEqual(out, { switcher: 0, heralds: 0, cookies: 0, resets: 0 });
+    }));
+
+test('loading a save while running does not duplicate the timers', { skip }, () =>
+    withMod(async (game) => {
+        const out = await game.eval(() => {
+            FrozenCookies.autoClick = 1;
+            FrozenCookies.cookieClickSpeed = 10;
+            FCStart();
+            const before = window.__vt.timers.size;
+            for (let i = 0; i < 3; i++) Game.LoadSave(Game.WriteSave(1));
+            return { before, after: window.__vt.timers.size };
+        });
+        assert.equal(out.after, out.before);
     }));
