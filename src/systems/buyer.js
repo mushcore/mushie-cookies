@@ -25,7 +25,9 @@ const ENABLERS = new Set([
  * @param {(what: string) => void} [deps.log]
  */
 export function createBuyer({ game, settings, policy, loop, extraReserve = () => 0, log = () => {} }) {
-    const options = { holdReserve: true };
+    // The reserve is kept only once the best purchase repays more slowly than this (seconds).
+    // 6000 s is the reserve's own size in seconds of CpS: below that, its upkeep costs more than it yields.
+    const options = { reserveMinPayback: 6000 };
     const state = {
         ranked: [],
         income: null,
@@ -61,7 +63,7 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
             amount,
             incomeAt: estimateIncome({ ...now, bank: amount }).total,
         }));
-        const held = options.holdReserve ? chooseReserve({ best, reserves, income: empty }) : 0;
+        const held = chooseReserve({ best, reserves, income: empty, minPurchasePayback: options.reserveMinPayback });
         state.reserve = Math.max(held, extraReserve() || 0);
         state.ranked = ranked;
         state.income = income;

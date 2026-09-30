@@ -49,10 +49,17 @@ test('the reserve is kept only when it pays back as fast as the best purchase', 
         { amount: 600000, incomeAt: 250 }, // pays back in 4000 s
         { amount: 4200000, incomeAt: 400 }, // pays back in 14000 s
     ];
-    assert.equal(chooseReserve({ best: { payback: 5000 }, reserves, income }), 600000);
-    assert.equal(chooseReserve({ best: { payback: 20000 }, reserves, income }), 4200000);
-    assert.equal(chooseReserve({ best: { payback: 100 }, reserves, income }), 0);
+    assert.equal(chooseReserve({ best: { purePayback: 5000 }, reserves, income }), 600000);
+    assert.equal(chooseReserve({ best: { purePayback: 20000 }, reserves, income }), 4200000);
+    assert.equal(chooseReserve({ best: { purePayback: 100 }, reserves, income }), 0);
     assert.equal(chooseReserve({ best: null, reserves, income }), 4200000, 'with nothing to buy, keep the largest');
+});
+
+test('the upkeep threshold keeps the reserve off while purchases still repay quickly', () => {
+    const reserves = [{ amount: 600000, incomeAt: 250 }]; // repays in 4000 s
+    assert.equal(chooseReserve({ best: { purePayback: 5000 }, reserves, income, minPurchasePayback: 6000 }), 0);
+    assert.equal(chooseReserve({ best: { purePayback: 7000 }, reserves, income, minPurchasePayback: 6000 }), 600000);
+    assert.equal(chooseReserve({ best: null, reserves, income, minPurchasePayback: 6000 }), 600000);
 });
 
 test('a reserve that does not raise income is never kept', () => {
