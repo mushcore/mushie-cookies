@@ -1,14 +1,15 @@
 // The one place that reads the legacy globals the new systems still need: the settings object
 // `FrozenCookies`, the blacklist presets, and the extra-reserve helpers.
 import { createBuyer } from '../systems/buyer.js';
+import { createAscension } from '../systems/ascension.js';
 
 const CHAIN_REACH = 15;
 
 /** Which buildings and upgrades the settings exclude, read live. */
-export function policyFrom(game, settings, presets) {
+export function policyFrom(game, settings, presets, prerequisites) {
     const preset = (presets && presets[settings.blacklist]) || { upgrades: [], buildings: [] };
     const excludedUpgrades = preset.upgrades === true ? 'all' : new Set(preset.upgrades);
-    if (preset.buildings === true) return { excludedBuildings: 'all', excludedUpgrades, chainReach: CHAIN_REACH };
+    if (preset.buildings === true) return { excludedBuildings: 'all', excludedUpgrades, chainReach: CHAIN_REACH, prerequisites };
 
     const excludedBuildings = new Set(preset.buildings);
     const exclude = (name) => excludedBuildings.add(game.Objects[name].id);
@@ -19,7 +20,7 @@ export function policyFrom(game, settings, presets) {
     if (settings.mineLimit && game.Objects['Mine'].amount >= settings.mineMax) exclude('Mine');
     if (settings.factoryLimit && game.Objects['Factory'].amount >= settings.factoryMax) exclude('Factory');
     if (settings.autoDragonOrbs && settings.orbLimit && you.amount >= settings.orbMax) exclude('You');
-    return { excludedBuildings, excludedUpgrades, chainReach: CHAIN_REACH };
+    return { excludedBuildings, excludedUpgrades, chainReach: CHAIN_REACH, prerequisites };
 }
 
 /** Bank the settings ask to hold beyond the golden cookie reserve, from the legacy helpers. */
@@ -39,8 +40,16 @@ export function startSystems({ game, loop, legacy, log }) {
         settings,
         loop,
         log,
-        policy: () => policyFrom(game, settings, legacy.blacklistPresets),
+        policy: () => policyFrom(game, settings, legacy.blacklistPresets, legacy.prerequisites),
         extraReserve: () => extraReserveFrom(settings, legacy),
     });
-    return { buyer };
+    const ascension = createAscension({
+        game,
+        settings,
+        loop,
+        log,
+        buyer,
+        extras: () => legacy.wrinklerValue() + legacy.chocolateValue(),
+    });
+    return { buyer, ascension };
 }

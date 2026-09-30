@@ -1,5 +1,6 @@
 const SCALARS = [
     'cookiesPsRawHighest',
+    'prestige',
     'BuildingsOwned',
     'UpgradesOwned',
     'AchievementsOwned',

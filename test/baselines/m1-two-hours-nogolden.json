@@ -1,0 +1,122 @@
+{
+  "seed": "baseline",
+  "mod": "C:\\Users\\klian\\AppData\\Local\\Temp/mushie-m1/dist/MushieCookies/main.js",
+  "settings": {
+    "autoBuy": 1,
+    "autoGC": 1,
+    "autoClick": 1,
+    "cookieClickSpeed": 50
+  },
+  "goldenCookies": false,
+  "wallSeconds": 179,
+  "points": [
+    {
+      "minute": 10,
+      "earned": 323432.4425333746,
+      "cps": 1024.36,
+      "unbuffedCps": 1024.36,
+      "buildings": 65,
+      "upgrades": 9,
+      "achievements": 15
+    },
+    {
+      "minute": 20,
+      "earned": 3039141.880467574,
+      "cps": 6829.16,
+      "unbuffedCps": 6829.16,
+      "buildings": 129,
+      "upgrades": 14,
+      "achievements": 18
+    },
+    {
+      "minute": 30,
+      "earned": 12751195.471668603,
+      "cps": 15125,
+      "unbuffedCps": 15125,
+      "buildings": 161,
+      "upgrades": 16,
+      "achievements": 19
+    },
+    {
+      "minute": 40,
+      "earned": 33147316.1158111,
+      "cps": 28665.660000000003,
+      "unbuffedCps": 28665.660000000003,
+      "buildings": 182,
+      "upgrades": 18,
+      "achievements": 23
+    },
+    {
+      "minute": 50,
+      "earned": 80981925.77301045,
+      "cps": 68525.6503456,
+      "unbuffedCps": 68525.6503456,
+      "buildings": 213,
+      "upgrades": 23,
+      "achievements": 24
+    },
+    {
+      "minute": 60,
+      "earned": 169616510.14294836,
+      "cps": 115278.82652000003,
+      "unbuffedCps": 115278.82652000003,
+      "buildings": 251,
+      "upgrades": 25,
+      "achievements": 25
+    },
+    {
+      "minute": 70,
+      "earned": 307245686.7709596,
+      "cps": 182209.68832000002,
+      "unbuffedCps": 182209.68832000002,
+      "buildings": 256,
+      "upgrades": 26,
+      "achievements": 25
+    },
+    {
+      "minute": 80,
+      "earned": 531297051.2746849,
+      "cps": 252428.23039330138,
+      "unbuffedCps": 252428.23039330138,
+      "buildings": 294,
+      "upgrades": 28,
+      "achievements": 27
+    },
+    {
+      "minute": 90,
+      "earned": 879011805.5185585,
+      "cps": 462718.59750371205,
+      "unbuffedCps": 462718.59750371205,
+      "buildings": 331,
+      "upgrades": 31,
+      "achievements": 28
+    },
+    {
+      "minute": 100,
+      "earned": 1376344837.7688303,
+      "cps": 500452.3182489696,
+      "unbuffedCps": 500452.3182489696,
+      "buildings": 339,
+      "upgrades": 31,
+      "achievements": 29
+    },
+    {
+      "minute": 110,
+      "earned": 1996164851.8901174,
+      "cps": 637746.5936179528,
+      "unbuffedCps": 637746.5936179528,
+      "buildings": 350,
+      "upgrades": 33,
+      "achievements": 29
+    },
+    {
+      "minute": 120,
+      "earned": 2825520796.572422,
+      "cps": 725569.9217961761,
+      "unbuffedCps": 725569.9217961761,
+      "buildings": 358,
+      "upgrades": 34,
+      "achievements": 30
+    }
+  ]
+}

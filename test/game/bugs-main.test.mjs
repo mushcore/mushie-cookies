@@ -64,36 +64,12 @@ test('season switchers and other toggles are never purchase candidates', { skip 
             for (const id of [182, 183, 184, 185, 209]) Game.UpgradesById[id].unlocked = 1;
             Game.RebuildUpgrades();
             const inStore = Game.UpgradesInStore.map((u) => u.id);
-            const policy = { excludedBuildings: new Set(), excludedUpgrades: new Set(), chainReach: 15 };
+            const policy = { excludedBuildings: new Set(), excludedUpgrades: new Set(), chainReach: 15, prerequisites: upgradeJson };
             const candidates = MushieCookies.listCandidates(Game, policy).filter((c) => c.kind === 'upgrade').map((c) => c.upgrade.id);
             return { inStore, candidates };
         });
         assert.ok([182, 183, 184, 185, 209].some((id) => out.inStore.includes(id)), 'the fixture should have put switchers in the store');
         for (const id of [182, 183, 184, 185, 209]) assert.ok(!out.candidates.includes(id), `switcher ${id} was a candidate`);
-    }));
-
-test('prestige-doubling ascension does not depend on the fixed-amount setting', { skip }, () =>
-    withMod(async (game) => {
-        const out = await game.eval(() => {
-            FrozenCookies.autoAscendToggle = 1;
-            FrozenCookies.comboAscend = 1;
-            FrozenCookies.HCAscendAmount = 0;
-            Game.prestige = 100;
-            Game.cookiesReset = 0;
-            Game.cookiesEarned = Game.HowManyCookiesReset(250);
-            FrozenCookies.autoAscend = 2;
-            const doubling = shouldAutoAscend();
-            FrozenCookies.autoAscend = 1;
-            const fixedWithZero = shouldAutoAscend();
-            FrozenCookies.HCAscendAmount = 100;
-            const fixedWith100 = shouldAutoAscend();
-            FrozenCookies.HCAscendAmount = 200;
-            const fixedWith200 = shouldAutoAscend();
-            FrozenCookies.autoAscendToggle = 0;
-            const off = shouldAutoAscend();
-            return { doubling, fixedWithZero, fixedWith100, fixedWith200, off };
-        });
-        assert.deepEqual(out, { doubling: true, fixedWithZero: false, fixedWith100: true, fixedWith200: false, off: false });
     }));
 
 test('restarting the timers does not leak intervals', { skip }, () =>
@@ -111,42 +87,14 @@ test('restarting the timers does not leak intervals', { skip }, () =>
         assert.equal(out.later, out.first);
     }));
 
-test('auto-ascend ascends and reincarnates without a wall-clock timer', { skip }, () =>
-    withMod(async (game) => {
-        await game.eval(() => {
-            Game.Earn(1e15);
-            Game.prestige = 10;
-            Game.heavenlyChips = 10;
-            Game.cookiesReset = Game.HowManyCookiesReset(10);
-            Game.cookiesEarned = Game.HowManyCookiesReset(40);
-            FrozenCookies.autoAscendToggle = 1;
-            FrozenCookies.autoAscend = 2;
-            FrozenCookies.comboAscend = 1;
-            FCStart();
-        });
-        game.clearLogs();
-        await game.advanceSeconds(60);
-        const out = await game.eval(() => ({
-            onAscend: Game.OnAscend,
-            ascendTimer: Game.AscendTimer,
-            resets: Game.resets,
-            prestige: Game.prestige,
-        }));
-        assert.equal(out.resets, 1, 'the run should have ascended exactly once');
-        assert.equal(out.onAscend, 0, 'the mod should have left the ascension screen');
-        assert.ok(out.prestige >= 40);
-        assert.deepEqual(game.errors, []);
-    }));
-
 test('a manual ascension is left alone even with auto-ascend switched on', { skip }, () =>
     withMod(async (game) => {
         await game.eval(() => {
             Game.Earn(1e15);
             Game.cookiesEarned = Game.HowManyCookiesReset(50);
             FrozenCookies.autoAscendToggle = 1;
-            FrozenCookies.autoAscend = 0; // the method is off: the player ascends by hand
             FCStart();
-            Game.Ascend(1);
+            Game.Ascend(1); // the player ascends by hand
         });
         await game.advanceSeconds(15);
         const out = await game.eval(() => ({ onAscend: Game.OnAscend, resets: Game.resets }));

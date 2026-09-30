@@ -10,6 +10,9 @@ export { awardForBuildings, awardForUpgrades } from './game/awards.js';
 export { listCandidates, NEVER_BUY } from './game/candidates.js';
 export { estimateIncome } from './core/income.js';
 export { rankCandidates, chooseReserve, decide } from './core/buyer.js';
+export { shouldAscend } from './core/ascension.js';
+export { rankHeavenly, planChips } from './core/heavenly.js';
+export { heavenlyCandidates, planHeavenly, slotCandidates, fillPermanentSlots } from './game/prestige.js';
 
 export const version = __MUSHIE_VERSION__;
 
@@ -18,6 +21,7 @@ const log = (message) => console.log(`[Mushie Cookies] ${message}`);
 
 /** The new systems, by name, once the mod has started. */
 export let buyer = null;
+export let ascension = null;
 
 const guards = createGuard({
     maxFailures: 5,
@@ -50,12 +54,16 @@ const runtime = {
             legacy: {
                 settings: window.FrozenCookies,
                 blacklistPresets: window.blacklist,
+                prerequisites: window.upgradeJson,
                 edificeBank: () => window.edificeBank(),
                 harvestBank: () => window.harvestBank(),
                 manualBank: () => window.manualBank(),
+                wrinklerValue: () => window.wrinklerValue(),
+                chocolateValue: () => window.chocolateValue(),
             },
         });
         buyer = systems.buyer;
+        ascension = systems.ascension;
     },
     save: () => window.saveFCData(),
     load: (data) => window.setOverrides(data),

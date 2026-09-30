@@ -108,3 +108,16 @@ test('a what-if of every building takes well under a millisecond each', { skip }
         });
         assert.ok(perTrialMs < 1, `${perTrialMs.toFixed(3)} ms per trial`);
     }));
+
+test('no golden cookie income is expected while golden cookies cannot spawn', { skip }, () =>
+    withGame(async (game) => {
+        const out = await game.eval(() => {
+            const on = MushieCookies.readState(Game, {}).golden.meanInterval;
+            Game.Upgrades['Golden switch [off]'].earn(); // the switch is on: spawning stops
+            const off = MushieCookies.readState(Game, {}).golden.meanInterval;
+            return { on, off, spawns: Game.shimmerTypes.golden.spawnConditions() };
+        });
+        assert.ok(Number.isFinite(out.on));
+        assert.equal(out.spawns, false);
+        assert.equal(out.off, Infinity);
+    }));

@@ -149,28 +149,6 @@ function legacyStart(saveData) {
         },
         { everyFrames: 8 }
     );
-    // Leaves the ascension screen once the game is ready for it.
-    MushieCookies.loop.add(
-        "reincarnate",
-        function () {
-            Game.ClosePrompt();
-            Game.Reincarnate(1);
-        },
-        {
-            everyFrames: 30,
-            enabled: function () {
-                // The flag is set just before the mod calls Game.Ascend. The animation runs
-                // first (AscendTimer), then the screen opens (OnAscend); the flag is cleared
-                // once neither is in progress, so it never applies to a later manual ascension.
-                if (!Game.OnAscend && !Game.AscendTimer) FrozenCookies.ascendingByMod = false;
-                return (
-                    FrozenCookies.ascendingByMod === true &&
-                    Game.OnAscend &&
-                    !Game.AscendTimer
-                );
-            },
-        }
-    );
     logEvent(
         "Load",
         "Mushie Cookies v " +
@@ -247,7 +225,6 @@ function setOverrides(gameSaveData) {
         // Separate because these are user-input values
         FrozenCookies.cookieClickSpeed = preferenceParse("cookieClickSpeed", 0);
         FrozenCookies.frenzyClickSpeed = preferenceParse("frenzyClickSpeed", 0);
-        FrozenCookies.HCAscendAmount = preferenceParse("HCAscendAmount", 0);
         FrozenCookies.minCpSMult = preferenceParse("minCpSMult", 1);
         FrozenCookies.maxSpecials = preferenceParse("maxSpecials", 1);
         FrozenCookies.minLoanMult = preferenceParse("minLoanMult", 1);
@@ -418,7 +395,6 @@ function saveFCData() {
     });
     saveString.frenzyClickSpeed = FrozenCookies.frenzyClickSpeed;
     saveString.cookieClickSpeed = FrozenCookies.cookieClickSpeed;
-    saveString.HCAscendAmount = FrozenCookies.HCAscendAmount;
     saveString.mineMax = FrozenCookies.mineMax;
     saveString.factoryMax = FrozenCookies.factoryMax;
     saveString.minCpSMult = FrozenCookies.minCpSMult;
@@ -562,15 +538,6 @@ function updateCpSMultMin(base) {
         'What CpS multiplier should trigger Auto Casting? (e.g. "7" will trigger during a Frenzy, "1" prevents triggering during a clot, etc.)',
         FrozenCookies[base],
         storeNumberCallback(base, 0)
-    );
-}
-
-function updateAscendAmount(base) {
-    userInputPrompt(
-        "Autoascending!",
-        "How many heavenly chips do you want to auto-ascend at?",
-        FrozenCookies[base],
-        storeNumberCallback(base, 1)
     );
 }
 
@@ -757,10 +724,7 @@ function recommendedSettingsAction() {
         FrozenCookies.factoryLimit = 1;
         FrozenCookies.factoryMax = 500;
         // other auto options
-        FrozenCookies.autoAscendToggle = 0;
-        FrozenCookies.autoAscend = 2;
-        FrozenCookies.comboAscend = 0;
-        FrozenCookies.HCAscendAmount = 0;
+        FrozenCookies.autoAscendToggle = 1;
         FrozenCookies.autoBulk = 2;
         FrozenCookies.autoWrinkler = 1;
         FrozenCookies.shinyPop = 0;
@@ -1339,33 +1303,6 @@ function maxCookieTime() {
     return Game.shimmerTypes.golden.maxTime;
 }
 
-// True when the ascension settings say this run should end now.
-function shouldAutoAscend() {
-    if (FrozenCookies.autoAscendToggle != 1) return false;
-    if (Game.OnAscend || Game.AscendTimer || Game.prestige <= 0) return false;
-    if (
-        FrozenCookies.comboAscend != 1 &&
-        cpsBonus() >= FrozenCookies.minCpSMult
-    )
-        return false;
-    var resetPrestige = Game.HowMuchPrestige(
-        Game.cookiesReset +
-            Game.cookiesEarned +
-            wrinklerValue() +
-            chocolateValue()
-    );
-    if (FrozenCookies.autoAscend == 1) {
-        return (
-            FrozenCookies.HCAscendAmount > 0 &&
-            resetPrestige - Game.prestige >= FrozenCookies.HCAscendAmount
-        );
-    }
-    if (FrozenCookies.autoAscend == 2) {
-        return resetPrestige >= Game.prestige * 2;
-    }
-    return false;
-}
-
 // One pass of the buying loop. Returns true when something was bought.
 function autoCookieBody() {
     var currentHCAmount = Game.HowMuchPrestige(
@@ -1455,12 +1392,6 @@ function autoCookieBody() {
     }
 
     var itemBought = false;
-
-    if (shouldAutoAscend()) {
-        Game.ClosePrompt();
-        FrozenCookies.ascendingByMod = true;
-        Game.Ascend(1);
-    }
 
     var fps_amounts = [
         "15",

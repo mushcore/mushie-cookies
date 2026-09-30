@@ -1,14 +1,16 @@
 // Plays the same seed under two buyer settings and prints progress side by side.
-// Usage: node tools/dev/compare.mjs <hours> <seed> '<js applied to A>' '<js applied to B>'
+// Usage: node tools/dev/compare.mjs <hours> <seed> '<js applied to A>' '<js applied to B>' [--no-golden]
 import { launchWithMod } from '../../test/harness/game.mjs';
 
 const hours = Number(process.argv[2] || 4);
 const seed = process.argv[3] || 'compare';
 const variants = { A: process.argv[4] || '', B: process.argv[5] || '' };
+const noGolden = process.argv.includes('--no-golden');
 const results = {};
 for (const [name, code] of Object.entries(variants)) {
     const game = await launchWithMod({ seed });
     try {
+        if (noGolden) await game.eval(() => { Game.shimmerTypes.golden.spawnConditions = () => false; });
         await game.eval((snippet) => {
             FrozenCookies.autoBuy = 1;
             FrozenCookies.autoGC = 1;

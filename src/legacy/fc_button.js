@@ -382,82 +382,35 @@ function FCMenu() {
             menu.append(subsection);
         }
 
-        // --- HEAVENLY CHIPS INFO SECTION ---
+        // --- ASCENSION SECTION ---
         subsection = $("<div>").addClass("subsection");
-        subsection.append(
-            $("<div>").addClass("title").text("Heavenly Chips Information")
-        );
-        currHC = Game.heavenlyChips;
-        resetHC = Game.HowMuchPrestige(
-            Game.cookiesReset +
-                Game.cookiesEarned +
-                wrinklerValue() +
-                chocolateValue()
-        );
-
-        // Show timing if it's been more than a minute since the last HC was gained
-        var showTiming = Date.now() - FrozenCookies.lastHCTime > 1000 * 60;
-        subsection.append(buildListing("HC Now", Beautify(Game.heavenlyChips)));
-        subsection.append(buildListing("HC After Reset", Beautify(resetHC)));
-        if (showTiming) {
-            subsection.append(
-                buildListing("Estimated time to next HC", nextHC())
-            );
-        }
-        if (currHC < resetHC) {
-            if (showTiming) {
+        subsection.append($("<div>").addClass("title").text("Ascension"));
+        var ascension = MushieCookies.ascension ? MushieCookies.ascension.report() : null;
+        subsection.append(buildListing("Prestige now", Beautify(Game.prestige)));
+        subsection.append(buildListing("Heavenly chips", Beautify(Game.heavenlyChips)));
+        if (ascension) {
+            subsection.append(buildListing("Prestige if ascending now", Beautify(Math.floor(ascension.projected))));
+            subsection.append(buildListing("Chips gained by ascending", Beautify(ascension.gain)));
+            if (ascension.firstTarget) {
+                subsection.append(buildListing("First ascension at", Beautify(ascension.firstTarget) + " prestige"));
+            }
+            if (ascension.verdict) {
+                subsection.append(buildListing("Verdict", ascension.verdict.reason));
+            }
+            subsection.append(buildListing("This run", timeDisplay(ascension.runSeconds)));
+            if (ascension.last) {
                 subsection.append(
                     buildListing(
-                        "Time since last HC",
-                        timeDisplay(
-                            (Date.now() - FrozenCookies.lastHCTime) / 1000
-                        )
+                        "Last ascension bought",
+                        ascension.last.bought.join(", ") || "nothing"
                     )
                 );
-                if (FrozenCookies.lastHCAmount - 1 >= currHC) {
-                    subsection.append(
-                        buildListing(
-                            "Time to get last HC",
-                            timeDisplay(
-                                (FrozenCookies.lastHCTime -
-                                    FrozenCookies.prevLastHCTime) /
-                                    1000
-                            )
-                        )
-                    );
+                if (ascension.last.saving) {
+                    subsection.append(buildListing("Saving for", ascension.last.saving));
                 }
-            }
-            if (FrozenCookies.maxHCPercent > 0) {
-                subsection.append(
-                    buildListing(
-                        "Max HC Gain/hr",
-                        Beautify(FrozenCookies.maxHCPercent)
-                    )
-                );
-            }
-            subsection.append(
-                buildListing(
-                    "Average HC Gain/hr",
-                    Beautify(
-                        (60 * 60 * (FrozenCookies.lastHCAmount - currHC)) /
-                            ((FrozenCookies.lastHCTime - Game.startDate) / 1000)
-                    )
-                )
-            );
-            if (showTiming && FrozenCookies.lastHCAmount - 1 >= currHC) {
-                subsection.append(
-                    buildListing(
-                        "Previous Average HC Gain/hr",
-                        Beautify(
-                            (60 *
-                                60 *
-                                (FrozenCookies.lastHCAmount - 1 - currHC)) /
-                                ((FrozenCookies.prevLastHCTime -
-                                    Game.startDate) /
-                                    1000)
-                        )
-                    )
-                );
+                if (ascension.last.slots.length) {
+                    subsection.append(buildListing("Permanent slots", ascension.last.slots.join(", ")));
+                }
             }
         }
         menu.append(subsection);

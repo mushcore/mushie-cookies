@@ -94,25 +94,9 @@ FrozenCookies.preferenceValues = {
         default: 0,
     },
     autoAscendToggle: {
-        hint: "Auto-ascend at target chips (⚠️ skips upgrade screen).",
+        hint: "Ascend when prestige growth slows; buys heavenly upgrades and fills permanent slots by measured value.",
         display: ["Auto Ascend OFF", "Auto Ascend ON"],
         default: 0,
-    },
-    autoAscend: {
-        hint: "Choose auto-ascend method.",
-        display: [
-            "Auto-ascend OFF",
-            "Auto-ascend at SET amount",
-            "Auto-ascend when prestige is DOUBLED",
-        ],
-        default: 0,
-        extras: '<a class="option" id="chipsToAscend" onclick="updateAscendAmount(\'HCAscendAmount\');">${HCAscendAmount} heavenly chips</a>',
-    },
-    comboAscend: {
-        hint: "Block auto-ascend when you have X Frenzy or higher.",
-        display: ["Ascend during combo OFF", "Ascend during combo ON"],
-        default: 0,
-        extras: '<a class="option" id="minCpSMult" onclick="updateCpSMultMin(\'minCpSMult\');">x${minCpSMult} minimum Frenzy</a>',
     },
     autoWrinkler: {
         hint: "Auto-pop wrinklers.",

@@ -13,15 +13,13 @@ Work in progress. The goal is a mod that plays from a fresh save onward with no 
 | # | Milestone | State |
 |---|---|---|
 | 1 | Foundation: offline, crash-proof, audited bugs fixed, test harness | Done |
-| 2 | Buying | Next |
-| 3 | Ascension and heavenly upgrades | Planned |
+| 2 | Buying by measured income: clicks, golden cookies, achievements, chains, a priced reserve | Done |
+| 3 | Ascension and heavenly upgrades | In progress |
 | 4 | Sugar lumps | Planned |
 | 5 | Combos | Planned |
 | 6 | Garden | Planned |
 | 7 | Stock market | Planned |
 | 8 | Pantheon and dragon | Planned |
-
-Until milestone 2 lands, buying decisions are the ones Frozen Cookies makes.
 
 ## What it will and will not do
 
@@ -64,6 +62,12 @@ To switch the mod off, open **Options**, then **Manage mods**.
 ## Known conflict
 
 Cookie Monster and Frozen Cookies are known to interfere with each other, and Mushie Cookies inherits that. Disable Cookie Monster while Mushie Cookies is on.
+
+## What the buyer does
+
+Every building, every upgrade in the store and every "a few more buildings unlock a tier upgrade" chain is measured by a what-if against the game's own calculation: the income it would add, counting clicks at the game's real cap of 50 a second, golden cookies from the game's live rules, and the achievements the purchase would earn. Purchases are ranked by payback (time to afford plus time to repay), and a reserve for Lucky golden cookies is kept only once the best purchase repays more slowly than the reserve does.
+
+Over two game hours from nothing, this reached 2 to 35 times the cookies of the inherited logic on the same seed. The harness runs about 100 times real time with the mod buying, against about 25 before.
 
 ## If something goes wrong
 

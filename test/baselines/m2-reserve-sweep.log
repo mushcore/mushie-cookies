@@ -1,0 +1,25 @@
+== seed sweep1: A = never hold, B = hold when purchases repay slower than the reserve (no upkeep term)
+1h  A: 7.96e+8 earned, cps 3.76e+5, 328b/30u   B: 7.96e+8, cps 3.76e+5, 328b/30u   B/A earned 1.00x
+2h  A: 4.54e+10 earned, cps 5.75e+6, 486b/51u   B: 4.54e+10, cps 5.75e+6, 486b/51u   B/A earned 1.00x
+3h  A: 8.87e+11 earned, cps 4.60e+7, 625b/62u   B: 8.87e+11, cps 4.60e+7, 625b/62u   B/A earned 1.00x
+4h  A: 4.70e+12 earned, cps 1.73e+8, 715b/69u   B: 4.70e+12, cps 1.73e+8, 715b/69u   B/A earned 1.00x
+5h  A: 2.78e+13 earned, cps 5.84e+8, 790b/74u   B: 2.76e+13, cps 5.79e+8, 829b/75u   B/A earned 0.99x
+6h  A: 4.97e+13 earned, cps 8.33e+8, 844b/78u   B: 7.90e+13, cps 1.18e+9, 910b/80u   B/A earned 1.59x
+wall A 265s, B 267s
+== seed sweep1: A = upkeep 6000 s, B = upkeep 12000 s
+1h  A: 7.96e+8 earned, cps 3.76e+5, 328b/30u   B: 7.96e+8, cps 3.76e+5, 328b/30u   B/A earned 1.00x
+2h  A: 4.54e+10 earned, cps 5.75e+6, 486b/51u   B: 4.54e+10, cps 5.75e+6, 486b/51u   B/A earned 1.00x
+3h  A: 8.87e+11 earned, cps 4.60e+7, 625b/62u   B: 8.87e+11, cps 4.60e+7, 625b/62u   B/A earned 1.00x
+4h  A: 4.70e+12 earned, cps 1.73e+8, 715b/69u   B: 4.70e+12, cps 1.73e+8, 715b/69u   B/A earned 1.00x
+5h  A: 2.78e+13 earned, cps 5.84e+8, 790b/74u   B: 2.78e+13, cps 5.84e+8, 790b/74u   B/A earned 1.00x
+6h  A: 4.97e+13 earned, cps 8.33e+8, 844b/78u   B: 4.97e+13, cps 8.33e+8, 844b/78u   B/A earned 1.00x
+wall A 290s, B 274s
+== seed sweep2: A = never hold, B = hold when purchases repay slower than the reserve (no upkeep term)
+1h  A: 6.79e+8 earned, cps 3.47e+5, 315b/30u   B: 6.79e+8, cps 3.47e+5, 315b/30u   B/A earned 1.00x
+2h  A: 4.83e+10 earned, cps 5.75e+6, 487b/51u   B: 4.83e+10, cps 5.75e+6, 487b/51u   B/A earned 1.00x
+3h  A: 2.29e+12 earned, cps 9.63e+7, 672b/66u   B: 2.29e+12, cps 9.63e+7, 672b/66u   B/A earned 1.00x
+4h  A: 6.17e+12 earned, cps 2.00e+8, 728b/69u   B: 1.62e+13, cps 3.94e+8, 845b/72u   B/A earned 2.63x
+5h  A: 1.88e+13 earned, cps 5.00e+8, 786b/72u   B: 3.07e+13, cps 6.21e+8, 863b/75u   B/A earned 1.64x
+6h  A: 8.61e+13 earned, cps 1.33e+9, 875b/80u   B: 8.45e+13, cps 1.34e+9, 915b/80u   B/A earned 0.98x
+wall A 264s, B 266s
+== seed sweep2: A = upkeep 6000 s, B = upkeep 12000 s

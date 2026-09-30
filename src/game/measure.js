@@ -92,8 +92,10 @@ function goldenState(game) {
     const type = game.shimmerTypes.golden;
     const minFrames = type.getMinTime(type);
     const maxFrames = type.getMaxTime(type);
+    // No golden cookie spawns while the game's own spawn condition is false (the Golden switch).
+    const spawning = typeof type.spawnConditions !== 'function' || type.spawnConditions();
     // With golden cookies clicked as they appear, the wait between them is the spawn timer alone.
-    const meanInterval = expectedSpawnFrames(minFrames, maxFrames) / game.fps;
+    const meanInterval = spawning ? expectedSpawnFrames(minFrames, maxFrames) / game.fps : Infinity;
     const w = wrathChance(game);
     const eligible = game.ObjectsById.filter((b) => b.amount >= 10);
     return {

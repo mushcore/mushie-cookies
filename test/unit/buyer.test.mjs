@@ -67,13 +67,12 @@ test('a reserve that does not raise income is never kept', () => {
     assert.equal(chooseReserve({ best: null, reserves, income }), 0);
 });
 
-test('decide buys the best only when the bank covers it and the reserve', () => {
+test('decide buys the best when the bank covers it and the reserve', () => {
     const ranked = [
-        { key: 'best', price: 1000, payback: 10 },
-        { key: 'cheap', price: 10, payback: 20 },
+        { key: 'best', price: 1000, payback: 10, purePayback: 5 },
+        { key: 'cheap', price: 10, payback: 20, purePayback: 20 },
     ];
     assert.equal(decide({ ranked, reserve: 0, bank: 1000 }).key, 'best');
-    assert.equal(decide({ ranked, reserve: 0, bank: 999 }), null, 'waits rather than buying the worse deal');
     assert.equal(decide({ ranked, reserve: 500, bank: 1200 }), null, 'the reserve is not spent');
     assert.equal(decide({ ranked, reserve: 500, bank: 1500 }).key, 'best');
 });

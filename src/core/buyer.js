@@ -76,8 +76,10 @@ export function chooseReserve({ best, reserves, income, minPurchasePayback = 0 }
 
 /**
  * What to buy now: the best candidate if the bank covers it and the reserve, else nothing.
- * Buying something worse because it is affordable is not a shortcut: the payback ordering
- * already priced the wait.
+ *
+ * Buying something cheaper while saving never helps under this ranking: an affordable item that
+ * would repay before the best one is reachable already has the lower payback, so it would be the
+ * best. (A rule that tried it was measured and never fired.)
  */
 export function decide({ ranked, reserve, bank }) {
     const best = ranked.find((c) => Number.isFinite(c.payback));

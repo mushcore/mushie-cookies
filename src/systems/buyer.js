@@ -26,13 +26,15 @@ const ENABLERS = new Set([
  */
 export function createBuyer({ game, settings, policy, loop, extraReserve = () => 0, log = () => {} }) {
     // The reserve is kept only once the best purchase repays more slowly than this (seconds).
-    // 6000 s is the reserve's own size in seconds of CpS: below that, its upkeep costs more than it yields.
-    const options = { reserveMinPayback: 6000 };
+    // Measured over six game hours on two seeds: with 0 the reserve engages around hour four or
+    // five and was never behind holding none; with 6000 or more it never engaged in that span.
+    const options = { reserveMinPayback: 0 };
     const state = {
         ranked: [],
         income: null,
         reserve: 0,
         rankedAt: -Infinity,
+        stale: true,
         stamp: '',
         last: null, // the last decision, for the menu
         purchases: 0,
@@ -68,11 +70,12 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         state.ranked = ranked;
         state.income = income;
         state.rankedAt = frame;
+        state.stale = false;
         state.stamp = stampOf();
     }
 
     function refreshIfStale(frame) {
-        if (!state.income || frame - state.rankedAt >= RERANK_FRAMES || state.stamp !== stampOf()) rank(frame);
+        if (state.stale || !state.income || frame - state.rankedAt >= RERANK_FRAMES || state.stamp !== stampOf()) rank(frame);
     }
 
     function buy(candidate) {
@@ -83,7 +86,7 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         } else if (candidate.kind === 'upgrade') {
             candidate.upgrade.buy();
         } else if (candidate.kind === 'chain') {
-            buyBuilding(candidate.building, candidate.steps);
+            for (const step of candidate.steps) buyBuilding(step.building, step.missing);
             if (candidate.upgrade.unlocked && !candidate.upgrade.bought) candidate.upgrade.buy();
         }
         const spent = before - game.cookies;
@@ -134,9 +137,9 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
 
     return {
         options,
-        /** Forces a fresh ranking on the next tick. */
+        /** Forces a fresh ranking on the next tick or the next report. */
         invalidate() {
-            state.rankedAt = -Infinity;
+            state.stale = true;
         },
         ranking() {
             return state.ranked;
