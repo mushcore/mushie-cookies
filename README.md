@@ -38,12 +38,14 @@ From the harness, against the inherited Frozen Cookies logic or against doing no
 
 | Part | Result |
 |---|---|
-| Spell casting | 6.0× the cookies of not casting over three game hours (geometric mean of six seeds, range 0.43× to 103×); the inherited "smart" casting managed 1.04× |
-| Stock market | 1.92× the profit of the published "buy at 50%, sell at 125% of resting value" rule, on a price history the search never saw |
+| Spell casting | 6.0× the cookies of not casting over three game hours (geometric mean of six seeds, range 0.43× to 103×); the inherited "smart" casting managed 1.04×. Promising, not established: with six seeds the 95% interval runs from about 0.65× to 56× |
+| Stock market | 1.95× the profit of the published "buy at 50%, sell at 125% of resting value" rule on a price history the search never saw (bank levels 1 and 5, 5% broker overhead; 1.92× over every bank level and overhead). Simulated profit per share of storage, not profit measured in the game |
 | Buying | On par with the inherited logic for pure purchase order (0.96× to 1.03×, luck removed); the gains are correctness and a four times faster simulation |
-| Garden | 7 of 34 seeds in the first six game hours from a fresh seed log |
+| Garden | 8 of 34 seeds in the first six game hours from a fresh seed log, 27 by 48 hours; one seed, with a bank so large that seed prices never held it back |
 
 A single run is dominated by golden cookie luck, so strategies are compared with golden cookies switched off (which makes runs deterministic) or across several seeds.
+
+The casting, buying and garden results were recorded before commit `eb1e001` fixed the harness clock. Until then every timer in a frame ran at the frame's time, so the game, which counts a click only 20 ms after the last one, counted at most 30 clicks a second instead of 50.
 
 ## Install
 

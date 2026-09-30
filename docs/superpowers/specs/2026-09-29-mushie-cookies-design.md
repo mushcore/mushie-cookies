@@ -192,7 +192,8 @@ Status: single-cast forecasting done 2026-09-29; dual-casting, Godzamok, Golden 
 
 - The forecast matched 200 of 200 real casts across five seasons, including backfires with golden cookies on screen, and leaves the game's own random sequence untouched (the inherited predictor reseeded the global generator).
 - The casting policy values the next outcome in cookies given the buffs running, burns bad outcomes with Haggler's Charm, and lands good ones on a running buff or casts when mana is full.
-- Over six seeds, three game hours from a mid-game bakery: forecast casting earned 6.0× what no casting did (geometric mean; range 0.43× to 103×); the inherited "smart" casting earned 1.04×. Forecast casting beat the inherited mode on five seeds of six. Evidence: `test/baselines/m5-casting-6-seeds.json`.
+- Over six seeds, three game hours from a mid-game bakery: forecast casting earned 6.0× what no casting did (geometric mean; range 0.43× to 103×, above 1× on five seeds of six); the inherited "smart" casting earned 1.04× (range 0.16× to 7.7×). Forecast casting beat the inherited mode on five seeds of six. Evidence: `test/baselines/m5-casting-6-seeds.json`.
+- That is promising, not yet statistically established. The log-ratios spread widely (standard deviation about 2.1), so with six seeds the 95% interval for the geometric mean (a t-interval on the log-ratios) runs from about 0.65× to 56×, and five wins in six has a sign-test p of about 0.11 one-sided (0.22 two-sided). The runs are also not paired on luck: the harness gives each argument-less `Math.seedrandom()` the next seed in a counted sequence (`test/harness/virtualTime.mjs`), and the Grimoire reseeds that way after every cast (minigameGrimoire.js:314), so after the first cast the variants draw different golden cookie streams. Establishing the gain needs more seeds, or runs paired on the golden cookie stream.
 
 ### M6 — Garden
 
@@ -202,7 +203,7 @@ Status: single-cast forecasting done 2026-09-29; dual-casting, Godzamok, Golden 
 
 Verified by: time to a full seed log in the harness, against published figures for existing garden bots.
 
-Status: unlock loop and sacrifice implemented 2026-09-29. Mutation rules are asked of the game's own `getMuts`; a layout optimiser places parents; sprouts of locked plants are kept until mature, which unlocks the seed, and a secured target frees the rest of the plot for the next. From a fresh log with a full plot: 7 of 34 seeds in 6 game hours, 22 by 30 hours and 27 by 48 hours (`test/baselines/m6-garden-48h.log`; measured on the build before the M2–M4 review fixes, which did not touch the garden). The last seven are the slow ones (everdaisy, the juicy queenbeet, the duketater and shriekbulb line), so a full log is likely a few game days out, in the range of the published figure for garden-gnome (mean about 5.7 days). No steady-state CpS layout between sacrifices yet.
+Status: unlock loop and sacrifice implemented 2026-09-29. Mutation rules are asked of the game's own `getMuts`; a layout optimiser places parents; sprouts of locked plants are kept until mature, which unlocks the seed, and a secured target frees the rest of the plot for the next. From a fresh log with a full plot, on one seed: 8 of 34 seeds by 6 game hours (the log reads 8/34 at hours 5 and 6), 22 by 30 hours and 27 by 48 hours (`test/baselines/m6-garden-48h.log`; measured on the build before the M2–M4 review fixes, which did not touch the garden). The fixture (`tools/dev/garden.mjs`) gave the bakery 1e30 cookies earned and a 1e15 bank, so the price of seeds, which scales with CpS, never held the run back; the garden also ignored the buyer's reserve at the time, a defect being fixed separately. The run measures the breeding logic, not a bakery that has to pay for its seeds. The last seven are the slow ones (everdaisy, the juicy queenbeet, the duketater and shriekbulb line). That a full log lands in the range of the published figure for garden-gnome (mean about 5.7 days) is an extrapolation: no run has gone past 48 hours. No steady-state CpS layout between sacrifices yet.
 
 ### M7 — Stock market
 
@@ -211,7 +212,14 @@ Status: unlock loop and sacrifice implemented 2026-09-29. Mutation rules are ask
 
 Verified by: profit per day in the market simulator against the three published strategies (fixed percentages of resting value, quantiles, mode transitions).
 
-Status: done 2026-09-29. The price model is ported line for line and a harness test holds it bit-for-bit identical to the game's tick over 300 ticks of all 18 goods. Thresholds per good, bank level and broker overhead come from a grid search over simulated histories; on a fresh history the search never saw, they earn 1.92× the fixed-percentage rule (buy at 50%, sell at 125% of resting value). The quantile and mode-transition strategies were not implemented for comparison. Loans are still the inherited code's.
+Status: done 2026-09-29; table regenerated 2026-09-30. The price model is ported line for line and a harness test holds it bit-for-bit identical to the game's tick over 300 ticks of all 18 goods. Buy and sell prices per good, bank level and broker overhead come from a grid search over one simulated history per bank level (`tools/gen-market.mjs`, 60,000 ticks, about 42 game days). Thresholds are not per hidden mode as planned: each entry carries one `modeAware` flag, which makes the policy hold instead of buying in a fast fall, and keep a rising good until it stops rising or reaches 1.5× the sell price; the search chose it for all 324 entries. A harness test holds the trader to the buyer's reserve.
+
+- On a fresh history the search never saw, at bank levels 1 and 5 and 5% overhead, the table earns 1.95× the fixed-percentage rule (buy at 50%, sell at 125% of resting value): 5.855 against 3.004. Over every bank level and overhead it earns 1.92× (51.72 against 27.00). Three different fresh histories give 1.95× to 1.96× and 1.91× to 1.92×.
+- That figure is simulated profit in dollars per share of storage per tick, summed over the goods, from the ported model without the Supreme Intellect aura, all in and all out. It is not profit in the game, where orders are also capped by the bank and by storage, and the fixed rule has not been compared with it there; the harness only shows trading realising a positive profit over 12 game hours.
+- The first table, the source of the earlier 1.92× (5.7757 against 3.0106, the same two bank levels and overhead), was generated with 20,000 ticks rather than the tool's default of 60,000, and 18 of its 324 sell prices sat at the grid's upper edge of 2.5× resting value (3 buy prices at the lower edge of 0.1×), so the bound, not the data, set them. The grid now reaches 10× and no entry sits at either edge. On the new held-out histories the first table scores 1.91× and 1.87×.
+- The search now reads each price pair's trades from tables built once per good instead of replaying every tick, and re-scores every winner with the plain simulation, which must match to the last bit. It reproduces the first table exactly in under a minute, where the old search took about seventeen; the new table, with three times the history and about four times the price pairs, takes about three.
+
+The quantile and mode-transition strategies were not implemented for comparison. Loans are still the inherited code's.
 
 ### M8 — Pantheon and dragon
 
@@ -220,7 +228,7 @@ Status: done 2026-09-29. The price model is ported line for line and a harness t
 
 Verified by: income per day in the harness against static slotting.
 
-Status: implemented 2026-09-29, verified for behaviour, not yet for income per day. Gods and auras are chosen by what-if against the income model and moved the way a player moves them (dragging a god spends a swap; an aura goes through the game's confirmation, which sacrifices a building, counted as lost output). Harness tests show gods slotted and Radiant Appetite chosen when available. Cyclius stays with the inherited timetable.
+Status: implemented 2026-09-29, verified for behaviour, not yet for income per day. Gods and auras are chosen by what-if against the income model and moved the way a player moves them (dragging a god spends a swap; an aura goes through the game's confirmation, which sacrifices a building, counted as lost output). Harness tests show gods slotted and Radiant Appetite chosen when available. The behaviour test asks for at least one swap and sets no upper bound, so it could not detect thrash (gods swapped back and forth, spending swaps for nothing); that defect is being fixed separately. Cyclius stays with the inherited timetable.
 
 ## 7. Testing
 
@@ -240,6 +248,8 @@ Three rules follow from how the harness works:
 - New code is driven by the game's `logic` hook and counts frames. It never uses wall-clock timers, so it behaves identically at any playback speed.
 - The harness replaces timers, the clock and the random seed with virtual ones, so legacy code that still uses timers runs in virtual time and every run is reproducible.
 - The harness loads mods at the point where Steam loads them, so a mod that touches the game too early fails in tests as it would in the game.
+
+One harness artifact affects older measurements. Until commit `eb1e001` the harness ran every timer due within a frame at that frame's time, and the game counts a click only once 20 ms have passed since the last one it counted (main.js:4770), so it counted at most one click per frame: 30 a second instead of 50. Every baseline in `test/baselines/`, and with them the buying, casting and garden results in section 6, was recorded before that fix, at 30 clicks a second. The market figures come from the offline simulator and do not depend on it.
 
 Game files are read from the local install at test time. They are never copied into the repository.
 
