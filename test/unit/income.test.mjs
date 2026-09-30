@@ -94,3 +94,24 @@ test('golden payouts are sized from real CpS, not the wrinkler-inflated figure',
     const with10 = estimateIncome({ ...quiet, bank: 1e12, golden: g, wrinklers: { count: 10, returnMult: 1.1, suckRate: 0.05 } });
     assert.ok(Math.abs(with10.golden - (900 * 1000 + 13) / 300) < 1e-9);
 });
+
+test('reindeer pay a minute of real CpS each, every mean interval, only while they run', () => {
+    // One every 240 s pays 60 s of CpS: a quarter of CpS (main.js:5787-5793).
+    const out = estimateIncome({ ...quiet, reindeer: { meanInterval: 240, payoutMult: 1 } });
+    assert.ok(close(out.reindeer, 250), String(out.reindeer));
+    assert.ok(close(out.total, 1250));
+    // Ho ho ho-flavored frosting doubles the payout.
+    assert.ok(close(estimateIncome({ ...quiet, reindeer: { meanInterval: 240, payoutMult: 2 } }).reindeer, 500));
+    // Sized from real CpS: wrinklers do not change what a reindeer pays.
+    const wr = estimateIncome({ ...quiet, reindeer: { meanInterval: 240, payoutMult: 1 }, wrinklers: { count: 10, returnMult: 1.1, suckRate: 0.05 } });
+    assert.ok(close(wr.reindeer, 250));
+    // No reindeer outside Christmas, or when nothing clicks them.
+    assert.equal(estimateIncome({ ...quiet, reindeer: null }).reindeer, 0);
+    assert.equal(estimateIncome(quiet).total, 1000);
+});
+
+test('a frenzy raises what a reindeer pays, as the CpS it is sized from', () => {
+    const g = golden({ meanInterval: 770, probabilities: { frenzy: 1 } });
+    const out = estimateIncome({ ...quiet, golden: g, reindeer: { meanInterval: 240, payoutMult: 1 } });
+    assert.ok(close(out.reindeer, 250 * 1.6), String(out.reindeer));
+});

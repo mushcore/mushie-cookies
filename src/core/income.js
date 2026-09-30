@@ -87,12 +87,18 @@ export function estimateIncome(state) {
     const passiveTotal = passive * cpsFactor * (1 - cursed);
     const clickTotal = click * clickFactor * cpsFactor + cursedClicks;
     const payouts = payoutsPerSecond(state, cps);
+    // Reindeer (Christmas only, when something clicks them): each pays a minute of the CpS of the
+    // moment, buffs included, and wrinklers do not shrink it (main.js:5787-5793). The game takes a
+    // quarter off during a Frenzy, which this leaves out.
+    const deer = state.reindeer;
+    const reindeer = deer && deer.meanInterval > 0 ? (60 * cps * deer.payoutMult * cpsFactor) / deer.meanInterval : 0;
 
     return {
-        total: passiveTotal + clickTotal + payouts.total,
+        total: passiveTotal + clickTotal + payouts.total + reindeer,
         passive: passiveTotal,
         click: clickTotal,
         golden: payouts.total,
+        reindeer,
         byOutcome: payouts.byOutcome,
         basket: state.basket || 0,
     };
