@@ -140,6 +140,24 @@ function legacyStart(saveData) {
         if (hard) emptyCaches();
         // if the user is starting fresh, code will likely need to be called to reinitialize some historical data here as well
     });
+    // Leaves the ascension screen once the game is ready for it.
+    MushieCookies.loop.add(
+        "reincarnate",
+        function () {
+            Game.ClosePrompt();
+            Game.Reincarnate(1);
+        },
+        {
+            everyFrames: 30,
+            enabled: function () {
+                return (
+                    FrozenCookies.autoAscendToggle == 1 &&
+                    Game.OnAscend &&
+                    !Game.AscendTimer
+                );
+            },
+        }
+    );
     setOverrides(saveData);
     logEvent(
         "Load",
@@ -229,20 +247,6 @@ function setOverrides(gameSaveData) {
     Game.RefreshStore();
     Game.RebuildUpgrades();
     beautifyUpgradesAndAchievements();
-    // Replace Game.Popup references with event logging
-    eval(
-        "Game.shimmerTypes.golden.popFunc = " +
-            Game.shimmerTypes.golden.popFunc
-                .toString()
-                .replace(/Game\.Popup\((.+)\)\;/g, 'logEvent("GC", $1, true);')
-    );
-    eval(
-        "Game.UpdateWrinklers = " +
-            Game.UpdateWrinklers.toString().replace(
-                /Game\.Popup\((.+)\)\;/g,
-                'logEvent("Wrinkler", $1, true);'
-            )
-    );
 
 
     function loadFCData() {
@@ -425,8 +429,8 @@ function fcReset() {
     FrozenCookies.lastHCTime = Date.now();
     FrozenCookies.maxHCPercent = 0;
     FrozenCookies.prevLastHCTime = Date.now();
-    FrozenCookies.lastCps = 0;
-    FrozenCookies.lastBaseCps = 0;
+    FrozenCookies.lastCPS = 0;
+    FrozenCookies.lastBaseCPS = 0;
     recommendationList(true);
 }
 
@@ -1370,7 +1374,7 @@ function estimatedTimeRemaining(cookies) {
 }
 
 function canCastSE() {
-    if (M.magicM >= 80 && Game.Objects["You"].amount > 0) return 1;
+    if (M && M.magicM >= 80 && Game.Objects["You"].amount > 0) return 1;
     return 0;
 }
 
@@ -1379,7 +1383,7 @@ function manualBank() {
 }
 
 function edificeBank() {
-    if (!canCastSE) return 0;
+    if (!canCastSE()) return 0;
     var cmCost = Game.Objects["You"].price;
     return Game.hasBuff("everything must go")
         ? (cmCost * (100 / 95)) / 2
@@ -1575,7 +1579,7 @@ function bestBank(minEfficiency) {
                 ? bank
                 : null;
         });
-    if (bankLevels[0].cost > bankOverride)
+    if (bankLevels.length && bankLevels[0].cost > bankOverride)
         return bankLevels[0];
     return {
         cost: bankOverride,
@@ -2003,7 +2007,7 @@ function isUnavailable(upgrade, upgradeBlacklist) {
     // Steamed cookies are only on Steam
     if (!App && upgrade.id == 817) return true;
 
-    // Don't leave base season if it's desired
+    // Don't pay to leave a free base season when no season has anything left to unlock
     if (
         (upgrade.id == 182 ||
             upgrade.id == 183 ||
@@ -2012,18 +2016,14 @@ function isUnavailable(upgrade, upgradeBlacklist) {
             upgrade.id == 209) &&
         Game.baseSeason &&
         Game.UpgradesById[181].unlocked &&
-        upgrade.id == 182 &&
         haveAll("christmas") &&
-        upgrade.id == 183 &&
         haveAll("halloween") &&
-        upgrade.id == 184 &&
         haveAll("valentines") &&
-        upgrade.id == 209 &&
         haveAll("easter") &&
         (FrozenCookies.freeSeason == 2 ||
             (FrozenCookies.freeSeason == 1 &&
-                ((Game.baseSeason == "christmas" && upgrade.id == 182) ||
-                    (Game.baseSeason == "fools" && upgrade.id == 185))))
+                (Game.baseSeason == "christmas" ||
+                    Game.baseSeason == "fools")))
     )
         return true;
 
@@ -2453,24 +2453,6 @@ function logEvent(event, text, popup) {
     if (popup) Game.Popup(text);
 }
 
-function inRect(x, y, rect) {
-    // Duplicate of internally defined method,
-    // only needed because I'm modifying the scope of Game.UpdateWrinklers and it can't see this anymore.
-    var dx = x + Math.sin(-rect.r) * -(rect.h / 2 - rect.o),
-        dy = y + Math.cos(-rect.r) * -(rect.h / 2 - rect.o);
-    var h1 = Math.sqrt(dx * dx + dy * dy);
-    var currA = Math.atan2(dy, dx);
-    var newA = currA - rect.r;
-    var x2 = Math.cos(newA) * h1;
-    var y2 = Math.sin(newA) * h1;
-    return (
-        x2 > -0.5 * rect.w &&
-        x2 < 0.5 * rect.w &&
-        y2 > -0.5 * rect.h &&
-        y2 < 0.5 * rect.h
-    );
-}
-
 function transpose(a) {
     return Object.keys(a[0]).map(function (c) {
         return a.map(function (r) {
@@ -2524,7 +2506,7 @@ function shouldPopWrinklers() {
             });
         } else {
             var delay = delayAmount();
-            var wrinklerList = Game.wrinklers;
+            var wrinklerList = Game.wrinklers.slice();
             var nextRecNeeded = nextPurchase().cost + delay - Game.cookies;
             var nextRecCps = nextPurchase().delta_cps;
             var wrinklersNeeded = wrinklerList
@@ -2710,6 +2692,33 @@ function reindeerLife() {
 function fcClickCookie() {
     if (!Game.OnAscend && !Game.AscendTimer && !Game.specialTabHovered)
         Game.ClickCookie();
+}
+
+// True when the ascension settings say this run should end now.
+function shouldAutoAscend() {
+    if (FrozenCookies.autoAscendToggle != 1) return false;
+    if (Game.OnAscend || Game.AscendTimer || Game.prestige <= 0) return false;
+    if (
+        FrozenCookies.comboAscend != 1 &&
+        cpsBonus() >= FrozenCookies.minCpSMult
+    )
+        return false;
+    var resetPrestige = Game.HowMuchPrestige(
+        Game.cookiesReset +
+            Game.cookiesEarned +
+            wrinklerValue() +
+            chocolateValue()
+    );
+    if (FrozenCookies.autoAscend == 1) {
+        return (
+            FrozenCookies.HCAscendAmount > 0 &&
+            resetPrestige - Game.prestige >= FrozenCookies.HCAscendAmount
+        );
+    }
+    if (FrozenCookies.autoAscend == 2) {
+        return resetPrestige >= Game.prestige * 2;
+    }
+    return false;
 }
 
 // One pass of the buying loop. Returns true when something was bought.
@@ -2923,62 +2932,9 @@ function autoCookieBody() {
         itemBought = true;
     }
 
-    if (
-        FrozenCookies.autoAscendToggle == 1 &&
-        FrozenCookies.autoAscend == 1 &&
-        !Game.OnAscend &&
-        !Game.AscendTimer &&
-        Game.prestige > 0 &&
-        FrozenCookies.HCAscendAmount > 0 &&
-        (FrozenCookies.comboAscend == 1 ||
-            cpsBonus() < FrozenCookies.minCpSMult)
-    ) {
-        var resetPrestige = Game.HowMuchPrestige(
-            Game.cookiesReset +
-                Game.cookiesEarned +
-                wrinklerValue() +
-                chocolateValue()
-        );
-        if (
-            resetPrestige - Game.prestige >= FrozenCookies.HCAscendAmount &&
-            FrozenCookies.HCAscendAmount > 0
-        ) {
-            Game.ClosePrompt();
-            Game.Ascend(1);
-            setTimeout(function () {
-                Game.ClosePrompt();
-                Game.Reincarnate(1);
-            }, 10000);
-        }
-    }
-
-    if (
-        FrozenCookies.autoAscendToggle == 1 &&
-        FrozenCookies.autoAscend == 2 &&
-        !Game.OnAscend &&
-        !Game.AscendTimer &&
-        Game.prestige > 0 &&
-        FrozenCookies.HCAscendAmount > 0 &&
-        (FrozenCookies.comboAscend == 1 ||
-            cpsBonus() < FrozenCookies.minCpSMult)
-    ) {
-        var resetPrestige = Game.HowMuchPrestige(
-            Game.cookiesReset +
-                Game.cookiesEarned +
-                wrinklerValue() +
-                chocolateValue()
-        );
-        if (
-            resetPrestige >= Game.prestige * 2 &&
-            FrozenCookies.HCAscendAmount > 0
-        ) {
-            Game.ClosePrompt();
-            Game.Ascend(1);
-            setTimeout(function () {
-                Game.ClosePrompt();
-                Game.Reincarnate(1);
-            }, 10000);
-        }
+    if (shouldAutoAscend()) {
+        Game.ClosePrompt();
+        Game.Ascend(1);
     }
 
     var fps_amounts = [
@@ -3431,84 +3387,3 @@ function FCStart() {
 
     FCMenu();
 }
-
-// --- Reward Cookie Helper ---
-function isRewardCookie(upgrade) {
-    // Reward cookies: upgrades that require all buildings to reach a certain number
-    // See cc_upgrade_prerequisites.js, e.g. ids 334, 335, 336, 337, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414
-    // We'll check if the prereq is all buildings > 0 and the array is long (i.e. 15-20 buildings)
-    if (!upgrade || !upgradeJson[upgrade.id]) return false;
-    var prereq = upgradeJson[upgrade.id].buildings;
-    if (!prereq || prereq.length < 10) return false;
-    var allSame = prereq.every(function (v) {
-        return v > 0 && v === prereq[0];
-    });
-    return allSame;
-}
-
-function getRewardCookieBuildingTargets(upgrade) {
-    // Returns an array of {id, amount} for each building type needed
-    if (!upgrade || !upgradeJson[upgrade.id]) return [];
-    var prereq = upgradeJson[upgrade.id].buildings;
-    return prereq.map(function (amt, idx) {
-        return { id: idx, amount: amt };
-    });
-}
-
-function restoreBuildingLimits() {
-    // Sells excess buildings to return to user limits
-    if (FrozenCookies.towerLimit) {
-        var obj = Game.Objects["Wizard tower"];
-        if (obj.amount > FrozenCookies.manaMax)
-            obj.sell(obj.amount - FrozenCookies.manaMax);
-    }
-    if (FrozenCookies.mineLimit) {
-        var obj = Game.Objects["Mine"];
-        if (obj.amount > FrozenCookies.mineMax)
-            obj.sell(obj.amount - FrozenCookies.mineMax);
-    }
-    if (FrozenCookies.factoryLimit) {
-        var obj = Game.Objects["Factory"];
-        if (obj.amount > FrozenCookies.factoryMax)
-            obj.sell(obj.amount - FrozenCookies.factoryMax);
-    }
-    if (FrozenCookies.autoDragonOrbs && FrozenCookies.orbLimit) {
-        var obj = Game.Objects["You"];
-        if (obj.amount > FrozenCookies.orbMax)
-            obj.sell(obj.amount - FrozenCookies.orbMax);
-    }
-}
-
-// --- Patch autoCookie for reward cookies ---
-var _oldAutoCookie = autoCookie;
-autoCookie = function () {
-    var chainRec = nextChainedPurchase();
-    if (
-        chainRec &&
-        chainRec.type === "upgrade" &&
-        isRewardCookie(chainRec.purchase)
-    ) {
-        // Temporarily ignore limits and buy up to required amount for each building
-        var targets = getRewardCookieBuildingTargets(chainRec.purchase);
-        targets.forEach(function (t) {
-            var obj = Game.ObjectsById[t.id];
-            if (obj && obj.amount < t.amount) {
-                obj.buy(t.amount - obj.amount);
-            }
-        });
-        // Try to buy the reward cookie if unlocked and affordable
-        if (
-            chainRec.purchase.unlocked &&
-            !chainRec.purchase.bought &&
-            Game.cookies >= chainRec.purchase.getPrice()
-        ) {
-            chainRec.purchase.buy();
-            restoreBuildingLimits();
-        }
-        // Continue with normal autobuy for other things
-        _oldAutoCookie();
-        return;
-    }
-    // Default behavior
-    _oldAutoCookie();
-};
