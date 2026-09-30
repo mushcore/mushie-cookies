@@ -65,12 +65,16 @@ export function startSystems({ game, loop, legacy, log, guard }) {
         // Asked from the loop only, once `ascension` below exists.
         ascensionImminent: () => {
             if (settings.autoAscendToggle != 1) return false;
-            const verdict = ascension.verdict();
+            // Only a verdict on this run: the ended run's says "ascend" until the ascension's next
+            // tick after a reincarnation, as lumps.js's frenzy check allows for too.
+            const verdict = ascension.currentVerdict();
             return ascension.phase() !== 'playing' || !!(verdict && verdict.ascend);
         },
     });
     const clicker = createClicker({ game, settings, loop, log, guard });
     let lumps = null; // created below; the buyer keeps the bank a golden lump is timed to pay on
+    const collectLumpNow = () => lumps && lumps.collectBeforeAscension();
+    const collectLump = guard ? guard('lumpHarvest', collectLumpNow) : collectLumpNow;
     const buyer = createBuyer({
         game,
         settings,
@@ -90,7 +94,9 @@ export function startSystems({ game, loop, legacy, log, guard }) {
         extras: () => wrinklers.held() + legacy.chocolateValue(),
         collect: () => wrinklers.collect(),
         heavenly,
-        prepare: () => legacy.prepareForAscension(),
+        // The lump system collects a golden lump inside the routine, before the buildings are
+        // sold (see fc_main.js prepareForAscension); a failure there must not stop the sales.
+        prepare: () => legacy.prepareForAscension(collectLump),
     });
     lumps = createLumps({
         game,
@@ -101,13 +107,15 @@ export function startSystems({ game, loop, legacy, log, guard }) {
         // The ascension's growth verdict times Sugar frenzy; while its verdict is not yet known the
         // growth reads as unknown, and with it off nothing ends the run.
         run: () => (settings.autoAscendToggle == 1 ? ascension.verdict() || { instantRate: Infinity, averageRate: 0, rated: false } : null),
-        ascending: () => settings.autoAscendToggle == 1 && ascension.phase() === 'settling',
+        // From the wrinkler pop on: the ascension collects a golden lump itself from here.
+        ascending: () => settings.autoAscendToggle == 1 && ascension.phase() !== 'playing',
     });
     const grimoire = createGrimoire({ game, settings, loop, log });
     const garden = createGarden({ game, settings, loop, log, reserve: () => buyer.reserve() });
     const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
     // The dragon trains before the gods pick auras; `dragon` tells them when a level is gained.
-    const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve() });
+    // The dragon's horizon is the run as played, on the ascension's clock.
+    const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve(), runSeconds: () => ascension.runSeconds() });
     const gods = createGods({ game, settings, loop, log, buyer, dragon });
     // Halloween cookies and eggs drop from popped wrinklers: the season system asks the wrinkler
     // system to hunt them, and the wrinkler system weighs each hunt against what it forfeits.

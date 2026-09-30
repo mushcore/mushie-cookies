@@ -1,6 +1,6 @@
 // Sugar lumps: harvests ripe lumps (a golden one timed by its payout), switches Sugar frenzy on
 // near the end of a run, and spends lumps on building levels. The only thing that clicks the lump.
-import { nextLevelUp, bestLevel, lumpWorth, decideHarvest, decideFrenzy, GOLDEN } from '../core/lumps.js';
+import { nextLevelUp, bestLevel, lumpWorth, decideHarvest, decideFrenzy, cpsBuffChance, GOLDEN } from '../core/lumps.js';
 import { readState } from '../game/measure.js';
 
 const TICK_EVERY = 30; // frames
@@ -14,8 +14,10 @@ const SUGAR_FRENZY = 'Sugar frenzy';
  * @param {{invalidate(): void, ranking(): Array}} [deps.buyer]  holds the bank a golden lump pays on
  * @param {() => ({instantRate: number, averageRate: number, rated: boolean, startDate?: number} | null)} [deps.run]
  *        the ascension's growth verdict; null when nothing ends runs
- * @param {() => boolean} [deps.ascending]  the ascension has collected and is about to ascend
+ * @param {() => boolean} [deps.ascending]  the ascension has begun: it collects a golden lump itself,
+ *        through collectBeforeAscension, and a Sugar frenzy would be lost
  * @param {() => number} [deps.goldenWait]  expected seconds to the next golden cookie
+ * @param {() => number} [deps.buffChance]  chance a golden cookie gives a CpS buff of x7 or more
  * @param {(what: string) => void} [deps.log]
  */
 export function createLumps({
@@ -26,6 +28,7 @@ export function createLumps({
     run = () => null,
     ascending = () => false,
     goldenWait = () => readState(game, settings).golden.meanInterval,
+    buffChance = () => cpsBuffChance(readState(game, settings).golden),
     log = () => {},
 }) {
     const state = {
@@ -36,7 +39,6 @@ export function createLumps({
         hold: 0,
         frenzy: null,
         frenzyAt: null,
-        settlingTicks: 0,
     };
 
     // The game shows the lump and the level buttons only outside Born again (main.js:3547, 4440,
@@ -94,23 +96,21 @@ export function createLumps({
         if ((was > 0) !== (amount > 0) && buyer) buyer.invalidate();
     }
 
-    // The ascension collects wrinklers and stock, then ascends two of its ticks later; the popped
-    // wrinklers pay on the frames between (systems/ascension.js SETTLE_TICKS). A golden lump is
-    // collected on the second tick, on the biggest bank.
-    function collecting() {
-        if (!ascending()) {
-            state.settlingTicks = 0;
-            return false;
-        }
-        state.settlingTicks++;
-        return state.settlingTicks >= 2;
+    function harvest() {
+        if (!playable()) return setHold(0);
+        // Once the ascension has begun a golden lump is its to collect, from prepare(), on the bank
+        // the wrinklers and the stock sale filled and before the buildings are sold
+        // (collectBeforeAscension). A tick here may come after the sale, whose next frame takes the
+        // CpS that caps the payout (main.js:4492-4496, 7879, 16274). Until then the hold stays.
+        if (ascending() && game.lumpCurrentType === GOLDEN) return;
+        harvestBy(false);
     }
 
-    function harvest() {
-        const collectingNow = collecting();
-        if (!playable()) return setHold(0);
+    /** Decides and clicks; `ascendingRule`: the bank is about to be lost to the reset. */
+    function harvestBy(ascendingRule) {
         const age = Date.now() - game.lumpT;
         const golden = game.lumpCurrentType === GOLDEN;
+        const wait = golden && age >= game.lumpRipeAge ? goldenWait() : Infinity;
         const decision = decideHarvest({
             age,
             matureAge: game.lumpMatureAge,
@@ -123,8 +123,9 @@ export function createLumps({
             // Only a golden lump's timing reads these, and it is rare: they are not read otherwise.
             payback: golden ? bestPayback() : Infinity,
             lumpWorth: golden ? worthOfALump() : 0,
-            goldenWait: golden && age >= game.lumpRipeAge ? goldenWait() : Infinity,
-            ascending: collectingNow,
+            goldenWait: wait,
+            buffChance: Number.isFinite(wait) ? buffChance() : 0,
+            ascending: ascendingRule,
         });
         setHold(decision.hold);
         if (!decision.harvest) return;
@@ -203,6 +204,14 @@ export function createLumps({
         /** Bank the buyer should keep for a golden lump's payout; 0 for none. */
         hold() {
             return settings.autoSL == 1 ? state.hold : 0;
+        },
+        /**
+         * Called by the ascension's last steps (fc_main.js prepareForAscension) after the stock sale
+         * and before the buildings are sold: harvests the lump if it pays before the reset.
+         */
+        collectBeforeAscension() {
+            if (settings.autoSL != 1 || !playable()) return;
+            harvestBy(true);
         },
         report() {
             return {

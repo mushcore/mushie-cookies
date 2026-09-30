@@ -64,18 +64,45 @@ function fakeBuyer(purePayback) {
     };
 }
 
-test('a golden lump ripe at an ascension is collected on its second settling tick, after the wrinklers pay', () => {
+test('while the ascension is under way a golden lump is left for it, and collected when it asks', () => {
+    // The ascension asks from prepare(), after the wrinklers paid and the stock sold, before the
+    // buildings go: a tick of the lump system's own could come after the sale, when the CpS that
+    // caps the payout is gone (main.js:4492-4496, 7879, 16274).
     const game = fakeGame({ lumpCurrentType: 2 });
     const loop = fakeLoop();
-    let settling = false;
-    createLumps({ game, settings: { autoSL: 1 }, loop, ascending: () => settling, goldenWait: () => Infinity });
+    let ascending = false;
+    const lumps = createLumps({ game, settings: { autoSL: 1 }, loop, ascending: () => ascending, goldenWait: () => Infinity });
     loop.run('lumpHarvest');
     assert.equal(game.clicks, 0, 'held for its payout while the run goes on');
-    settling = true;
-    loop.run('lumpHarvest');
-    assert.equal(game.clicks, 0, 'the wrinklers collected this tick pay on the next frames');
-    loop.run('lumpHarvest');
+    const held = lumps.hold();
+    assert.ok(held > 0);
+    ascending = true;
+    for (let i = 0; i < 3; i++) loop.run('lumpHarvest');
+    assert.equal(game.clicks, 0, 'never on a tick of its own once the ascension has begun');
+    assert.equal(lumps.hold(), held, 'the bank it pays on is still kept');
+    lumps.collectBeforeAscension();
     assert.equal(game.clicks, 1, 'collected before the ascension takes the bank');
+    assert.equal(lumps.hold(), 0);
+});
+
+test('the ascension\'s collection clicks only with harvesting on, and keeps a lump that is not ripe', () => {
+    const settings = { autoSL: 0 };
+    const game = fakeGame({ lumpCurrentType: 2 });
+    const lumps = createLumps({ game, settings, loop: fakeLoop(), ascending: () => true, goldenWait: () => Infinity });
+    lumps.collectBeforeAscension();
+    assert.equal(game.clicks, 0, 'harvesting is off');
+    settings.autoSL = 1;
+    game.lumpT = Date.now() - 1000; // just started growing
+    lumps.collectBeforeAscension();
+    assert.equal(game.clicks, 0, 'a click now pays nothing and the lump carries over');
+});
+
+test('an ordinary lump ripening during the ascension is harvested as usual', () => {
+    const game = fakeGame();
+    const loop = fakeLoop();
+    createLumps({ game, settings: { autoSL: 1 }, loop, ascending: () => true });
+    loop.run('lumpHarvest');
+    assert.equal(game.clicks, 1, 'its yield does not depend on the bank');
 });
 
 test('the buyer is told when a golden hold starts and when it ends, not on every tick', () => {
@@ -99,6 +126,21 @@ test('the buyer is told when a golden hold starts and when it ends, not on every
     assert.equal(buyer.invalidations, 2, 'released');
 });
 
+test('at the cap a golden lump waits for a CpS buff only as likely as the golden cookies make it', () => {
+    // Five days banked: a Frenzy would pay five times as much. With the chance of a CpS buff read
+    // from the golden cookie odds, the wait is weighed; with none, it is not made.
+    const settings = { autoSL: 1, autoBuy: 1 };
+    const lumpAt = (chance) => {
+        const game = fakeGame({ lumpCurrentType: 2, cookies: 5 * 86400 });
+        const loop = fakeLoop();
+        createLumps({ game, settings, loop, buyer: fakeBuyer(3600), goldenWait: () => 300, buffChance: () => chance });
+        loop.run('lumpHarvest');
+        return game.clicks;
+    };
+    assert.equal(lumpAt(0.5), 0, 'a CpS buff is likely within the hour: waited for');
+    assert.equal(lumpAt(0), 1, 'no golden cookie gives one: harvested');
+});
+
 test('Sugar frenzy never acts on a verdict left from the run before', () => {
     // Right after a reincarnation the ascension still holds the ended run's verdict (rated, rate
     // under the average) until its next tick; a frenzy then would land at the start of the new run.
@@ -114,6 +156,34 @@ test('Sugar frenzy never acts on a verdict left from the run before', () => {
     verdict = { ...verdict, ascend: false, startDate };
     loop.run('sugarFrenzy');
     assert.equal(bought.length, 1, 'a verdict on this run is acted on');
+});
+
+test('Sugar frenzy waits for a second lump: with one, the game gives the buff but not the mark', () => {
+    // The switch's click spends the lump first, then buys the upgrade, whose own check wants a lump
+    // still in the jar (main.js:11036-11043, 4570-4589, 9480-9484, 9552): with a single lump the
+    // hour comes but the switch is not marked used, and the lump is gone.
+    const startDate = Date.now() - 3600 * 1000;
+    const game = fakeGame({ startDate, lumps: 1 });
+    const frenzy = {
+        unlocked: 1,
+        bought: 0,
+        hours: 0,
+        buy() {
+            if (game.lumps < 1) return;
+            game.lumps -= 1;
+            frenzy.hours++;
+            if (game.lumps >= 1) frenzy.bought = 1;
+        },
+    };
+    game.Upgrades = { 'Sugar frenzy': frenzy };
+    const loop = fakeLoop();
+    const nearTheEnd = { ascend: false, instantRate: 1, averageRate: 1, rated: true, startDate };
+    createLumps({ game, settings: { sugarFrenzy: 1 }, loop, run: () => nearTheEnd });
+    loop.run('sugarFrenzy');
+    assert.deepEqual([frenzy.hours, game.lumps], [0, 1], 'one lump: left alone');
+    game.lumps = 2;
+    loop.run('sugarFrenzy');
+    assert.deepEqual([frenzy.hours, frenzy.bought, game.lumps], [1, 1, 1], 'two: switched on and marked used');
 });
 
 test('Sugar frenzy stands aside while the inherited Sugar frenzy option is on', () => {

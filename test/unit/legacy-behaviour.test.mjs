@@ -103,6 +103,55 @@ test('Spontaneous Edifice casting still sells Yous until half a You is banked, t
     assert.deepEqual(many.casts, [many.edifice]);
 });
 
+/** A bakery about to ascend with a Chocolate egg to buy; `events` records what the routine does, in order. */
+function ascendingBakery({ dragonLevel = 0 } = {}) {
+    const events = [];
+    const ObjectsById = ['Cursor', 'Farm', 'Bank', 'Temple', 'Wizard tower'].map((name, id) => ({
+        name,
+        id,
+        amount: 10,
+        minigame: null,
+        sell(n) {
+            if (n === -1 && this.amount > 0) {
+                events.push('sell ' + name);
+                this.amount = 0;
+            }
+        },
+    }));
+    const Objects = Object.fromEntries(ObjectsById.map((b) => [b.name, b]));
+    Objects.Bank.minigame = { goodsById: [{}, {}], sellGood: (i) => events.push('stock ' + i) };
+    Objects.Farm.minigame = { harvestAll: () => events.push('harvest') };
+    const game = {
+        dragonLevel,
+        Objects,
+        ObjectsById,
+        hasAura: () => false,
+        HasUnlocked: (name) => name === 'Chocolate egg',
+        Has: () => false,
+        SetDragonAura: () => events.push('aura'),
+        ConfirmPrompt: () => {},
+        Upgrades: { 'Chocolate egg': { buy: () => events.push('egg') } },
+    };
+    const ctx = sandbox({ Game: game, document: { addEventListener: () => {} }, FrozenCookies: {}, MushieCookies: {} }, ['fc_main.js']);
+    return { ctx, events };
+}
+
+test('before an ascension a golden lump is collected after the stock sale and before the buildings go', () => {
+    // A golden lump pays min(CpS x 86400, bank) (main.js:4492-4496). Selling the buildings takes
+    // the CpS with them on the next frame (main.js:7879, 16274), so a harvest after the
+    // sale paid nothing; after the stock sale it pays on the bigger bank.
+    for (const dragonLevel of [0, 9]) {
+        const { ctx, events } = ascendingBakery({ dragonLevel });
+        ctx.prepareForAscension(() => events.push('lump'));
+        const lump = events.indexOf('lump');
+        assert.ok(lump > events.indexOf('stock 1') && lump > events.indexOf('harvest'), events.join(', '));
+        const firstSale = events.findIndex((e) => e.startsWith('sell') || e === 'aura');
+        assert.ok(firstSale > 0 && lump < firstSale, `the Earth Shatterer switch sacrifices a building too: ${events.join(', ')}`);
+        assert.equal(events[events.length - 1], 'egg', 'the egg last, on the whole bank');
+    }
+    assert.doesNotThrow(() => ascendingBakery().ctx.prepareForAscension(), 'with no lump to collect');
+});
+
 /** The infobox code over a fake canvas that counts what it is asked to do. */
 function infobox(fancyui) {
     const calls = { measureText: 0, drawText: 0, drawArc: 0, drawRect: 0, nextPurchase: 0 };

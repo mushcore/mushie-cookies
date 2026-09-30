@@ -12,6 +12,14 @@ test('runs systems on their own cadence', () => {
     assert.deepEqual(ran, { every: 9, third: 3 });
 });
 
+test('frame() is the frame last run: the clock the guard times its retries by', () => {
+    const loop = createLoop(createGuard());
+    assert.equal(loop.frame(), 0);
+    loop.run(41);
+    loop.run(42);
+    assert.equal(loop.frame(), 42);
+});
+
 test('a system added with `first` runs before those added earlier', () => {
     const loop = createLoop(createGuard());
     const order = [];

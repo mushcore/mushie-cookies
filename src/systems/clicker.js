@@ -65,7 +65,7 @@ export function createClicker({ game, settings, loop, guard = null, timers = pag
 
     // A guard of its own: the loop tick that re-arms the pump succeeds every frame, and a shared
     // guard would count that as the end of a failure streak. Once switched off, the tick's calls
-    // to it do nothing until MushieCookies.revive('clicker:pump').
+    // to it do nothing until the guard's next try (src/core/guard.js) or MushieCookies.revive('clicker:pump').
     const step = guard ? guard('clicker:pump', click) : click;
 
     function pump() {

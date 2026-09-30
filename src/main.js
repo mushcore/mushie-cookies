@@ -66,11 +66,38 @@ export let clicker = null;
 export let wrinklers = null;
 export let seasons = null;
 
+const MINUTE = 60 * 30; // logic frames: Game.fps is 30 (main.js:1971)
+const RETRY_FRAMES = [1 * MINUTE, 5 * MINUTE, 30 * MINUTE];
+
+const escapeHtml = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const minutes = (frames) => `${frames / MINUTE} minute${frames === MINUTE ? '' : 's'}`;
+
+/**
+ * The one notice a player sees when a system is switched off: the console, where every failure is
+ * reported, is out of sight on Steam. Game.Notify with no `quick` stays until closed
+ * (main.js:6260-6269, 6164-6173), for a player who comes back to an unattended game.
+ */
+function noticeSwitchedOff(name, error, retryFrames) {
+    const game = typeof window !== 'undefined' ? window.Game : null;
+    if (!game || typeof game.Notify !== 'function') return;
+    const next = retryFrames.length
+        ? `It will be tried again after ${retryFrames.map(minutes).join(', then ')} of play, and left off if it keeps failing.`
+        : 'It stays off until the game is reloaded.';
+    game.Notify('Mushie Cookies: ' + escapeHtml(name) + ' switched off', 'It failed repeatedly: ' + escapeHtml(error.message) + '.<br>' + next, '');
+}
+
+// `loop` is read when a failure happens, by then long defined: the guard's clock is the frame the
+// loop last ran, which stops while the machine sleeps, so a back-off is always play time.
 const guards = createGuard({
     maxFailures: 5,
+    retryFrames: RETRY_FRAMES,
+    // An hour up after a try: the fault is taken as over, and a new one starts at the first back-off.
+    forgiveFrames: 60 * MINUTE,
+    clock: () => loop.frame(),
     onError(name, error, disabled) {
         report(`${name} failed: ${error.message}` + (disabled ? ' (switched off after repeated failures)' : ''));
     },
+    onSwitchedOff: noticeSwitchedOff,
 });
 
 export const guard = guards.guard;
@@ -103,7 +130,7 @@ const runtime = {
                 harvestBank: () => window.harvestBank(),
                 manualBank: () => window.manualBank(),
                 wrinklerValue: () => window.wrinklerValue(),
-                prepareForAscension: () => window.prepareForAscension(),
+                prepareForAscension: (beforeSelling) => window.prepareForAscension(beforeSelling),
                 chocolateValue: () => window.chocolateValue(),
             },
         });
