@@ -475,9 +475,9 @@ FrozenCookies.preferenceValues = {
         hint: "Other:",
     },
     FCshortcuts: {
-        hint: "Enable keyboard shortcuts (see readme).",
+        hint: "Keyboard shortcuts: a autobuy, b building spread, c golden cookies, e export, r ascend (asks first), s save, w wrinklers.",
         display: ["Shortcuts OFF", "Shortcuts ON"],
-        default: 1,
+        default: 0,
     },
     simulatedGCPercent: {
         hint: "Assume % of GCs clicked for efficiency (100% recommended).",

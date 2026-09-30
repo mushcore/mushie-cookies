@@ -457,32 +457,20 @@ function getBuildingSpread() {
 // Press 'b' to pop up a copyable window with building spread.
 // Press 'c' to toggle auto-GC
 // Press 'e' to pop up a copyable window with your export string
-// Press 'r' to pop up the reset window
+// Press 'r' to pop up the ascend window (the game's own confirmation)
 // Press 's' to do a manual save
 // Press 'w' to display a wrinkler-info window
 document.addEventListener("keydown", function (event) {
+    // Typing in a text box (a prompt, the bakery name) is not a shortcut.
+    var target = event.target || {};
+    if (target.tagName == "INPUT" || target.tagName == "TEXTAREA" || target.isContentEditable) return;
     if (!Game.promptOn && FrozenCookies.FCshortcuts) {
-        if (event.keyCode == 65) {
-            Game.Toggle(
-                "autoBuy",
-                "autobuyButton",
-                "Autobuy OFF",
-                "Autobuy ON"
-            );
-            toggleFrozen("autoBuy");
-        }
+        if (event.keyCode == 65) setPreferenceDirect("autoBuy", FrozenCookies.autoBuy ? 0 : 1);
         if (event.keyCode == 66) copyToClipboard(getBuildingSpread());
-        if (event.keyCode == 67) {
-            Game.Toggle(
-                "autoGC",
-                "autogcButton",
-                "Autoclick GC OFF",
-                "Autoclick GC ON"
-            );
-            toggleFrozen("autoGC");
-        }
+        if (event.keyCode == 67) setPreferenceDirect("autoGC", FrozenCookies.autoGC ? 0 : 1);
         if (event.keyCode == 69) copyToClipboard(Game.WriteSave(true));
-        if (event.keyCode == 82) Game.Reset();
+        // Game.Ascend() without an argument asks first; Game.Reset() would reset the run on the spot.
+        if (event.keyCode == 82) Game.Ascend();
         if (event.keyCode == 83) Game.WriteSave();
         if (event.keyCode == 87) {
             Game.Notify(

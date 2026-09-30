@@ -21,6 +21,7 @@ test('the Autopilot is the first option and, like every option, off by default',
         // Display options keep the inherited defaults; everything that plays starts off.
         if (p.display && !DISPLAY.includes(name) && name !== 'freeSeason' && name !== 'simulatedGCPercent') assert.equal(p.default, 0, `${name} defaults to ${p.default}`);
     }
+    assert.equal(prefs.FCshortcuts.default, 0, 'keyboard shortcuts are a feature too');
     assert.deepEqual(prefs.autopilot.display, ['Autopilot OFF', 'Autopilot ON']);
 });
 
