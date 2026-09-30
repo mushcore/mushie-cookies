@@ -302,6 +302,37 @@ test('while a double cast is forecast and mana fills, the buyer keeps the cookie
         assert.deepEqual(game.errors, []);
     }));
 
+test('nothing is kept for a pair whose worth rests on a buff that ends before mana is full', { skip }, () =>
+    withLateBakery(async (game) => {
+        // A Lucky, then a click frenzy: worth doubling only on a running Frenzy.
+        const pair = await game.eval(burnTo, ['multiply cookies', 'click frenzy']);
+        assert.deepEqual(pair, ['multiply cookies', 'click frenzy']);
+        await game.eval(() => {
+            Object.assign(FrozenCookies, { autoFate: 1, autoFTHOFCombo: 1, autoCasting: 0, auto100ConsistencyCombo: 0, autoClick: 1, cookieClickSpeed: 50, autoBuy: 0 });
+            // Test fixture: a Frenzy with 60 s left, and mana about twenty minutes from full
+            // (30 of 90, minigameGrimoire.js:486-488).
+            Game.gainBuff('frenzy', 60, 7);
+            Game.Objects['Wizard tower'].minigame.magic = 30;
+        });
+        await game.advance(16);
+        const report = () =>
+            game.eval(() => ({
+                kept: MushieCookies.buyer.kept('grimoire'),
+                decision: MushieCookies.grimoire.report().decision,
+                casts: MushieCookies.grimoire.report().casts,
+            }));
+        const short = await report();
+        assert.equal(short.casts, 0);
+        assert.equal(short.kept, 0, `kept ${short.kept} for a pair castable only after the Frenzy: ${JSON.stringify(short.decision)}`);
+        // The same pair while a Frenzy will still run once mana is full: its buy-back is kept.
+        await game.eval(() => Game.gainBuff('frenzy', 3000, 7)); // adds to the running one (main.js:13765-13771)
+        await game.advance(16);
+        const long = await report();
+        assert.equal(long.casts, 0);
+        assert.ok(long.kept > 0, JSON.stringify(long.decision));
+        assert.deepEqual(game.errors, []);
+    }));
+
 test('Double Cast FTHOF runs forecast casting with double casts; the inherited combo casts nothing', { skip }, () =>
     withLateBakery(async (game) => {
         // A good outcome next, one that pairs with nothing: the inherited combo would cast Haggler's

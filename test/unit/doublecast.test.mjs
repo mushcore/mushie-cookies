@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { magicMax, spellCost, regenSeconds, planSale, fateOdds, decideDouble } from '../../src/core/doublecast.js';
+import { magicMax, spellCost, regenSeconds, planSale, fateOdds, decideDouble, contextAt } from '../../src/core/doublecast.js';
 import { outcomeValue, afterOutcome } from '../../src/core/grimoire.js';
 
 // Force the Hand of Fate's price: 10 magic plus 60% of max magic (minigameGrimoire.js:42-43).
@@ -152,6 +152,17 @@ test('a Lucky gains from a frenzy cast before it, not from one cast after it', (
     const rich = { ...ctx, bank: 1e12 };
     assert.equal(double('frenzy', 'multiply cookies', { ctx: rich }).action, 'double');
     assert.equal(double('multiply cookies', 'frenzy', { ctx: rich }).action, 'single');
+});
+
+test('a pair not castable yet is valued on the buffs still running when it can be', () => {
+    const frenzy = { ...ctx, buffs: [buff('Frenzy', 7, 10), buff('Clot', 0.5, 100)] };
+    // 30 s from now the Frenzy is over and the Clot has 70 s left.
+    assert.deepEqual(contextAt(frenzy, 30).buffs.map((b) => [b.name, b.secondsLeft]), [['Clot', 70]]);
+    assert.deepEqual(contextAt(frenzy, 0).buffs, frenzy.buffs);
+    // A click frenzy after a Lucky pays on the running Frenzy only while it runs.
+    const rich = { ...frenzy, buffs: [buff('Frenzy', 7, 10)], bank: 1e12 };
+    assert.equal(double('multiply cookies', 'click frenzy', { ctx: rich }).action, 'double');
+    assert.equal(double('multiply cookies', 'click frenzy', { ctx: contextAt(rich, 30) }).action, 'single');
 });
 
 test('a sugar lump is cast on its own', () => {

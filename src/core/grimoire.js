@@ -188,7 +188,7 @@ export function afterOutcome(outcome, ctx) {
 }
 
 /** The buffs still running `t` seconds from now, with the time they will have left then. */
-const runningAfter = (buffs, t) => buffs.filter((b) => b.secondsLeft > t).map((b) => ({ ...b, secondsLeft: b.secondsLeft - t }));
+export const runningAfter = (buffs, t) => buffs.filter((b) => b.secondsLeft > t).map((b) => ({ ...b, secondsLeft: b.secondsLeft - t }));
 
 /**
  * What an outcome would be worth held until each running debuff (a CpS multiplier below 1) ends,

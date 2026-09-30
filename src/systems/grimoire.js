@@ -5,7 +5,7 @@
 // Wizard towers between the two and buying them back (src/core/doublecast.js).
 import { forecastFate } from '../game/fate.js';
 import { decideCast } from '../core/grimoire.js';
-import { decideDouble, planSale, fateOdds, magicMax } from '../core/doublecast.js';
+import { decideDouble, planSale, fateOdds, magicMax, regenSeconds, contextAt } from '../core/doublecast.js';
 import { readState } from '../game/measure.js';
 
 const TICK_EVERY = 15; // frames
@@ -145,7 +145,10 @@ export function createGrimoire({ game, settings, loop, buyer = null, log = () =>
         if (!buyer) return;
         let amount = 0;
         if (doubling() && action !== 'skip') {
-            const plan = planDouble(grimoire, next, ctx, grimoire.magicM);
+            // A pair waiting for mana is cast once the bar is full at the latest (decideCast), on
+            // the buffs still running then: a Frenzy that ends first is no reason to keep anything.
+            const seconds = action === 'cast' ? 0 : regenSeconds(grimoire.magic, grimoire.magicM, grimoire.magicM);
+            const plan = planDouble(grimoire, next, contextAt(ctx, seconds), grimoire.magicM);
             if (plan.gain > 0) amount = plan.rebuyLoss;
         }
         buyer.keep(HOLDER, amount);

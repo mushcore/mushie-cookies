@@ -11,7 +11,16 @@
  * later (a click frenzy on a frenzy is worth seven of it), by more than the towers' round trip
  * and the mana the second cast takes from the casts after it.
  */
-import { outcomeValue, afterOutcome } from './grimoire.js';
+import { outcomeValue, afterOutcome, runningAfter } from './grimoire.js';
+
+/**
+ * The context a cast `seconds` from now will see: the buffs still running then, with the time
+ * they will have left. A pair forecast while mana fills is worth what it adds when it can be cast.
+ */
+export function contextAt(ctx, seconds) {
+    if (!(seconds > 0)) return ctx;
+    return { ...ctx, buffs: runningAfter(ctx.buffs || [], seconds) };
+}
 
 /** Max magic with `towers` Wizard towers at `level` (minigameGrimoire.js:263-267). */
 export function magicMax(towers, level) {
