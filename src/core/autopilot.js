@@ -6,11 +6,12 @@
 /** Setting name → value under Autopilot. */
 export const AUTOPILOT = Object.freeze({
     // Clicking. The game ignores a click less than 20 ms after the last one it counted
-    // (main.js Game.ClickCookie). On real, jittery timers a 50-a-second clicker loses every click
-    // that lands at 19 ms; calling at 250 a second (4 ms, the browser's timer floor) lands each one
-    // within a few ms of the window opening. Frenzy clicking adds nothing beyond that.
+    // (main.js:4770). The clicker times each call for the moment the game will count it
+    // (src/systems/clicker.js), so the speed is only a cap, and 50 is as fast as the game counts.
+    // Frenzy clicking adds nothing beyond that. Golden cookies, reindeer and fortunes: the shimmer
+    // system (src/systems/shimmers.js).
     autoClick: 1,
-    cookieClickSpeed: 250,
+    cookieClickSpeed: 50,
     autoFrenzy: 0,
     autoGC: 1,
     autoReindeer: 1,
@@ -25,16 +26,15 @@ export const AUTOPILOT = Object.freeze({
     autoBulk: 0,
     autoAscendToggle: 1,
 
-    // Wrinklers.
+    // Wrinklers: the measured popping policy, collection before every ascension.
     autoWrinkler: 1,
-    shinyPop: 0,
 
-    // Sugar lumps: harvest when ripe, spend with the lump system. Rigidel and aura swaps around
-    // the harvest would fight the pantheon and aura system, so they stay off.
+    // Sugar lumps: the lump system harvests at ripe (a golden lump by its payout), spends, and
+    // takes Sugar frenzy near the end of a run.
     autoSL: 1,
-    dragonsCurve: 0,
     sugarBakingGuard: 1,
     autoLumps: 1,
+    sugarFrenzy: 1,
 
     // Minigames: the new systems, and every inherited system that acts on the same thing off.
     autoFate: 1,
@@ -64,10 +64,10 @@ export const AUTOPILOT = Object.freeze({
     autoBank: 0,
     autoBroker: 0,
 
-    // Dragon. The inherited petting reseeds the game's generator every second, so it stays off
-    // until the dragon system pets with a private forecast.
+    // Dragon: trained by what each level's aura repays, petted for drops forecast on a private
+    // generator (src/systems/dragon.js).
     autoDragon: 1,
-    petDragon: 0,
+    petDragon: 1,
 
     // Seasons. The inherited Easter and Halloween switches fight each other at rising prices,
     // ignore the buyer's reserve and pop every wrinkler all season; off until the season planner.

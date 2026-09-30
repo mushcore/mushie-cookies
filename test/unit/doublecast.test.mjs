@@ -99,10 +99,14 @@ test('an outcome leaves its buff running for what comes next, or lengthens its o
 
 test('a CpS buff also multiplies clicks under a running click frenzy, and a running storm\'s drops', () => {
     // Plastic mouse and its kind add a share of buffed CpS to each click (main.js:4692-4708), and
-    // a storm drop pays minutes of buffed CpS (main.js:5599).
+    // a storm drop pays minutes of buffed CpS (main.js:5599), one on half of the frames (5257).
     const alone = outcomeValue('frenzy', ctx);
     near(outcomeValue('frenzy', { ...ctx, buffs: [{ name: 'Click frenzy', multCpS: 1, multClick: 777, secondsLeft: 13 }] }) - alone, 500 * 776 * 6 * 13);
-    near(outcomeValue('frenzy', { ...ctx, buffs: [{ name: 'Cookie storm', multCpS: 1, multClick: 1, secondsLeft: 7 }] }) - alone, 1000 * 240 * 7.5 * 6 * 7);
+    const storm = [{ name: 'Cookie storm', multCpS: 1, multClick: 1, secondsLeft: 7 }];
+    near(outcomeValue('frenzy', { ...ctx, buffs: storm }) - alone, 1000 * 240 * 15 * 6 * 7);
+    // The drops are counted as the storm outcome counts them: those reached, times the gain multiplier.
+    const quiet = { ...ctx, stormReach: 0.5, gainMult: 2 };
+    near(outcomeValue('frenzy', { ...quiet, buffs: storm }) - outcomeValue('frenzy', quiet), 1000 * 240 * 2 * 7.5 * 6 * 7);
 });
 
 // A Wizard tower bakery at level 1 with 400 towers: max magic 90, the first cast 64.

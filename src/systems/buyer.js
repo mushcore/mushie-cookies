@@ -2,6 +2,7 @@
 // cookies when that pays, and buys. Runs on the loop; reads settings live.
 import { estimateIncome } from '../core/income.js';
 import { rankCandidates, chooseReserve, decide } from '../core/buyer.js';
+import { clickBuffRunning } from '../core/clicker.js';
 import { readState, measureCandidates } from '../game/measure.js';
 import { listCandidates } from '../game/candidates.js';
 
@@ -29,7 +30,9 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
     // The reserve is kept only once the best purchase repays more slowly than this (seconds).
     // Measured over six game hours on two seeds: with 0 the reserve engages around hour four or
     // five and was never behind holding none; with 6000 or more it never engaged in that span.
-    const options = { reserveMinPayback: 0 };
+    // clickPriority: stand aside while a click buff runs (see clickBuff below); off only to
+    // measure what that is worth.
+    const options = { reserveMinPayback: 0, clickPriority: true };
     const state = {
         ranked: [],
         income: null,
@@ -39,6 +42,7 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         stamp: '',
         last: null, // the last decision, for the menu
         purchases: 0,
+        ranks: 0,
         failed: new Map(), // candidate key -> frame it may be tried again
         frame: 0,
     };
@@ -59,10 +63,19 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         return state.reserve + kept;
     };
 
-    // A CpS buff inflates click power in a way the model cannot fully divide out (mouse upgrades
-    // add a share of the buffed CpS, main.js:4692-4708), so rankings are made between buffs and
-    // the last one is kept while a buff runs.
-    const cpsBuffRunning = () => Object.values(game.buffs).some((b) => b.multCpS && b.multCpS !== 1);
+    // CpS buffs need no care: readState reads every income unbuffed (src/game/measure.js), so a
+    // ranking made during a Frenzy is the one made without it, and the buyer ranks and buys
+    // through CpS buffs as between them. Buying on down the ranking it had through a short CpS
+    // buff instead, without ranking after each purchase, earned 0.81x and 0.65x the cookies over
+    // two game hours (luck-free, a forced 77 s Frenzy every 10 minutes or 154 s every 5).
+    // While a click buff runs each click is worth hundreds of ordinary ones, and a ranking pass
+    // (hundreds of what-ifs inside Game.Logic) holds the page's one thread while the clicker's
+    // timer waits: in the game's runtime, during a Click frenzy with a rich bank, the clicker got
+    // 23 accepted clicks a second with the buyer buying through it (0.4 to 36 over eight tries)
+    // and 39 with it standing aside (tools/dev/clicker.mjs). So buying and ranking wait the buff
+    // out (Click frenzy lasts 13 s, Dragonflight and Cursed finger 10 s, times the golden cookie
+    // duration upgrades).
+    const clickBuff = () => options.clickPriority && clickBuffRunning(game.buffs);
 
     // Anything here changing means the ranking may be wrong.
     const stampOf = () =>
@@ -97,13 +110,14 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         state.rankedAt = frame;
         state.stale = false;
         state.stamp = stampOf();
+        state.ranks++;
     }
 
     function refreshIfStale(frame) {
         if (held()) return;
         const due = state.stale || !state.income || frame - state.rankedAt >= RERANK_FRAMES || state.stamp !== stampOf();
         if (!due) return;
-        if (state.income && cpsBuffRunning() && !state.stale) return;
+        if (state.income && clickBuff()) return; // even a stale ranking waits for the clicks
         rank(frame);
     }
 
@@ -170,6 +184,7 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
     function tick(frame) {
         state.frame = frame;
         if (held()) return;
+        if (state.income && clickBuff()) return;
         refreshIfStale(frame);
         for (let i = 0; i < PURCHASES_PER_TICK; i++) {
             const choice = decide({ ranked: state.ranked, reserve: holding(), bank: game.cookies });
@@ -215,6 +230,10 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         },
         kept(holder) {
             return keeps.get(holder) || 0;
+        },
+        /** Rankings made and purchases made so far; reading them ranks nothing. */
+        activity() {
+            return { ranks: state.ranks, purchases: state.purchases };
         },
         /** What the next purchase is, or null; ranks first if the ranking is stale. */
         next() {

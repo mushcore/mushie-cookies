@@ -1,0 +1,1038 @@
+{
+ "note": "tools/dev/wrinklers.mjs 24 w1,w2,w3 with Unholy bait: luck-free (golden cookies off), a 1e15 bank and a small bakery, elder wrath 3 with every slot empty, autoBuy on. 'inherited' is the build of 1ca4dc0 (the inherited 'efficient' popping), 'measured' the wrinkler system of 2f0849a; games one at a time. total = cookies earned in the day plus what the wrinklers still hold at the game's pop multiplier. The runs of w1 and w2's inherited run were transcribed from the progress lines of an invocation stopped before it printed its records, so they carry the final hour only, at four significant figures.",
+ "summary": {
+  "measured / inherited, 24h": {
+   "perSeed": [
+    {
+     "seed": "w1",
+     "total": 2.1202274573517466,
+     "cps": 2.408759124087591,
+     "pops": [
+      28,
+      162
+     ],
+     "attached": [
+      9.89,
+      9.57
+     ]
+    },
+    {
+     "seed": "w2",
+     "total": 2.1432067485089323,
+     "cps": 2.4688850318335467,
+     "pops": [
+      25,
+      156
+     ],
+     "attached": [
+      9.91,
+      9.567673611111111
+     ]
+    },
+    {
+     "seed": "w3",
+     "total": 2.0958570093941664,
+     "cps": 2.4693033781388807,
+     "pops": [
+      25,
+      152
+     ],
+     "attached": [
+      9.905625,
+      9.563125
+     ]
+    }
+   ],
+   "totalGeoMean": 2.1196755514428056,
+   "totalRange": [
+    2.0958570093941664,
+    2.1432067485089323
+   ],
+   "cpsGeoMean": 2.4488164274336146,
+   "cpsRange": [
+    2.408759124087591,
+    2.4693033781388807
+   ]
+  }
+ },
+ "runs": [
+  {
+   "note": "transcribed from day-bait.log (the invocation was stopped at its 2 h limit before printing JSON)",
+   "variant": "inherited",
+   "seed": "w1",
+   "hours": 24,
+   "bait": true,
+   "wall": 2841,
+   "points": [
+    {
+     "hour": 24,
+     "total": 1.231e+16,
+     "held": 4410000000000000.0,
+     "cps": 52060000000.0,
+     "popped": 28,
+     "attached": 9.89
+    }
+   ]
+  },
+  {
+   "note": "transcribed from day-bait.log",
+   "variant": "measured",
+   "seed": "w1",
+   "hours": 24,
+   "bait": true,
+   "wall": 1011,
+   "points": [
+    {
+     "hour": 24,
+     "total": 2.61e+16,
+     "held": 4510000000000000.0,
+     "cps": 125400000000.0,
+     "popped": 162,
+     "attached": 9.57
+    }
+   ]
+  },
+  {
+   "note": "transcribed from day-bait.log",
+   "variant": "inherited",
+   "seed": "w2",
+   "hours": 24,
+   "bait": true,
+   "wall": 2467,
+   "points": [
+    {
+     "hour": 24,
+     "total": 1.226e+16,
+     "held": 4740000000000000.0,
+     "cps": 50780000000.0,
+     "popped": 25,
+     "attached": 9.91
+    }
+   ]
+  },
+  {
+   "variant": "measured",
+   "seed": "w2",
+   "hours": 24,
+   "bait": true,
+   "wall": 980,
+   "start": {
+    "earned": 1000000000000000,
+    "held": 0,
+    "cps": 0,
+    "popped": 0,
+    "attached": 0,
+    "buildings": 400,
+    "upgrades": 3,
+    "wrath": 3
+   },
+   "points": [
+    {
+     "hour": 1,
+     "total": 141829610669587.22,
+     "earned": 1140818155048209.8,
+     "held": 1011455621377.4685,
+     "cps": 9622280351.016716,
+     "popped": 10,
+     "attached": 9.090277777777779,
+     "buildings": 1178,
+     "upgrades": 84,
+     "wrath": 3
+    },
+    {
+     "hour": 2,
+     "total": 326178263735421.2,
+     "earned": 1298448165782161.2,
+     "held": 27730097953259.918,
+     "cps": 11794637652.48793,
+     "popped": 20,
+     "attached": 9.037777777777778,
+     "buildings": 1188,
+     "upgrades": 86,
+     "wrath": 3
+    },
+    {
+     "hour": 3,
+     "total": 579987457130588.4,
+     "earned": 1507440818491234,
+     "held": 72546638639354.36,
+     "cps": 13776133147.627922,
+     "popped": 30,
+     "attached": 9.230833333333333,
+     "buildings": 1191,
+     "upgrades": 86,
+     "wrath": 3
+    },
+    {
+     "hour": 4,
+     "total": 878922040820021.8,
+     "earned": 1571399424647554.5,
+     "held": 307522616172467.3,
+     "cps": 14232236276.428156,
+     "popped": 32,
+     "attached": 9.39875,
+     "buildings": 1192,
+     "upgrades": 86,
+     "wrath": 3
+    },
+    {
+     "hour": 5,
+     "total": 1186514784977724,
+     "earned": 1958190095581471,
+     "held": 228324689396252.94,
+     "cps": 17041087469.765001,
+     "popped": 39,
+     "attached": 9.418555555555555,
+     "buildings": 1200,
+     "upgrades": 88,
+     "wrath": 3
+    },
+    {
+     "hour": 6,
+     "total": 1546059143522736.8,
+     "earned": 2488630998272456,
+     "held": 57428145250280.82,
+     "cps": 21496028646.189365,
+     "popped": 49,
+     "attached": 9.442453703703704,
+     "buildings": 1201,
+     "upgrades": 89,
+     "wrath": 3
+    },
+    {
+     "hour": 7,
+     "total": 2004452571385795.5,
+     "earned": 2647640422188446,
+     "held": 356812149197349.4,
+     "cps": 23137590929.71191,
+     "popped": 52,
+     "attached": 9.49345238095238,
+     "buildings": 1205,
+     "upgrades": 89,
+     "wrath": 3
+    },
+    {
+     "hour": 8,
+     "total": 2519597039656567,
+     "earned": 2915882976692677,
+     "held": 603714062963889.8,
+     "cps": 24748707440.052486,
+     "popped": 56,
+     "attached": 9.533159722222223,
+     "buildings": 1207,
+     "upgrades": 89,
+     "wrath": 3
+    },
+    {
+     "hour": 9,
+     "total": 3093997664664398,
+     "earned": 3665088500313339.5,
+     "held": 428909164351058.3,
+     "cps": 31317594054.06426,
+     "popped": 67,
+     "attached": 9.483395061728395,
+     "buildings": 1208,
+     "upgrades": 90,
+     "wrath": 3
+    },
+    {
+     "hour": 10,
+     "total": 3774950751893767.5,
+     "earned": 3964388845401705,
+     "held": 810561906492062.5,
+     "cps": 34136542759.22027,
+     "popped": 70,
+     "attached": 9.513166666666667,
+     "buildings": 1211,
+     "upgrades": 90,
+     "wrath": 3
+    },
+    {
+     "hour": 11,
+     "total": 4532780354463554,
+     "earned": 4945636620075201,
+     "held": 587143734388352.5,
+     "cps": 40183683816.51182,
+     "popped": 77,
+     "attached": 9.51780303030303,
+     "buildings": 1228,
+     "upgrades": 92,
+     "wrath": 3
+    },
+    {
+     "hour": 12,
+     "total": 5362344432408098,
+     "earned": 6215430802339304,
+     "held": 146913630068793.62,
+     "cps": 46875028781.05611,
+     "popped": 86,
+     "attached": 9.52199074074074,
+     "buildings": 1233,
+     "upgrades": 93,
+     "wrath": 3
+    },
+    {
+     "hour": 13,
+     "total": 6371726817048224,
+     "earned": 6459004743723781,
+     "held": 912722073324443.1,
+     "cps": 48018609128.338585,
+     "popped": 87,
+     "attached": 9.554123931623932,
+     "buildings": 1234,
+     "upgrades": 93,
+     "wrath": 3
+    },
+    {
+     "hour": 14,
+     "total": 7378281243826418,
+     "earned": 6889642167154456,
+     "held": 1488639076671961.5,
+     "cps": 50021642505.65201,
+     "popped": 89,
+     "attached": 9.567976190476191,
+     "buildings": 1237,
+     "upgrades": 93,
+     "wrath": 3
+    },
+    {
+     "hour": 15,
+     "total": 8547564814419390,
+     "earned": 8651839229896567,
+     "held": 895725584522823.4,
+     "cps": 59625930578.532196,
+     "popped": 98,
+     "attached": 9.563592592592592,
+     "buildings": 1237,
+     "upgrades": 94,
+     "wrath": 3
+    },
+    {
+     "hour": 16,
+     "total": 9823265990962604,
+     "earned": 9957952843661908,
+     "held": 865313147300696.2,
+     "cps": 69234685762.14395,
+     "popped": 109,
+     "attached": 9.54123263888889,
+     "buildings": 1240,
+     "upgrades": 94,
+     "wrath": 3
+    },
+    {
+     "hour": 17,
+     "total": 11358021299352228,
+     "earned": 10636517240126774,
+     "held": 1721504059225454.5,
+     "cps": 72437604156.68121,
+     "popped": 113,
+     "attached": 9.563235294117646,
+     "buildings": 1241,
+     "upgrades": 94,
+     "wrath": 3
+    },
+    {
+     "hour": 18,
+     "total": 12964989095846510,
+     "earned": 12761138573685736,
+     "held": 1203850522160774.2,
+     "cps": 84179339931.89252,
+     "popped": 123,
+     "attached": 9.543657407407407,
+     "buildings": 1242,
+     "upgrades": 94,
+     "wrath": 3
+    },
+    {
+     "hour": 19,
+     "total": 14781127404147806,
+     "earned": 13849692970288558,
+     "held": 1931434433859248,
+     "cps": 89767221027.39444,
+     "popped": 127,
+     "attached": 9.559488304093568,
+     "buildings": 1256,
+     "upgrades": 95,
+     "wrath": 3
+    },
+    {
+     "hour": 20,
+     "total": 16655618899642914,
+     "earned": 16557746485572068,
+     "held": 1097872414070845.6,
+     "cps": 101302551645.03293,
+     "popped": 137,
+     "attached": 9.542208333333333,
+     "buildings": 1261,
+     "upgrades": 96,
+     "wrath": 3
+    },
+    {
+     "hour": 21,
+     "total": 18767211336304716,
+     "earned": 18491357553638140,
+     "held": 1275853782666576.2,
+     "cps": 110023399073.43736,
+     "popped": 144,
+     "attached": 9.545978835978836,
+     "buildings": 1263,
+     "upgrades": 98,
+     "wrath": 3
+    },
+    {
+     "hour": 22,
+     "total": 20962430143140824,
+     "earned": 21421608362806984,
+     "held": 540821780333838.56,
+     "cps": 121961737831.69812,
+     "popped": 154,
+     "attached": 9.53135101010101,
+     "buildings": 1266,
+     "upgrades": 98,
+     "wrath": 3
+    },
+    {
+     "hour": 23,
+     "total": 23596803680035884,
+     "earned": 21641139490630984,
+     "held": 2955664189404899.5,
+     "cps": 121961737831.69812,
+     "popped": 154,
+     "attached": 9.551727053140096,
+     "buildings": 1266,
+     "upgrades": 98,
+     "wrath": 3
+    },
+    {
+     "hour": 24,
+     "total": 26275714736719510,
+     "earned": 22481961285897750,
+     "held": 4793753450821758,
+     "cps": 125369981916.50749,
+     "popped": 156,
+     "attached": 9.567673611111111,
+     "buildings": 1267,
+     "upgrades": 98,
+     "wrath": 3
+    }
+   ],
+   "failures": []
+  },
+  {
+   "variant": "inherited",
+   "seed": "w3",
+   "hours": 24,
+   "bait": true,
+   "wall": 1813,
+   "start": {
+    "earned": 1000000000000000,
+    "held": 0,
+    "cps": 0,
+    "popped": 0,
+    "attached": 0,
+    "buildings": 400,
+    "upgrades": 3,
+    "wrath": 3
+   },
+   "points": [
+    {
+     "hour": 1,
+     "total": 143631692374263.28,
+     "earned": 1014183147284306.4,
+     "held": 129448545089956.9,
+     "cps": 7340325088.469648,
+     "popped": 0,
+     "attached": 9.222222222222221,
+     "buildings": 1178,
+     "upgrades": 83,
+     "wrath": 3
+    },
+    {
+     "hour": 2,
+     "total": 302182714286801.75,
+     "earned": 1027395732446306.4,
+     "held": 274786981840495.34,
+     "cps": 7340325088.469648,
+     "popped": 0,
+     "attached": 9.61111111111111,
+     "buildings": 1178,
+     "upgrades": 83,
+     "wrath": 3
+    },
+    {
+     "hour": 3,
+     "total": 460733736199374.2,
+     "earned": 1040608317608306.4,
+     "held": 420125418591067.8,
+     "cps": 7340325088.469648,
+     "popped": 0,
+     "attached": 9.74074074074074,
+     "buildings": 1178,
+     "upgrades": 83,
+     "wrath": 3
+    },
+    {
+     "hour": 4,
+     "total": 619284758115530.5,
+     "earned": 1053820902770306.4,
+     "held": 565463855345224.1,
+     "cps": 7340325088.469648,
+     "popped": 0,
+     "attached": 9.805555555555555,
+     "buildings": 1178,
+     "upgrades": 83,
+     "wrath": 3
+    },
+    {
+     "hour": 5,
+     "total": 777835780031686.8,
+     "earned": 1067033487932306.4,
+     "held": 710802292099380.4,
+     "cps": 7340325088.469648,
+     "popped": 0,
+     "attached": 9.844444444444445,
+     "buildings": 1178,
+     "upgrades": 83,
+     "wrath": 3
+    },
+    {
+     "hour": 6,
+     "total": 1007621706512134.5,
+     "earned": 1390361454991015.8,
+     "held": 617260251521118.8,
+     "cps": 12135628685.307102,
+     "popped": 4,
+     "attached": 9.808657407407408,
+     "buildings": 1193,
+     "upgrades": 86,
+     "wrath": 3
+    },
+    {
+     "hour": 7,
+     "total": 1285666958431582,
+     "earned": 1630493435443734.8,
+     "held": 655173522987847.1,
+     "cps": 14531298999.84989,
+     "popped": 6,
+     "attached": 9.828055555555556,
+     "buildings": 1200,
+     "upgrades": 86,
+     "wrath": 3
+    },
+    {
+     "hour": 8,
+     "total": 1599543016814200.8,
+     "earned": 1656649773625734.8,
+     "held": 942893243188466,
+     "cps": 14531298999.84989,
+     "popped": 6,
+     "attached": 9.84954861111111,
+     "buildings": 1200,
+     "upgrades": 86,
+     "wrath": 3
+    },
+    {
+     "hour": 9,
+     "total": 1953410367105592.8,
+     "earned": 2145412883171835.2,
+     "held": 807997483933757.5,
+     "cps": 17132993635.140823,
+     "popped": 9,
+     "attached": 9.855246913580247,
+     "buildings": 1216,
+     "upgrades": 88,
+     "wrath": 3
+    },
+    {
+     "hour": 10,
+     "total": 2323483029607397,
+     "earned": 2176252271696835.2,
+     "held": 1147230757910561.8,
+     "cps": 17132993635.140823,
+     "popped": 9,
+     "attached": 9.869722222222222,
+     "buildings": 1216,
+     "upgrades": 88,
+     "wrath": 3
+    },
+    {
+     "hour": 11,
+     "total": 2693555692106268,
+     "earned": 2207091660221835.2,
+     "held": 1486464031884432.8,
+     "cps": 17132993635.140823,
+     "popped": 9,
+     "attached": 9.881565656565657,
+     "buildings": 1216,
+     "upgrades": 88,
+     "wrath": 3
+    },
+    {
+     "hour": 12,
+     "total": 3063628354599213,
+     "earned": 2237931048746835.2,
+     "held": 1825697305852377.5,
+     "cps": 17132993635.140823,
+     "popped": 9,
+     "attached": 9.891435185185186,
+     "buildings": 1216,
+     "upgrades": 88,
+     "wrath": 3
+    },
+    {
+     "hour": 13,
+     "total": 3433701017104539.5,
+     "earned": 2268770437286693.5,
+     "held": 2164930579817846,
+     "cps": 17132993635.140823,
+     "popped": 9,
+     "attached": 9.899786324786325,
+     "buildings": 1216,
+     "upgrades": 88,
+     "wrath": 3
+    },
+    {
+     "hour": 14,
+     "total": 3826397430458893,
+     "earned": 3445403010492048.5,
+     "held": 1380994419966844.5,
+     "cps": 25115594195.378876,
+     "popped": 13,
+     "attached": 9.898035714285715,
+     "buildings": 1244,
+     "upgrades": 90,
+     "wrath": 3
+    },
+    {
+     "hour": 15,
+     "total": 4368894265070761,
+     "earned": 3490611080034048.5,
+     "held": 1878283185036712.8,
+     "cps": 25115594195.378876,
+     "popped": 13,
+     "attached": 9.904833333333332,
+     "buildings": 1244,
+     "upgrades": 90,
+     "wrath": 3
+    },
+    {
+     "hour": 16,
+     "total": 4911391099675975,
+     "earned": 3535819149576048.5,
+     "held": 2375571950099926.5,
+     "cps": 25115594195.378876,
+     "popped": 13,
+     "attached": 9.91078125,
+     "buildings": 1244,
+     "upgrades": 90,
+     "wrath": 3
+    },
+    {
+     "hour": 17,
+     "total": 5459574672104729,
+     "earned": 5128670883913201,
+     "held": 1330903788191528,
+     "cps": 36575781516.86179,
+     "popped": 17,
+     "attached": 9.909575163398692,
+     "buildings": 1284,
+     "upgrades": 93,
+     "wrath": 3
+    },
+    {
+     "hour": 18,
+     "total": 6258091690705948,
+     "earned": 6120597745750058,
+     "held": 1137493944955890,
+     "cps": 41135830103.40152,
+     "popped": 20,
+     "attached": 9.890262345679012,
+     "buildings": 1306,
+     "upgrades": 93,
+     "wrath": 3
+    },
+    {
+     "hour": 19,
+     "total": 7176036248705051,
+     "earned": 6435841949194631,
+     "held": 1740194299510420,
+     "cps": 42738033819.12541,
+     "popped": 21,
+     "attached": 9.894941520467837,
+     "buildings": 1307,
+     "upgrades": 93,
+     "wrath": 3
+    },
+    {
+     "hour": 20,
+     "total": 8099177779125251,
+     "earned": 6512770409998631,
+     "held": 2586407369126620,
+     "cps": 42738033819.12541,
+     "popped": 21,
+     "attached": 9.900194444444445,
+     "buildings": 1307,
+     "upgrades": 93,
+     "wrath": 3
+    },
+    {
+     "hour": 21,
+     "total": 9015399847978192,
+     "earned": 7070476081580083,
+     "held": 2944923766398108,
+     "cps": 46364649089.699684,
+     "popped": 22,
+     "attached": 9.901190476190477,
+     "buildings": 1307,
+     "upgrades": 94,
+     "wrath": 3
+    },
+    {
+     "hour": 22,
+     "total": 10067987632565760,
+     "earned": 8341285165685288,
+     "held": 2726702466880472,
+     "cps": 50775565981.38772,
+     "popped": 25,
+     "attached": 9.897045454545454,
+     "buildings": 1315,
+     "upgrades": 94,
+     "wrath": 3
+    },
+    {
+     "hour": 23,
+     "total": 11164739857743508,
+     "earned": 8432681184449288,
+     "held": 3732058673294220.5,
+     "cps": 50775565981.38772,
+     "popped": 25,
+     "attached": 9.901521739130434,
+     "buildings": 1315,
+     "upgrades": 94,
+     "wrath": 3
+    },
+    {
+     "hour": 24,
+     "total": 12261492082926358,
+     "earned": 8524077203213288,
+     "held": 4737414879713070,
+     "cps": 50775565981.38772,
+     "popped": 25,
+     "attached": 9.905625,
+     "buildings": 1315,
+     "upgrades": 94,
+     "wrath": 3
+    }
+   ],
+   "failures": []
+  },
+  {
+   "variant": "measured",
+   "seed": "w3",
+   "hours": 24,
+   "bait": true,
+   "wall": 415,
+   "start": {
+    "earned": 1000000000000000,
+    "held": 0,
+    "cps": 0,
+    "popped": 0,
+    "attached": 0,
+    "buildings": 400,
+    "upgrades": 3,
+    "wrath": 3
+   },
+   "points": [
+    {
+     "hour": 1,
+     "total": 140788216680129.78,
+     "earned": 1140512807771923,
+     "held": 275408908206.7943,
+     "cps": 9622280351.016716,
+     "popped": 10,
+     "attached": 9.03,
+     "buildings": 1178,
+     "upgrades": 84,
+     "wrath": 3
+    },
+    {
+     "hour": 2,
+     "total": 330920784372021.3,
+     "earned": 1303093048331715.8,
+     "held": 27827736040305.562,
+     "cps": 11796030740.709032,
+     "popped": 22,
+     "attached": 9.05888888888889,
+     "buildings": 1189,
+     "upgrades": 86,
+     "wrath": 3
+    },
+    {
+     "hour": 3,
+     "total": 585008501827028.8,
+     "earned": 1324594156751052.5,
+     "held": 260414345075976.22,
+     "cps": 11964418549.043207,
+     "popped": 22,
+     "attached": 9.353240740740741,
+     "buildings": 1190,
+     "upgrades": 86,
+     "wrath": 3
+    },
+    {
+     "hour": 4,
+     "total": 850132035426256.4,
+     "earned": 1809120419399531.5,
+     "held": 41011616026724.92,
+     "cps": 15969930614.487701,
+     "popped": 36,
+     "attached": 9.363194444444444,
+     "buildings": 1199,
+     "upgrades": 86,
+     "wrath": 3
+    },
+    {
+     "hour": 5,
+     "total": 1175276344043625,
+     "earned": 1874113896354546.2,
+     "held": 301162447689078.7,
+     "cps": 16426033743.287937,
+     "popped": 37,
+     "attached": 9.401388888888889,
+     "buildings": 1200,
+     "upgrades": 86,
+     "wrath": 3
+    },
+    {
+     "hour": 6,
+     "total": 1531924479225965.5,
+     "earned": 1903834574275153.8,
+     "held": 628089904950811.9,
+     "cps": 16596355075.495392,
+     "popped": 37,
+     "attached": 9.501157407407407,
+     "buildings": 1201,
+     "upgrades": 86,
+     "wrath": 3
+    },
+    {
+     "hour": 7,
+     "total": 1957676589474379,
+     "earned": 2622115401196787,
+     "held": 335561188277591.9,
+     "cps": 22546057587.86056,
+     "popped": 48,
+     "attached": 9.467698412698413,
+     "buildings": 1208,
+     "upgrades": 89,
+     "wrath": 3
+    },
+    {
+     "hour": 8,
+     "total": 2457185096347084,
+     "earned": 2927382780594715,
+     "held": 529802315752369.25,
+     "cps": 24763980210.921814,
+     "popped": 53,
+     "attached": 9.503715277777777,
+     "buildings": 1211,
+     "upgrades": 89,
+     "wrath": 3
+    },
+    {
+     "hour": 9,
+     "total": 3013940137861973.5,
+     "earned": 3678498180020834.5,
+     "held": 335441957841139,
+     "cps": 31332866824.933586,
+     "popped": 64,
+     "attached": 9.4675,
+     "buildings": 1212,
+     "upgrades": 90,
+     "wrath": 3
+    },
+    {
+     "hour": 10,
+     "total": 3688222008508478,
+     "earned": 3977613913699580,
+     "held": 710608094808898.2,
+     "cps": 34151815530.089592,
+     "popped": 67,
+     "attached": 9.500694444444445,
+     "buildings": 1215,
+     "upgrades": 90,
+     "wrath": 3
+    },
+    {
+     "hour": 11,
+     "total": 4429942629465879,
+     "earned": 4270187070009806,
+     "held": 1159755559456073.2,
+     "cps": 35794815659.32022,
+     "popped": 69,
+     "attached": 9.528459595959596,
+     "buildings": 1217,
+     "upgrades": 91,
+     "wrath": 3
+    },
+    {
+     "hour": 12,
+     "total": 5233431203311514,
+     "earned": 4509187670354849,
+     "held": 1724243532956664.8,
+     "cps": 37604553445.233894,
+     "popped": 70,
+     "attached": 9.567199074074074,
+     "buildings": 1227,
+     "upgrades": 92,
+     "wrath": 3
+    },
+    {
+     "hour": 13,
+     "total": 6126171681210906,
+     "earned": 6668313529574993,
+     "held": 457858151635913.25,
+     "cps": 48546473782.12497,
+     "popped": 80,
+     "attached": 9.569123931623931,
+     "buildings": 1244,
+     "upgrades": 94,
+     "wrath": 3
+    },
+    {
+     "hour": 14,
+     "total": 7176030852270155,
+     "earned": 6986860747634008,
+     "held": 1189170104636147,
+     "cps": 50148677497.848854,
+     "popped": 82,
+     "attached": 9.591309523809525,
+     "buildings": 1245,
+     "upgrades": 94,
+     "wrath": 3
+    },
+    {
+     "hour": 15,
+     "total": 8325664245399459,
+     "earned": 8694593397774679,
+     "held": 631070847624779.8,
+     "cps": 59752965570.72904,
+     "popped": 92,
+     "attached": 9.593296296296296,
+     "buildings": 1245,
+     "upgrades": 95,
+     "wrath": 3
+    },
+    {
+     "hour": 16,
+     "total": 9592584142063762,
+     "earned": 9601192634672230,
+     "held": 991391507391532.5,
+     "cps": 66163707048.84855,
+     "popped": 100,
+     "attached": 9.575138888888889,
+     "buildings": 1248,
+     "upgrades": 95,
+     "wrath": 3
+    },
+    {
+     "hour": 17,
+     "total": 11035027179000292,
+     "earned": 10716416047284768,
+     "held": 1318611131715524,
+     "cps": 72569543837.92305,
+     "popped": 108,
+     "attached": 9.567042483660131,
+     "buildings": 1250,
+     "upgrades": 95,
+     "wrath": 3
+    },
+    {
+     "hour": 18,
+     "total": 12603283647396100,
+     "earned": 12794882720871998,
+     "held": 808400926524101.4,
+     "cps": 84312777154.36157,
+     "popped": 118,
+     "attached": 9.556820987654321,
+     "buildings": 1251,
+     "upgrades": 95,
+     "wrath": 3
+    },
+    {
+     "hour": 19,
+     "total": 14372511038115034,
+     "earned": 13864582158136230,
+     "held": 1507928879978803.8,
+     "cps": 89795777416.37863,
+     "popped": 122,
+     "attached": 9.56780701754386,
+     "buildings": 1261,
+     "upgrades": 96,
+     "wrath": 3
+    },
+    {
+     "hour": 20,
+     "total": 16160875897182796,
+     "earned": 16462454713936516,
+     "held": 698421183246280.1,
+     "cps": 101270124099.25403,
+     "popped": 132,
+     "attached": 9.539361111111111,
+     "buildings": 1264,
+     "upgrades": 96,
+     "wrath": 3
+    },
+    {
+     "hour": 21,
+     "total": 18226840400554744,
+     "earned": 18195002714326404,
+     "held": 1031837686228338.9,
+     "cps": 108769681197.67325,
+     "popped": 139,
+     "attached": 9.539351851851851,
+     "buildings": 1265,
+     "upgrades": 98,
+     "wrath": 3
+    },
+    {
+     "hour": 22,
+     "total": 20449340856877730,
+     "earned": 21391862864435010,
+     "held": 57477992442718.336,
+     "cps": 121972032519.94495,
+     "popped": 150,
+     "attached": 9.531906565656566,
+     "buildings": 1270,
+     "upgrades": 98,
+     "wrath": 3
+    },
+    {
+     "hour": 23,
+     "total": 23018855389666760,
+     "earned": 21614982644275650,
+     "held": 2403872745391112.5,
+     "cps": 121972032519.94495,
+     "popped": 150,
+     "attached": 9.545193236714976,
+     "buildings": 1270,
+     "upgrades": 98,
+     "wrath": 3
+    },
+    {
+     "hour": 24,
+     "total": 25698334127632284,
+     "earned": 22453322544294268,
+     "held": 4245011583338014.5,
+     "cps": 125380276604.75432,
+     "popped": 152,
+     "attached": 9.563125,
+     "buildings": 1271,
+     "upgrades": 98,
+     "wrath": 3
+    }
+   ],
+   "failures": []
+  }
+ ]
+}

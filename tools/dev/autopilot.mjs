@@ -1,7 +1,12 @@
 // Plays a fresh save with nothing but the Autopilot, the way a new player would install the mod
 // and walk away, and reports every system each game hour.
-// Usage: node tools/dev/autopilot.mjs <gameHours> [seed] [--no-golden] [--every=hours] [--first-target=prestige] > out.json
-import { launchWithMod } from '../../test/harness/game.mjs';
+// Usage: node tools/dev/autopilot.mjs <gameHours> [seed] [--no-golden] [--every=hours] [--first-target=prestige]
+//          [--save-at=h1,h2,...] [--checkpoint-dir=dir] [--from=checkpoint.json] [--mod=built main.js] > out.json
+// --save-at writes a checkpoint (the save and the virtual time) at those hours; --from resumes one,
+// so A/B runs can branch from a shared state instead of replaying the hours before it.
+import fs from 'node:fs';
+import path from 'node:path';
+import { launchWithMod, launchGame } from '../../test/harness/game.mjs';
 
 const hours = Number(process.argv[2] || 24);
 const seed = process.argv[3] && !process.argv[3].startsWith('--') ? process.argv[3] : 'autopilot';
@@ -11,7 +16,25 @@ const every = everyArg ? Number(everyArg.split('=')[1]) : 1;
 const targetArg = process.argv.find((a) => a.startsWith('--first-target='));
 const firstTarget = targetArg ? Number(targetArg.split('=')[1]) : null;
 
-const game = await launchWithMod({ seed, autopilot: true });
+const arg = (name) => {
+    const a = process.argv.find((x) => x.startsWith(`--${name}=`));
+    return a ? a.slice(name.length + 3) : null;
+};
+const saveAt = new Set((arg('save-at') || '').split(',').filter(Boolean).map(Number));
+const checkpointDir = arg('checkpoint-dir') || '.';
+const from = arg('from') ? JSON.parse(fs.readFileSync(arg('from'), 'utf8')) : null;
+const startHour = from ? from.hour : 0;
+if (from) process.stderr.write(`resuming ${from.seed} at hour ${from.hour}
+`);
+
+// --mod pins a built mod file, so a run queued for a game slot does not pick up a later build.
+const modFile = arg('mod');
+const game = modFile
+    ? await launchGame({ seed, autopilot: true, checkpoint: from, mods: [path.resolve(modFile)] }).then(async (g) => {
+          if (g) await g.modStarted();
+          return g;
+      })
+    : await launchWithMod({ seed, autopilot: true, checkpoint: from });
 if (!game) {
     console.error('game location not configured');
     process.exit(1);
@@ -62,10 +85,17 @@ try {
     if (firstTarget) await game.eval((t) => { MushieCookies.ascension.options.firstTarget = t; }, firstTarget);
     const points = [];
     const started = Date.now();
-    for (let h = every; h <= hours; h += every) {
+    for (let h = startHour + every; h <= startHour + hours; h += every) {
         await game.advanceSeconds(every * 3600);
         const p = await game.eval(snapshot);
         points.push({ hour: h, ...p });
+        if (saveAt.has(h)) {
+            const file = path.join(checkpointDir, `${seed}-h${h}.json`);
+            fs.mkdirSync(checkpointDir, { recursive: true });
+            fs.writeFileSync(file, JSON.stringify({ seed, hour: h, ...(await game.takeCheckpoint()) }));
+            process.stderr.write(`checkpoint written: ${file}
+`);
+        }
         process.stderr.write(
             `${String(h).padStart(4)}h earned=${fmt(p.earnedAllTime)} cps=${fmt(p.cps)} prestige=${p.prestige} asc=${p.ascensions} heavenly=${p.heavenly} ` +
                 `b=${p.buildings} u=${p.upgrades} ach=${p.achievements} lumps=${p.lumps} lv=${Object.values(p.levels).join('/')} ` +

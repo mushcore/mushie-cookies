@@ -56,12 +56,9 @@ test('stands aside for every inherited option that slots gods or picks auras, an
         ['autoWorshipToggle', 1, true, false],
         ['autoCyclius', 1, true, false],
         ['autoCyclius', 2, true, false], // Cyclius in all three slots
-        ['autoSL', 2, true, false], // Auto Rigidel
-        ['autoSL', 1, false, false], // plain harvesting touches neither
+        ['autoSL', 1, false, false], // the lump system's harvest touches neither
         ['autoGodzamok', 1, true, false],
         ['autoDragonToggle', 1, false, true],
-        ['dragonsCurve', 1, false, true],
-        ['dragonsCurve', 2, false, true],
         ['autoDragonOrbs', 1, false, true],
         ['auto100ConsistencyCombo', 1, true, true],
         // The double cast is forecast casting's (src/systems/grimoire.js): it reads no god or aura.
@@ -73,7 +70,7 @@ test('stands aside for every inherited option that slots gods or picks auras, an
         assert.equal(inheritedAurasOn(settings), auras, `${name}=${value}: auras`);
     }
     // A setting missing from an old save is off, not "not zero".
-    assert.equal(inheritedAurasOn({ dragonsCurve: undefined }), false);
+    assert.equal(inheritedAurasOn({ autoDragonToggle: undefined }), false);
 });
 
 // Income 100 now; each move: income with the aura and every building (gross), income once the

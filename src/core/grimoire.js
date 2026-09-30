@@ -23,12 +23,11 @@ const OUTCOME_BUFF = {
     'cookie storm': 'Cookie storm',
 };
 
-// A storm drop pays 1 to 7 whole minutes of CpS, uniformly: 4 minutes on average (main.js:5599).
+// A storm drop pays 1 to 7 whole minutes of CpS, uniformly: 4 minutes on average, times the
+// golden cookie gain multiplier (main.js:5599).
 const STORM_DROP_SECONDS = 4 * 60;
-// During a cookie storm a drop appears on half of the game's 30 frames a second (main.js:5257).
-const STORM_DROPS_PER_SECOND = 30 * 0.5;
-// Seconds of CpS a running storm pays each second, half its drops reached.
-const STORM_SECONDS_PER_SECOND = STORM_DROP_SECONDS * STORM_DROPS_PER_SECOND * 0.5;
+// During a cookie storm a drop appears on half of the game's frames (main.js:5257).
+const STORM_DROP_CHANCE = 0.5;
 
 const cpsMultOf = (buff) => (buff.multCpS === undefined ? 1 : buff.multCpS);
 const clickMultOf = (buff) => (buff.multClick === undefined ? 1 : buff.multClick);
@@ -79,15 +78,21 @@ export function outcomeValue(outcome, ctx) {
         durationMult,
         buildingSpecials = [],
         buffs = [],
+        fps = 30, // storm drops are rolled each frame
+        gainMult = 1, // what storm drops pay is multiplied by it
+        stormReach = 1, // the share of storm drops clicked before they fade: all, clicked on sight
     } = ctx;
     // The game rounds buff durations up to whole seconds (main.js:5494-5595).
     const d = (seconds) => Math.ceil(seconds * durationMult);
     const cpsNow = meanCpsMult(buffs, 0, 0);
+    // Seconds of unbuffed CpS a running storm pays each second: the drops reached, minutes of
+    // CpS each (main.js:5257, 5599).
+    const stormSecondsPerSecond = fps * STORM_DROP_CHANCE * stormReach * STORM_DROP_SECONDS * gainMult;
     // What a CpS multiplier multiplies each second, given the other buffs running: buildings;
     // clicks, which Plastic mouse and its kind pay a share of buffed CpS (main.js:4692-4708) under
     // any click buff; and a storm's drops, minutes of buffed CpS each (5599).
     const cpsScaled = (running) =>
-        cpsMult(running) * (passive + click * clickMult(running) + (storming(running) ? passive * STORM_SECONDS_PER_SECOND : 0));
+        cpsMult(running) * (passive + click * clickMult(running) + (storming(running) ? passive * stormSecondsPerSecond : 0));
     // What a click multiplier multiplies: clicks, under every other buff (4732-4735).
     const clickScaled = (running) => click * cpsMult(running) * clickMult(running);
     // What raising CpS or clicks by `mult` for `seconds` adds, as a buff called `name`.
@@ -111,13 +116,13 @@ export function outcomeValue(outcome, ctx) {
         case 'multiply cookies':
             return Math.min(0.15 * bank, 900 * passive * cpsNow) + 13;
         case 'cookie storm': {
-            // Drops for as long as the storm lasts, half of them reached.
+            // Drops for as long as the storm lasts, those reached.
             const at = landing(buffs, 'Cookie storm');
-            const drops = STORM_DROPS_PER_SECOND * d(7) * 0.5;
-            return passive * STORM_DROP_SECONDS * drops * meanCpsMult(at.others, at.from, at.from + d(7));
+            const drops = fps * STORM_DROP_CHANCE * d(7) * stormReach;
+            return passive * STORM_DROP_SECONDS * gainMult * drops * meanCpsMult(at.others, at.from, at.from + d(7));
         }
         case 'cookie storm drop':
-            return passive * STORM_DROP_SECONDS * cpsNow;
+            return passive * STORM_DROP_SECONDS * gainMult * cpsNow;
         case 'cursed finger': {
             // CpS stops; each click pays the CpS of the whole duration as it was when the finger
             // struck (main.js:5556), so a running finger keeps its own payout.
@@ -177,7 +182,7 @@ export function afterOutcome(outcome, ctx) {
         case 'ruin cookies':
             return only(banked(-(Math.min(0.05 * ctx.bank, 600 * ctx.passive * cpsNow) + 13)));
         case 'cookie storm drop':
-            return only(banked(ctx.passive * STORM_DROP_SECONDS * cpsNow));
+            return only(banked(ctx.passive * STORM_DROP_SECONDS * (ctx.gainMult === undefined ? 1 : ctx.gainMult) * cpsNow));
         default:
             return only(ctx);
     }

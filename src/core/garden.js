@@ -142,29 +142,85 @@ export function agePerTick(plant, boost = 1) {
  * What a layout is expected to cost in seeds before its target appears, and how long that takes.
  * A planting succeeds if a mutation lands while every parent is mature: with `score` the summed
  * chance a tick over the empty tiles, a window of w mature ticks succeeds with 1 - e^(-score × w),
- * and each failure pays for the mortal parents again. Seeds come out of a budget that fills at
- * `budgetRate` cookies a second, so the slower of the garden and the budget sets the time.
+ * and each failure pays for the mortal parents again. Seeds come out of a pot that fills at
+ * `budgetRate` cookies a second, and nothing is planted until the pot covers the whole layout
+ * (plantGroup), so the first planting waits for the saving; a later one waits for the pot to
+ * save the replanting again, or for the planting before it to die, whichever is later.
  *
  * @param {object} a
  * @param {number} a.score        summed chance of the target per tick
  * @param {number} a.cost         cookies to plant what the layout still lacks
  * @param {number} a.replantCost  cookies to plant its mortal parents again
- * @param {number} a.growTicks    ticks until the last parent is mature
+ * @param {number} a.growTicks    ticks from planting until the last parent is mature
+ * @param {number} [a.regrowTicks=growTicks]  the same for a replanting, which starts from seed
  * @param {number} a.windowTicks  ticks the parents stay mature together; Infinity when immortal
  * @param {number} a.growSeconds  seconds per tick while growing
  * @param {number} a.waitSeconds  seconds per tick while waiting for the mutation
  * @param {number} a.budgetRate   cookies a second the garden may spend
- * @returns {{cost: number, seconds: number}}
+ * @param {number} [a.saved=0]    cookies already in the pot
+ * @returns {{cost: number, seconds: number}}  seconds is Infinity when the pot can never pay
  */
-export function expectedUnlock({ score, cost, replantCost, growTicks, windowTicks, growSeconds, waitSeconds, budgetRate }) {
+export function expectedUnlock({ score, cost, replantCost, growTicks, regrowTicks = growTicks, windowTicks, growSeconds, waitSeconds, budgetRate, saved = 0 }) {
     if (!(score > 0)) return { cost: Infinity, seconds: Infinity };
     const mortal = Number.isFinite(windowTicks);
     const plantings = mortal ? 1 / (1 - Math.exp(-score * windowTicks)) : 1;
     const spend = cost + replantCost * (plantings - 1);
-    const waitTicks = mortal ? (plantings - 1) * windowTicks + Math.min(windowTicks, 1 / score) : 1 / score;
-    const garden = plantings * growTicks * growSeconds + waitTicks * waitSeconds;
-    const budget = spend > 0 ? spend / budgetRate : 0;
-    return { cost: spend, seconds: Math.max(garden, budget) };
+    const save = cost > saved ? (budgetRate > 0 ? (cost - saved) / budgetRate : Infinity) : 0;
+    const lastWait = (mortal ? Math.min(windowTicks, 1 / score) : 1 / score) * waitSeconds;
+    let seconds = save + growTicks * growSeconds + lastWait;
+    if (plantings > 1) {
+        // The pot saves for the next planting while the failed one grows and waits.
+        const refill = replantCost > 0 ? (budgetRate > 0 ? replantCost / budgetRate : Infinity) : 0;
+        seconds += (plantings - 1) * Math.max(regrowTicks * growSeconds + windowTicks * waitSeconds, refill);
+    }
+    return { cost: spend, seconds };
+}
+
+/**
+ * What a layout still needs before its first planting, with some parents perhaps growing in
+ * place already. Such a parent costs nothing and is further along, but only if it is still alive
+ * when the rest has been paid for and grown: otherwise it dies waiting and is bought again.
+ * Ages and lifetimes are in ticks.
+ *
+ * @param {object} a
+ * @param {Array<{price: number, grow: number, life: number, age: number|null}>} a.parents
+ *   one per parent tile; grow: ticks from seed to mature; life: ticks a seed lives, Infinity when
+ *   immortal; age: ticks the parent in place has grown, or null when the tile lacks it
+ * @param {number} [a.saved=0]    cookies already in the pot
+ * @param {number} a.budgetRate   cookies a second the pot fills
+ * @param {number} a.tickSeconds  seconds a tick lasts meanwhile
+ * @returns {{cost: number, replantCost: number, growTicks: number, regrowTicks: number, windowTicks: number}}
+ *   growTicks count from the first planting, after the saving
+ */
+export function layoutCost({ parents, saved = 0, budgetRate, tickSeconds }) {
+    const kept = parents.map((p) => p.age !== null && p.age !== undefined);
+    for (;;) {
+        let cost = 0;
+        for (let i = 0; i < parents.length; i++) if (!kept[i]) cost += parents[i].price;
+        const saveTicks = cost > saved ? (budgetRate > 0 ? (cost - saved) / budgetRate / tickSeconds : Infinity) : 0;
+        // Ticks from now until every parent is mature.
+        let ready = 0;
+        parents.forEach((p, i) => (ready = Math.max(ready, kept[i] ? p.grow - p.age : saveTicks + p.grow)));
+        let lost = false;
+        parents.forEach((p, i) => {
+            if (kept[i] && Number.isFinite(p.life) && p.life - p.age <= ready) {
+                kept[i] = false;
+                lost = true;
+            }
+        });
+        if (lost) continue;
+        let replantCost = 0;
+        let regrowTicks = 0;
+        let windowTicks = Infinity;
+        for (const p of parents) {
+            if (!Number.isFinite(p.life)) continue;
+            replantCost += p.price;
+            regrowTicks = Math.max(regrowTicks, p.grow);
+            windowTicks = Math.min(windowTicks, p.life - p.grow);
+        }
+        const growTicks = Number.isFinite(saveTicks) ? Math.max(0, ready - saveTicks) : Math.max(0, ...parents.map((p) => p.grow));
+        return { cost, replantCost, growTicks, regrowTicks: regrowTicks || growTicks, windowTicks };
+    }
 }
 
 /**
@@ -179,4 +235,41 @@ export function plantNow(slots) {
     const out = new Set();
     for (const s of slots) if (!s.planted && s.ticksLeft >= horizon - 1) out.add(s.key);
     return out;
+}
+
+/**
+ * The seeds to plant this tick: every empty slot plantNow allows, or none. A layout produces only
+ * while its parents are mature together, so the group is planted only when
+ * - the pot covers the rest of the layout: this group, the slots planted after it, and the
+ *   parents that die before it matures and need a new seed. Bought one seed at a time, a slow
+ *   parent that takes longer to afford than a planted one lives never fills the layout, and its
+ *   faster partner, held back until it does, is never planted. The pot keeps the later groups'
+ *   money meanwhile;
+ * - the bank above the reserve covers the group;
+ * - every parent already planted will be mature alongside it: alive when it matures, or replaced
+ *   by a seed that matures before it dies. A fast parent planted just before its slow partner
+ *   dies of old age would die before the partner grows again.
+ * Ticks are the plant's own ticks; `grow` and `life` are those of a new seed (life Infinity when
+ * immortal), `lifeLeft` those of the plant in the slot.
+ *
+ * @param {Array<{key: string, planted: boolean, ticksLeft: number, lifeLeft: number, grow: number, life: number, cost: number}>} slots
+ * @param {{budget: number, spare: number}} money  the pot, and the bank above the reserve
+ * @returns {Array} the slots to plant now, all of them or none
+ */
+export function plantGroup(slots, { budget, spare }) {
+    const allowed = plantNow(slots);
+    const group = slots.filter((s) => !s.planted && allowed.has(s.key));
+    if (!group.length) return [];
+    const matures = Math.max(...group.map((s) => s.ticksLeft));
+    const dies = Math.min(...group.map((s) => s.life));
+    let rest = 0;
+    for (const s of slots) {
+        if (!s.planted) rest += s.cost;
+        else if (s.lifeLeft <= matures) {
+            if (s.lifeLeft + s.grow >= dies) return [];
+            rest += s.cost;
+        }
+    }
+    const cost = group.reduce((sum, s) => sum + s.cost, 0);
+    return rest <= budget && cost <= spare ? group : [];
 }

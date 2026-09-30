@@ -84,6 +84,9 @@ export function createGrimoire({ game, settings, loop, buyer = null, log = () =>
             clicksPerSecond: now.clicksPerSecond,
             bank: game.cookies,
             durationMult: now.golden.durationMult,
+            fps: now.golden.fps,
+            gainMult: now.golden.gainMult,
+            stormReach: now.golden.stormReach,
             buildingSpecials: buildingSpecials(),
             buffs: runningBuffs(),
         };
@@ -245,8 +248,7 @@ export function createGrimoire({ game, settings, loop, buyer = null, log = () =>
         try {
             if (buyBack) restore(seq);
         } finally {
-            // The towers are back, so the buyer's ranking still holds; a fresh one now would be
-            // made on the buffs just cast, which the model cannot fully divide out.
+            // The towers are back, so the buyer's ranking still holds and it carries on from it.
             if (buyer) {
                 buyer.release(HOLDER);
                 buyer.keep(HOLDER, 0);

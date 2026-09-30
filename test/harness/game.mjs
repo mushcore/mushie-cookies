@@ -25,9 +25,10 @@ export function skipReason() {
  * Boots the installed game in a headless browser on virtual time, from a freshly reset save.
  * `mods` are built mod files, loaded at the point where Steam loads them.
  * With `autopilot`, the Autopilot is on from the start, as for a player who switched it on earlier.
+ * With `checkpoint` ({save, now} from `takeCheckpoint`), the run resumes from that save.
  * Returns null when the game location is not configured.
  */
-export async function launchGame({ seed = 'mushie', headless = true, mods = [], autopilot = false } = {}) {
+export async function launchGame({ seed = 'mushie', headless = true, mods = [], autopilot = false, checkpoint = null } = {}) {
     const appDir = gameAppDir(root);
     if (!appDir) return null;
     const releaseSlot = await takeSlot();
@@ -81,7 +82,7 @@ export async function launchGame({ seed = 'mushie', headless = true, mods = [], 
         (e) => e.startsWith('pageerror') || e.includes('Mushie Cookies') || e.includes('harness:')
     );
     const bootBlocked = blocked.slice();
-    await page.evaluate((s) => window.__vt.takeover(s), seed);
+    await page.evaluate(([s, at]) => window.__vt.takeover(s, at), [seed, checkpoint ? checkpoint.now : null]);
     // Every run starts from the same state and the same timestamps.
     await page.evaluate(() => window.Game.HardReset(2));
     // Display only: a counted click spends 180 µs drawing particles and a number, which at 50
@@ -89,7 +90,15 @@ export async function launchGame({ seed = 'mushie', headless = true, mods = [], 
     await page.evaluate(() => {
         window.Game.prefs.particles = 0;
         window.Game.prefs.numbers = 0;
+        // The game measures its window every logic frame (main.js:16163), forcing a layout that
+        // was a tenth of a run's wall time. The harness window never changes size, and the
+        // bounds only place shimmers and tooltips on screen, so one measurement serves.
+        const bounds = window.Game.l.getBounds();
+        window.Game.l.getBounds = () => bounds;
     });
+    // A checkpoint is a save taken at a known virtual time: loaded before the first frame, the
+    // mod starts with the settings it held then, and the run continues from that moment.
+    if (checkpoint) await page.evaluate((save) => window.Game.LoadSave(save), checkpoint.save);
 
     const handle = {
         page,
@@ -110,6 +119,8 @@ export async function launchGame({ seed = 'mushie', headless = true, mods = [], 
             }
         },
         advanceSeconds: (seconds) => handle.advance(Math.round(seconds * 30)),
+        /** The machine sleeps for `seconds`: Date.now() and the timers move on, no frame runs. */
+        machineSleep: (seconds) => page.evaluate((ms) => window.__vt.sleep(ms), seconds * 1000),
         /** Advances until Mushie Cookies reports that it has started. */
         async modStarted() {
             for (let tries = 0; tries < 20; tries++) {
@@ -131,6 +142,8 @@ export async function launchGame({ seed = 'mushie', headless = true, mods = [], 
             }
             throw new Error('waitFor timed out');
         },
+        /** A save of the game now, with the virtual time it was taken at, to resume from later. */
+        takeCheckpoint: () => page.evaluate(() => ({ save: window.Game.WriteSave(1), now: Date.now() })),
         async close() {
             await browser.close();
             await server.close();

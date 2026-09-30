@@ -207,6 +207,9 @@ test('the buyer buys nothing between the sale and the buy-back, and buys again a
             Game.Objects['Wizard tower'].minigame.computeMagicM = window.__compute;
         });
         await game.advance(40);
+        // The second cast is a click frenzy, which the buyer stands aside for (src/systems/buyer.js):
+        // 13 s here, with no duration upgrades (main.js:5561).
+        await game.advanceSeconds(15);
         const out = await read(game);
         const fate = out.log.filter((e) => e.kind === 'cast' && e.spell === 'fate');
         assert.equal(fate.length, 2, JSON.stringify(out.report));

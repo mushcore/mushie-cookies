@@ -1,0 +1,615 @@
+{
+ "note": "tools/dev/lumps.mjs, luck-free (golden cookies off), build of commit 96e739c (lump system); games one at a time. Luck-free runs of one fixture are the same on every seed, so golden and frenzy vary the bakery (--earn) and run varies the starting prestige.",
+ "harvest": {
+  "mode": "harvest",
+  "rows": [
+   {
+    "seed": "lumps-a",
+    "variant": "system",
+    "harvests": 85,
+    "fell": 0,
+    "lagSeconds": 0.5941176470588244,
+    "lumps": 86,
+    "harvestsPerDay": 1.0434707736183477
+   },
+   {
+    "seed": "lumps-a",
+    "variant": "inherited",
+    "harvests": 86,
+    "fell": 0,
+    "lagSeconds": 0,
+    "lumps": 90,
+    "harvestsPerDay": 1.0434782608695652
+   },
+   {
+    "seed": "lumps-a",
+    "variant": "none",
+    "harvests": 83,
+    "fell": 83,
+    "lagSeconds": 3600.033333334313,
+    "lumps": 86,
+    "harvestsPerDay": 0.9999996141976684
+   },
+   {
+    "seed": "lumps-b",
+    "variant": "system",
+    "harvests": 85,
+    "fell": 0,
+    "lagSeconds": 0.5941176470588244,
+    "lumps": 88,
+    "harvestsPerDay": 1.0434707736183477
+   },
+   {
+    "seed": "lumps-b",
+    "variant": "inherited",
+    "harvests": 86,
+    "fell": 0,
+    "lagSeconds": 0,
+    "lumps": 87,
+    "harvestsPerDay": 1.0434782608695652
+   },
+   {
+    "seed": "lumps-b",
+    "variant": "none",
+    "harvests": 83,
+    "fell": 83,
+    "lagSeconds": 3600.033333334313,
+    "lumps": 90,
+    "harvestsPerDay": 0.9999996141976684
+   },
+   {
+    "seed": "lumps-c",
+    "variant": "system",
+    "harvests": 85,
+    "fell": 0,
+    "lagSeconds": 0.5941176470588244,
+    "lumps": 86,
+    "harvestsPerDay": 1.0434707736183477
+   },
+   {
+    "seed": "lumps-c",
+    "variant": "inherited",
+    "harvests": 86,
+    "fell": 0,
+    "lagSeconds": 0,
+    "lumps": 90,
+    "harvestsPerDay": 1.0434782608695652
+   },
+   {
+    "seed": "lumps-c",
+    "variant": "none",
+    "harvests": 83,
+    "fell": 83,
+    "lagSeconds": 3600.033333334313,
+    "lumps": 83,
+    "harvestsPerDay": 0.9999996141976684
+   }
+  ],
+  "summary": {
+   "pooledYieldPerHarvest": 1.031496062992126,
+   "system": {
+    "lagSeconds": {
+     "mean": 0.5941176470588244,
+     "min": 0.5941176470588244,
+     "max": 0.5941176470588244,
+     "n": 3
+    },
+    "harvestsPerDay": {
+     "mean": 1.0434707736183477,
+     "min": 1.0434707736183477,
+     "max": 1.0434707736183477,
+     "n": 3
+    },
+    "lumpsPerDay": {
+     "mean": 1.0763359948346736,
+     "min": 1.0763359948346736,
+     "max": 1.0763359948346736,
+     "n": 3
+    },
+    "observedYieldPerHarvest": {
+     "mean": 1.0196078431372548,
+     "min": 1.011764705882353,
+     "max": 1.035294117647059,
+     "n": 3
+    }
+   },
+   "inherited": {
+    "lagSeconds": {
+     "mean": 0,
+     "min": 0,
+     "max": 0,
+     "n": 3
+    },
+    "harvestsPerDay": {
+     "mean": 1.0434782608695652,
+     "min": 1.0434782608695652,
+     "max": 1.0434782608695652,
+     "n": 3
+    },
+    "lumpsPerDay": {
+     "mean": 1.076343717904827,
+     "min": 1.076343717904827,
+     "max": 1.076343717904827,
+     "n": 3
+    },
+    "observedYieldPerHarvest": {
+     "mean": 1.0348837209302326,
+     "min": 1.0116279069767442,
+     "max": 1.0465116279069768,
+     "n": 3
+    }
+   },
+   "none": {
+    "lagSeconds": {
+     "mean": 3600.033333334313,
+     "min": 3600.033333334313,
+     "max": 3600.033333334313,
+     "n": 3
+    },
+    "harvestsPerDay": {
+     "mean": 0.9999996141976683,
+     "min": 0.9999996141976684,
+     "max": 0.9999996141976684,
+     "n": 3
+    },
+    "lumpsPerDay": {
+     "mean": 1.0314956650385398,
+     "min": 1.0314956650385398,
+     "max": 1.0314956650385398,
+     "n": 3
+    },
+    "observedYieldPerHarvest": {
+     "mean": 1.040160642570281,
+     "min": 1,
+     "max": 1.0843373493975903,
+     "n": 3
+    }
+   }
+  }
+ },
+ "golden": [
+  {
+   "mode": "golden",
+   "earn": 10000000000000,
+   "rows": [
+    {
+     "seed": "lumps-a",
+     "variant": "inherited",
+     "payoutSeconds": 5606.409129441621,
+     "payout": 992904103649.3046,
+     "secondsAfterRipe": 0,
+     "earned": 10323804205229.71,
+     "cpsEnd": 400087299.1764554,
+     "cpsStart": 33448566.266666666
+    },
+    {
+     "seed": "lumps-a",
+     "variant": "system",
+     "payoutSeconds": 18222.601629512516,
+     "payout": 2883117453823.4116,
+     "secondsAfterRipe": 3540.5,
+     "earned": 10613348265566.754,
+     "cpsEnd": 415440437.9014223,
+     "cpsStart": 33448566.266666666
+    }
+   ],
+   "pairs": [
+    {
+     "seed": "lumps-a",
+     "payoutRatio": 2.903721963910559,
+     "earnedRatio": 1.0280462564555777,
+     "cpsRatio": 1.0383744716629846,
+     "payoutSecondsGain": 12616.192500070894
+    }
+   ],
+   "summary": {
+    "payoutRatio": {
+     "mean": 2.903721963910559,
+     "min": 2.903721963910559,
+     "max": 2.903721963910559,
+     "n": 1
+    },
+    "earnedRatio": {
+     "mean": 1.0280462564555777,
+     "min": 1.0280462564555777,
+     "max": 1.0280462564555777,
+     "n": 1
+    },
+    "cpsRatio": {
+     "mean": 1.0383744716629846,
+     "min": 1.0383744716629846,
+     "max": 1.0383744716629846,
+     "n": 1
+    },
+    "payoutSecondsGain": {
+     "mean": 12616.192500070894,
+     "min": 12616.192500070894,
+     "max": 12616.192500070894,
+     "n": 1
+    }
+   }
+  },
+  {
+   "mode": "golden",
+   "rows": [
+    {
+     "seed": "lumps-a",
+     "variant": "inherited",
+     "payoutSeconds": 4458.935046707075,
+     "payout": 78769386566758.69,
+     "secondsAfterRipe": 0,
+     "earned": 976192804172618,
+     "cpsEnd": 34476572626.909904,
+     "cpsStart": 3812972371.824762
+    },
+    {
+     "seed": "lumps-a",
+     "variant": "system",
+     "payoutSeconds": 24693.842557457694,
+     "payout": 306289039454926.25,
+     "secondsAfterRipe": 3540.5,
+     "earned": 1041704555288164,
+     "cpsEnd": 34888682191.851906,
+     "cpsStart": 3812972371.824762
+    },
+    {
+     "seed": "lumps-b",
+     "variant": "inherited",
+     "payoutSeconds": 4458.93523683363,
+     "payout": 78769389925442.3,
+     "secondsAfterRipe": 0,
+     "earned": 976192810889986,
+     "cpsEnd": 34476572626.909904,
+     "cpsStart": 3812972371.824762
+    },
+    {
+     "seed": "lumps-b",
+     "variant": "system",
+     "payoutSeconds": 24693.84282824376,
+     "payout": 306289042813609.9,
+     "secondsAfterRipe": 3540.5,
+     "earned": 1041704562005532,
+     "cpsEnd": 34888682191.851906,
+     "cpsStart": 3812972371.824762
+    }
+   ],
+   "pairs": [
+    {
+     "seed": "lumps-a",
+     "payoutRatio": 3.888427380291199,
+     "earnedRatio": 1.067109438663678,
+     "cpsRatio": 1.0119533217353611,
+     "payoutSecondsGain": 20234.907510750618
+    },
+    {
+     "seed": "lumps-b",
+     "payoutRatio": 3.888427257130239,
+     "earnedRatio": 1.067109438201885,
+     "cpsRatio": 1.0119533217353611,
+     "payoutSecondsGain": 20234.90759141013
+    }
+   ],
+   "summary": {
+    "payoutRatio": {
+     "mean": 3.8884273187107192,
+     "min": 3.888427257130239,
+     "max": 3.888427380291199,
+     "n": 2
+    },
+    "earnedRatio": {
+     "mean": 1.0671094384327815,
+     "min": 1.067109438201885,
+     "max": 1.067109438663678,
+     "n": 2
+    },
+    "cpsRatio": {
+     "mean": 1.0119533217353611,
+     "min": 1.0119533217353611,
+     "max": 1.0119533217353611,
+     "n": 2
+    },
+    "payoutSecondsGain": {
+     "mean": 20234.907551080374,
+     "min": 20234.907510750618,
+     "max": 20234.90759141013,
+     "n": 2
+    }
+   },
+   "earn": 10000000000000000
+  },
+  {
+   "mode": "golden",
+   "earn": 10000000000000000000,
+   "rows": [
+    {
+     "seed": "lumps-a",
+     "variant": "inherited",
+     "payoutSeconds": 4868.4478983582185,
+     "payout": 5391248385723208,
+     "secondsAfterRipe": 0,
+     "earned": 72084932848021500,
+     "cpsEnd": 1928370057469.023,
+     "cpsStart": 175675538914.3238
+    },
+    {
+     "seed": "lumps-a",
+     "variant": "system",
+     "payoutSeconds": 30861.87167794451,
+     "payout": 26390124516215130,
+     "secondsAfterRipe": 3540.5,
+     "earned": 85872166345676800,
+     "cpsEnd": 2077248926260.675,
+     "cpsStart": 175675538914.3238
+    }
+   ],
+   "pairs": [
+    {
+     "seed": "lumps-a",
+     "payoutRatio": 4.894993260948601,
+     "earnedRatio": 1.1912637350543598,
+     "cpsRatio": 1.0772045117663023,
+     "payoutSecondsGain": 25993.42377958629
+    }
+   ],
+   "summary": {
+    "payoutRatio": {
+     "mean": 4.894993260948601,
+     "min": 4.894993260948601,
+     "max": 4.894993260948601,
+     "n": 1
+    },
+    "earnedRatio": {
+     "mean": 1.1912637350543598,
+     "min": 1.1912637350543598,
+     "max": 1.1912637350543598,
+     "n": 1
+    },
+    "cpsRatio": {
+     "mean": 1.0772045117663023,
+     "min": 1.0772045117663023,
+     "max": 1.0772045117663023,
+     "n": 1
+    },
+    "payoutSecondsGain": {
+     "mean": 25993.42377958629,
+     "min": 25993.42377958629,
+     "max": 25993.42377958629,
+     "n": 1
+    }
+   }
+  }
+ ],
+ "frenzyFixedHorizon": [
+  {
+   "mode": "frenzy",
+   "earn": 10000000000000,
+   "hours": 4,
+   "rows": [
+    {
+     "seed": "lumps-a",
+     "variant": "none",
+     "earned": 48815547014620.1,
+     "cpsEnd": 2164455454.125069,
+     "cpsStart": 82430724.66346668,
+     "used": 0
+    },
+    {
+     "seed": "lumps-a",
+     "variant": "start",
+     "earned": 122107125425688.03,
+     "cpsEnd": 3319482428.618625,
+     "cpsStart": 82430724.66346668,
+     "used": 1
+    },
+    {
+     "seed": "lumps-a",
+     "variant": "end",
+     "earned": 122061667511750.66,
+     "cpsEnd": 3285331554.2967877,
+     "cpsStart": 82430724.66346668,
+     "used": 1
+    }
+   ],
+   "summary": {
+    "startOverNone": {
+     "mean": 2.5013982817629254,
+     "min": 2.5013982817629254,
+     "max": 2.5013982817629254,
+     "n": 1
+    },
+    "endOverNone": {
+     "mean": 2.500467063806405,
+     "min": 2.500467063806405,
+     "max": 2.500467063806405,
+     "n": 1
+    },
+    "startGainHoursOfEndCps": {
+     "mean": 9.405955545101188,
+     "min": 9.405955545101188,
+     "max": 9.405955545101188,
+     "n": 1
+    },
+    "endGainHoursOfEndCps": {
+     "mean": 9.400121653582714,
+     "min": 9.400121653582714,
+     "max": 9.400121653582714,
+     "n": 1
+    }
+   }
+  },
+  {
+   "mode": "frenzy",
+   "hours": 4,
+   "rows": [
+    {
+     "seed": "lumps-a",
+     "variant": "none",
+     "earned": 3941387526895218,
+     "cpsEnd": 124615751795.86423,
+     "cpsStart": 11855451787.200933,
+     "used": 0
+    },
+    {
+     "seed": "lumps-a",
+     "variant": "start",
+     "earned": 8131159095285520,
+     "cpsEnd": 181377398277.44565,
+     "cpsStart": 11855451787.200933,
+     "used": 1
+    },
+    {
+     "seed": "lumps-a",
+     "variant": "end",
+     "earned": 8122353588319316,
+     "cpsEnd": 181367155581.88904,
+     "cpsStart": 11855451787.200933,
+     "used": 1
+    },
+    {
+     "seed": "lumps-b",
+     "variant": "none",
+     "earned": 3965745348781896,
+     "cpsEnd": 126125964075.35545,
+     "cpsStart": 11855451787.200933,
+     "used": 0
+    },
+    {
+     "seed": "lumps-b",
+     "variant": "start",
+     "earned": 8131159095285520,
+     "cpsEnd": 181377398277.44565,
+     "cpsStart": 11855451787.200933,
+     "used": 1
+    },
+    {
+     "seed": "lumps-b",
+     "variant": "end",
+     "earned": 8152481221031716,
+     "cpsEnd": 181408811515.3533,
+     "cpsStart": 11855451787.200933,
+     "used": 1
+    }
+   ],
+   "summary": {
+    "startOverNone": {
+     "mean": 2.05668385335072,
+     "min": 2.050348264994639,
+     "max": 2.0630194417068006,
+     "n": 2
+    },
+    "endOverNone": {
+     "mean": 2.058255083919752,
+     "min": 2.055724839603179,
+     "max": 2.0607853282363244,
+     "n": 2
+    },
+    "startGainHoursOfEndCps": {
+     "mean": 9.256576039182207,
+     "min": 9.173839680919984,
+     "max": 9.33931239744443,
+     "n": 2
+    },
+    "endGainHoursOfEndCps": {
+     "mean": 9.270241726229877,
+     "min": 9.220799184862711,
+     "max": 9.319684267597044,
+     "n": 2
+    }
+   },
+   "earn": 10000000000000000
+  }
+ ],
+ "runThroughAscension": [
+  {
+   "seed": "lumps-a",
+   "p0": 1000000,
+   "variant": "off",
+   "ascended": true,
+   "runHours": 14.499166666666667,
+   "frenzyHoursIn": null,
+   "frenzyHoursBeforeAscension": null,
+   "prestigeGained": 2054021,
+   "yieldPerSecond": 0.000021267089746810598,
+   "lastVerdict": "still growing faster than the run average"
+  },
+  {
+   "seed": "lumps-a",
+   "p0": 1000000,
+   "variant": "rule",
+   "ascended": true,
+   "runHours": 14.318888888888889,
+   "frenzyHoursIn": 13.145277777777778,
+   "frenzyHoursBeforeAscension": 1.1736111111111112,
+   "prestigeGained": 2312717,
+   "yieldPerSecond": 0.000023101527551074776,
+   "lastVerdict": "still growing faster than the run average"
+  },
+  {
+   "seed": "lumps-a",
+   "p0": 1000000,
+   "variant": "start",
+   "ascended": true,
+   "runHours": 1.2522222222222221,
+   "frenzyHoursIn": 0.0006944444444444445,
+   "frenzyHoursBeforeAscension": 1.2515277777777778,
+   "prestigeGained": 36161,
+   "yieldPerSecond": 0.000007388207626777317,
+   "lastVerdict": "growth has slowed: 7.00e-6/s now against 7.40e-6/s for the run"
+  },
+  {
+   "seed": "lumps-a",
+   "p0": 3000000,
+   "variant": "off",
+   "ascended": true,
+   "runHours": 12.845,
+   "frenzyHoursIn": null,
+   "frenzyHoursBeforeAscension": null,
+   "prestigeGained": 3783790,
+   "yieldPerSecond": 0.0000175309068847627,
+   "lastVerdict": "still growing faster than the run average"
+  },
+  {
+   "seed": "lumps-a",
+   "p0": 3000000,
+   "variant": "rule",
+   "ascended": true,
+   "runHours": 13.352222222222222,
+   "frenzyHoursIn": 12.145,
+   "frenzyHoursBeforeAscension": 1.2072222222222222,
+   "prestigeGained": 4763137,
+   "yieldPerSecond": 0.000019657087576432737,
+   "lastVerdict": "still growing faster than the run average"
+  },
+  {
+   "seed": "lumps-a",
+   "p0": 3000000,
+   "variant": "start",
+   "ascended": true,
+   "runHours": 5.284166666666667,
+   "frenzyHoursIn": 0.0006944444444444445,
+   "frenzyHoursBeforeAscension": 5.283472222222223,
+   "prestigeGained": 949469,
+   "yieldPerSecond": 0.000014230128380369768,
+   "lastVerdict": "still growing faster than the run average"
+  }
+ ],
+ "hold": {
+  "mode": "hold",
+  "rows": [
+   {
+    "variant": "inherited",
+    "lumps": 1,
+    "cpsRatio": 0.5050060732849839,
+    "farm": 9,
+    "cursor": 10
+   },
+   {
+    "variant": "system",
+    "lumps": 100,
+    "cpsRatio": 1,
+    "farm": 1,
+    "cursor": 0
+   }
+  ]
+ }
+}

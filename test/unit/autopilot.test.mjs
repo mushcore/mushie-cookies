@@ -47,15 +47,15 @@ test('every playing option has an Autopilot value; display options have none', (
 test('the Autopilot never runs two systems that act on the same thing', () => {
     // Each pair: the new system, and the inherited one it replaces.
     const pairs = [
-        ['autoGods', ['autoWorshipToggle', 'autoWorship0', 'autoWorship1', 'autoWorship2', 'autoCyclius', 'autoDragonToggle', 'autoDragonAura0', 'autoDragonAura1', 'dragonsCurve']],
+        ['autoGods', ['autoWorshipToggle', 'autoWorship0', 'autoWorship1', 'autoWorship2', 'autoCyclius', 'autoDragonToggle', 'autoDragonAura0', 'autoDragonAura1']],
         // Double Cast FTHOF (autoFTHOFCombo) is part of forecast casting, not a rival to it.
         ['autoFate', ['autoCasting', 'auto100ConsistencyCombo']],
+        ['sugarFrenzy', ['autoSugarFrenzy']],
     ];
     for (const [modern, legacy] of pairs) {
         if (!AUTOPILOT[modern]) continue;
         for (const l of legacy) assert.equal(AUTOPILOT[l], 0, `${modern} is on, so ${l} must be off`);
     }
-    if (AUTOPILOT.autoGods) assert.notEqual(AUTOPILOT.autoSL, 2, 'Auto Rigidel would slot gods behind the pantheon system');
 });
 
 test('applying the Autopilot sets every value and reports only what changed', () => {
