@@ -9,21 +9,34 @@ import {
     auraHorizon,
     RETURN_BLOCK_SECONDS,
     SKIP_GODS,
+    skippedGods,
     pinnedSlots,
     goldenCookiesClicked,
 } from '../../src/core/gods.js';
 
 test('a god the system never slots, put in a slot by the player, keeps it', () => {
     // Keys of the Pantheon's gods table (minigamePantheon.js:12-116).
-    assert.deepEqual([...SKIP_GODS].sort(), ['ages', 'asceticism', 'order', 'ruin']);
+    assert.deepEqual([...SKIP_GODS].sort(), ['ages', 'asceticism', 'order']);
+    assert.deepEqual([...skippedGods({})].sort(), ['ages', 'asceticism', 'order', 'ruin']);
     assert.deepEqual(pinnedSlots(['order', 'asceticism', null], false), [true, true, false]);
-    assert.deepEqual(pinnedSlots(['ruin', 'ages', 'industry'], false), [true, true, false]);
+    assert.deepEqual(pinnedSlots(['ruin', 'ages', 'industry'], false, skippedGods({})), [true, true, false]);
     assert.deepEqual(pinnedSlots(['industry', 'mother', 'labor'], false), [false, false, false]);
     // Except Holobore while golden cookies are clicked: the next click unslots him and takes every
     // swap (main.js:5419-5422).
     assert.deepEqual(pinnedSlots(['order', 'asceticism', null], true), [true, false, false]);
-    assert.deepEqual(pinnedSlots(['asceticism', 'ruin', 'ages'], true), [false, true, true]);
+    assert.deepEqual(pinnedSlots(['asceticism', 'ruin', 'ages'], true, skippedGods({})), [false, true, true]);
     assert.deepEqual(pinnedSlots([null, null, null], true), [false, false, false]);
+});
+
+test('Godzamok is valued, and slotted or moved like any god, while the combo system sells for him', () => {
+    // His worth is Devastation, which the income model counts only while autoGodzamok sells
+    // (src/core/income.js); with it off he is worth nothing it can see, so he is left alone.
+    const selling = skippedGods({ autoGodzamok: 1 });
+    assert.equal(selling.has('ruin'), false);
+    assert.deepEqual([...selling].sort(), ['ages', 'asceticism', 'order']);
+    assert.deepEqual(pinnedSlots(['ruin', null, null], false, selling), [false, false, false]);
+    assert.equal(skippedGods({ autoGodzamok: 0 }).has('ruin'), true);
+    assert.equal(skippedGods({ autoGodzamok: undefined }).has('ruin'), true, 'a setting missing from an old save is off');
 });
 
 test('golden cookies are clicked when an option clicks them and something makes them', () => {
@@ -54,7 +67,8 @@ test('stands aside for every inherited option that slots gods or picks auras, an
         ['autoCyclius', 1, true, false],
         ['autoCyclius', 2, true, false], // Cyclius in all three slots
         ['autoSL', 1, false, false], // the lump system's harvest touches neither
-        ['autoGodzamok', 1, true, false],
+        // The combo system sells buildings for Godzamok but slots no god: it relies on this one.
+        ['autoGodzamok', 1, false, false],
         ['autoDragonToggle', 1, false, true],
         ['autoDragonOrbs', 1, false, true],
         ['auto100ConsistencyCombo', 1, true, true],

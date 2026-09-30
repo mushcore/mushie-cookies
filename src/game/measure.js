@@ -1,6 +1,7 @@
 // Reads the live game into the plain state that src/core/income.js estimates from.
 import { outcomeProbabilities } from '../core/goldenPool.js';
 import { simulateEach } from '../core/sim.js';
+import { devastationState } from './combos.js';
 import { modelClickRate } from '../core/clicker.js';
 import { unbuffedFactors } from '../core/buffs.js';
 import { wrinklerModel } from './wrinklers.js';
@@ -189,7 +190,7 @@ export function reindeerState(game, settings, { season = game.season } = {}) {
 
 /**
  * The income state of the game as it is now.
- * @param {object} settings  the mod's settings: autoClick, cookieClickSpeed
+ * @param {object} settings  the mod's settings: autoClick, cookieClickSpeed, autoWrinkler, autoGodzamok
  */
 export function readState(game, settings) {
     return {
@@ -202,6 +203,7 @@ export function readState(game, settings) {
         wrinklers: wrinklerState(game, settings),
         golden: goldenState(game, settings),
         reindeer: reindeerState(game, settings),
+        devastation: devastationState(game, settings),
     };
 }
 

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { estimateIncome } from '../../src/core/income.js';
+import { saleOptions, comboOverBuff } from '../../src/core/combos.js';
 
 const quiet = {
     cps: 1000, clickPower: 10, clicksPerSecond: 0, bank: 0,
@@ -87,6 +88,36 @@ test('wrinklers give nothing back when nobody pops them, and wither at the real 
     assert.ok(Math.abs(popped.passive - 6000) < 1e-9);
     assert.ok(Math.abs(kept.passive - 500) < 1e-9, String(kept.passive));
     assert.ok(Math.abs(guts.passive - 400) < 1e-9);
+});
+
+// Godzamok in the diamond slot, and 50 of one cheap building to sell and buy back each cycle.
+const godzamok = () => ({
+    perBuilding: 0.01,
+    options: saleOptions([{ id: 2, amount: 50, keep: 1, unitPrice: 10, inc: 1.15, free: 0, sellMult: 0.25 }]),
+    cycleSeconds: 0.5,
+});
+
+test('Godzamok adds what the combo earns over each click buff, net of the buildings bought back', () => {
+    const devastation = godzamok();
+    // A Click frenzy for half of the golden cookies, lasting 26 s with Get lucky.
+    const g = golden({ meanInterval: 1300, durationMult: 2, probabilities: { 'click frenzy': 0.5 } });
+    const without = estimateIncome({ ...quiet, golden: g, clicksPerSecond: 50 });
+    const out = estimateIncome({ ...quiet, golden: g, clicksPerSecond: 50, devastation });
+    // Clicking earns 50 × 10 × 777 a second during the buff; the combo starts with nothing in
+    // hand and sells from what the clicking earns.
+    const combo = comboOverBuff({ ...devastation, clickRate: 500 * 777, seconds: 26 });
+    assert.ok(combo.gain > combo.loss && combo.cycles > 1, JSON.stringify(combo));
+    assert.ok(close(out.devastation, (0.5 / 1300) * (combo.gain - combo.loss)), `${out.devastation}`);
+    assert.ok(close(out.total, without.total + out.devastation));
+    assert.equal(without.devastation, 0);
+});
+
+test('Godzamok adds nothing unslotted, without clicking, or with no click buff to come', () => {
+    const g = golden({ meanInterval: 1300, durationMult: 2, probabilities: { 'click frenzy': 0.5 } });
+    assert.equal(estimateIncome({ ...quiet, golden: g, clicksPerSecond: 50, devastation: { ...godzamok(), perBuilding: 0 } }).devastation, 0);
+    assert.equal(estimateIncome({ ...quiet, golden: g, clicksPerSecond: 0, devastation: godzamok() }).devastation, 0);
+    assert.equal(estimateIncome({ ...quiet, golden: golden({ probabilities: { 'click frenzy': 0.5 } }), clicksPerSecond: 50, devastation: godzamok() }).devastation, 0);
+    assert.equal(estimateIncome({ ...quiet, golden: golden({ meanInterval: 1300, probabilities: { frenzy: 1 } }), clicksPerSecond: 50, devastation: godzamok() }).devastation, 0);
 });
 
 test('golden payouts are sized from real CpS, not the wrinkler-inflated figure', () => {

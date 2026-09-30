@@ -945,24 +945,7 @@ function liveWrinklers() {
     });
 }
 
-function autoGSBuy() {
-    if (hasClickBuff() && !Game.hasBuff("Cursed finger")) {
-        if (
-            Game.Upgrades["Golden switch [off]"].unlocked &&
-            !Game.Upgrades["Golden switch [off]"].bought
-        ) {
-            Game.Upgrades["Golden switch [off]"].buy();
-        }
-    } else if (!hasClickBuff()) {
-        if (
-            Game.Upgrades["Golden switch [on]"].unlocked &&
-            !Game.Upgrades["Golden switch [on]"].bought
-        ) {
-            Game.recalculateGains = 1; // Ensure price is updated since Frenzy ended
-            Game.Upgrades["Golden switch [on]"].buy();
-        }
-    }
-}
+// The Golden switch (autoGS) and Godzamok (autoGodzamok) are played by src/systems/combos.js.
 
 function safeBuy(bldg, count) {
     if (count <= 0) return;
@@ -993,57 +976,6 @@ function safeBuy(bldg, count) {
         var half = Math.floor(toBuy / 2);
         safeBuy(bldg, half);
         safeBuy(bldg, toBuy - half);
-    }
-}
-
-function autoGodzamokAction() {
-    if (!T) return;
-
-    // if Godz is here and autoGodzamok is set
-    if (Game.hasGod("ruin") && FrozenCookies.autoGodzamok) {
-        // Need at least 10 of each to be useful
-        //if (Game.Objects["Mine"].amount < 10 || Game.Objects["Factory"].amount < 10) return;
-        var countMine = Game.Objects["Mine"].amount;
-        var countFactory = Game.Objects["Factory"].amount;
-
-        //Automatically sell all mines and factories
-        if (
-            !Game.hasBuff("Devastation") &&
-            !Game.hasBuff("Cursed finger") &&
-            hasClickBuff()
-        ) {
-            Game.Objects["Mine"].sell(countMine);
-            Game.Objects["Factory"].sell(countFactory);
-            //Rebuy mines
-            if (FrozenCookies.mineLimit) {
-                safeBuy(Game.Objects["Mine"], FrozenCookies.mineMax);
-                FrozenCookies.autobuyCount += 1;
-                logEvent(
-                    "AutoGodzamok",
-                    "Bought " + FrozenCookies.mineMax + " mines"
-                );
-            } else {
-                safeBuy(Game.Objects["Mine"], countMine);
-                FrozenCookies.autobuyCount += 1;
-                logEvent("AutoGodzamok", "Bought " + countMine + " mines");
-            }
-            //Rebuy factories
-            if (FrozenCookies.factoryLimit) {
-                safeBuy(Game.Objects["Factory"], FrozenCookies.factoryMax);
-                FrozenCookies.autobuyCount += 1;
-                logEvent(
-                    "AutoGodzamok",
-                    "Bought " + FrozenCookies.factoryMax + " factories"
-                );
-            } else {
-                safeBuy(Game.Objects["Factory"], countFactory);
-                FrozenCookies.autobuyCount += 1;
-                logEvent(
-                    "AutoGodzamok",
-                    "Bought " + countFactory + " factories"
-                );
-            }
-        }
     }
 }
 
@@ -1231,15 +1163,6 @@ function FCStart() {
         clearInterval(FrozenCookies.cookieBot);
         FrozenCookies.cookieBot = 0;
     }
-    if (FrozenCookies.autoGSBot) {
-        clearInterval(FrozenCookies.autoGSBot);
-        FrozenCookies.autoGSBot = 0;
-    }
-
-    if (FrozenCookies.autoGodzamokBot) {
-        clearInterval(FrozenCookies.autoGodzamokBot);
-        FrozenCookies.autoGodzamokBot = 0;
-    }
     if (FrozenCookies.autoCastingBot) {
         clearInterval(FrozenCookies.autoCastingBot);
         FrozenCookies.autoCastingBot = 0;
@@ -1305,20 +1228,6 @@ function FCStart() {
     }
 
     // Clicking (Autoclick, Autofrenzy): src/systems/clicker.js reads the settings live.
-
-    if (FrozenCookies.autoGS) {
-        FrozenCookies.autoGSBot = setInterval(
-            MushieCookies.guard("legacy:autoGSBuy", autoGSBuy),
-            FrozenCookies.frequency
-        );
-    }
-
-    if (FrozenCookies.autoGodzamok) {
-        FrozenCookies.autoGodzamokBot = setInterval(
-            MushieCookies.guard("legacy:autoGodzamokAction", autoGodzamokAction),
-            FrozenCookies.frequency
-        );
-    }
 
     if (FrozenCookies.autoCasting) {
         FrozenCookies.autoCastingBot = setInterval(

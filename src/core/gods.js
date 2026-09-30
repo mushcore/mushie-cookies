@@ -19,7 +19,6 @@ export function inheritedGodsOn(s) {
     return (
         on(s.autoWorshipToggle) ||
         on(s.autoCyclius) || // 1: ruby and jade, 2: every slot
-        on(s.autoGodzamok) || // sells buildings for Godzamok's buff, which needs him slotted (fc_main.js:1111-1115)
         combo(s)
     );
 }
@@ -34,12 +33,22 @@ export function inheritedAurasOn(s) {
 }
 
 // Gods whose worth the income model cannot see, or that would work against the mod:
-// Holobore unslots itself (and empties the swaps) when a golden cookie is clicked; Godzamok pays
-// only when buildings are sold; Cyclius follows the clock, which would have the mod chase it;
-// Rigidel affects only sugar lump timing. These are the keys of the Pantheon's `gods` table; the
-// gods themselves carry no key (minigamePantheon.js:12, 123).
-export const SKIP_GODS = new Set(['asceticism', 'ruin', 'ages', 'order']);
+// Holobore unslots itself (and empties the swaps) when a golden cookie is clicked; Cyclius
+// follows the clock, which would have the mod chase it; Rigidel affects only sugar lump timing.
+// These are the keys of the Pantheon's `gods` table; the gods themselves carry no key
+// (minigamePantheon.js:12, 123).
+export const SKIP_GODS = new Set(['asceticism', 'ages', 'order']);
 export const HOLOBORE = 'asceticism';
+const GODZAMOK = 'ruin';
+
+/**
+ * The gods never slotted, and left where the player put them. Godzamok pays only when buildings
+ * are sold: while the combo system sells for him the income model counts his Devastation
+ * (src/core/income.js), and he is valued like any god; otherwise he is skipped too.
+ */
+export function skippedGods(s) {
+    return on(s.autoGodzamok) ? SKIP_GODS : new Set([...SKIP_GODS, GODZAMOK]);
+}
 
 /**
  * Golden cookies are clicked as they appear: by golden cookie clicking, which clicks every one
@@ -62,10 +71,11 @@ export function goldenCookiesClicked(s, naturalSpawns) {
  * every swap left (main.js:5419-5422), so he is better taken out first.
  * @param {Array<string | null>} keys  the key of the god in each slot, null for an empty slot
  * @param {boolean} goldenClicked  see goldenCookiesClicked
+ * @param {Set<string>} [skipped]  see skippedGods
  * @returns {boolean[]}  per slot
  */
-export function pinnedSlots(keys, goldenClicked) {
-    return keys.map((key) => key !== null && SKIP_GODS.has(key) && !(key === HOLOBORE && goldenClicked));
+export function pinnedSlots(keys, goldenClicked, skipped = SKIP_GODS) {
+    return keys.map((key) => key !== null && skipped.has(key) && !(key === HOLOBORE && goldenClicked));
 }
 
 /** The shortest horizon an aura switch is judged over, however young the run. */

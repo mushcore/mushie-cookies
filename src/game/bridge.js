@@ -7,6 +7,7 @@ import { createGrimoire } from '../systems/grimoire.js';
 import { createGarden } from '../systems/garden.js';
 import { createMarket } from '../systems/market.js';
 import { createGods } from '../systems/gods.js';
+import { createCombos } from '../systems/combos.js';
 import { createHeavenly } from '../systems/heavenly.js';
 import { createDragon } from '../systems/dragon.js';
 import { createShimmers } from '../systems/shimmers.js';
@@ -76,13 +77,14 @@ export function startSystems({ game, loop, legacy, log, guard }) {
     const collectLumpNow = () => lumps && lumps.collectBeforeAscension();
     const collectLump = guard ? guard('lumpHarvest', collectLumpNow) : collectLumpNow;
     let market = null; // created below; it offers the bank office and brokers to the buyer
+    let combos = null; // created below; holds what the Golden switch needs while it is on for a combo
     const buyer = createBuyer({
         game,
         settings,
         loop,
         log,
         policy: () => policyFrom(game, settings, legacy.blacklistPresets, legacy.prerequisites),
-        extraReserve: () => Math.max(extraReserveFrom(settings, legacy), lumps ? lumps.hold() : 0),
+        extraReserve: () => Math.max(extraReserveFrom(settings, legacy), lumps ? lumps.hold() : 0, combos ? combos.hold() : 0),
         extraCandidates: (policy) => (market ? market.candidates(policy) : []),
     });
     const wrinklers = createWrinklers({ game, settings, loop, log, buyer });
@@ -118,9 +120,12 @@ export function startSystems({ game, loop, legacy, log, guard }) {
     // The dragon trains before the gods pick auras; `dragon` tells them when a level is gained.
     // The dragon's horizon is the run as played, on the ascension's clock.
     const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve(), runSeconds: () => ascension.runSeconds() });
-    const gods = createGods({ game, settings, loop, log, buyer, dragon });
+    // The gods are judged with the Golden switch as it will be once a click buff it is on for is over.
+    const gods = createGods({ game, settings, loop, log, buyer, dragon, passingSwitch: () => (combos ? combos.switchPassing() : false) });
     // Halloween cookies and eggs drop from popped wrinklers: the season system asks the wrinkler
     // system to hunt them, and the wrinkler system weighs each hunt against what it forfeits.
     const seasons = createSeasons({ game, settings, loop, log, buyer, wrinklers });
-    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, shimmers, clicker, wrinklers, heavenly, seasons };
+    // Leaving the Golden switch on for good is judged over the run's expected length, as played.
+    combos = createCombos({ game, settings, loop, log, buyer, runSeconds: () => ascension.runSeconds() });
+    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon, shimmers, clicker, wrinklers, heavenly, seasons, combos };
 }

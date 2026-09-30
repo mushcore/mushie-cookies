@@ -6,6 +6,7 @@
  * duration d is active a fraction p·d/interval of the time, and overlapping buffs multiply,
  * which is what independence gives.
  */
+import { comboOverBuff } from './combos.js';
 
 // Base durations in seconds and multipliers (main.js:13862-13972, 5493-5602).
 const CPS_BUFFS = {
@@ -97,13 +98,44 @@ export function estimateIncome(state) {
     const deer = state.reindeer;
     const reindeer = deer && deer.meanInterval > 0 ? (60 * cps * deer.payoutMult * cpsFactor) / deer.meanInterval : 0;
 
+    const devastation = devastationPerSecond(state, click, cpsFactor);
+
     return {
-        total: passiveTotal + clickTotal + payouts.total + reindeer,
+        total: passiveTotal + clickTotal + payouts.total + reindeer + devastation,
         passive: passiveTotal,
         click: clickTotal,
         golden: payouts.total,
         reindeer,
+        devastation,
         byOutcome: payouts.byOutcome,
         basket: state.basket || 0,
     };
+}
+
+/**
+ * Godzamok: at each click buff the combo sells and buys back buildings for Devastation
+ * (src/core/combos.js). What it nets over one buff, times how often each buff comes. The combo is
+ * valued as if it started with nothing in hand and sold only from what the buff's clicks earn,
+ * so the value does not depend on the bank (the buyer values its reserve by the bank).
+ * state.devastation: { perBuilding, options (saleOptions), cycleSeconds }, from src/game/combos.js.
+ */
+function devastationPerSecond(state, click, cpsFactor) {
+    const dev = state.devastation;
+    const { golden } = state;
+    if (!dev || !(dev.perBuilding > 0) || !(click > 0) || !Number.isFinite(golden.meanInterval) || golden.meanInterval <= 0) return 0;
+    const p = golden.probabilities || {};
+    let total = 0;
+    for (const [name, buff] of Object.entries(CLICK_BUFFS)) {
+        if (!p[name]) continue;
+        const out = comboOverBuff({
+            options: dev.options,
+            perBuilding: dev.perBuilding,
+            clickRate: click * buff.mult * cpsFactor,
+            // The game rounds the buff's length up to whole seconds (main.js:5561, 5565).
+            seconds: Math.ceil(buff.seconds * golden.durationMult),
+            cycleSeconds: dev.cycleSeconds,
+        });
+        total += (p[name] / golden.meanInterval) * (out.gain - out.loss);
+    }
+    return total;
 }

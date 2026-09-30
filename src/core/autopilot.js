@@ -64,10 +64,14 @@ export const AUTOPILOT = Object.freeze({
     autoBank: 1,
     autoBroker: 1,
 
+    // Godzamok and the Golden switch: the combo system (src/systems/combos.js), which plays each
+    // only while the income model says it pays. Measured ahead of the Autopilot without them on
+    // every seed (spec 4.12). Godzamok needs the clicker, which is on above.
+    autoGS: 1,
+    autoGodzamok: 1,
+
     // Combos the new systems do not model yet stay off until measured. Loans are modelled but off:
     // under golden cookies they measured x0.40 to x1.01 over 4 hours (geometric mean x0.76).
-    autoGS: 0,
-    autoGodzamok: 0,
     autoLoan: 0,
 
     // Dragon: trained by what each level's aura repays, petted for drops forecast on a private

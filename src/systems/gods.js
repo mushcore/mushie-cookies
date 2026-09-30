@@ -13,7 +13,7 @@ import {
     lindyHorizon,
     auraHorizon,
     RETURN_BLOCK_SECONDS,
-    SKIP_GODS,
+    skippedGods,
     HOLOBORE,
     pinnedSlots,
     goldenCookiesClicked,
@@ -23,12 +23,19 @@ import { readState } from '../game/measure.js';
 const DECIDE_EVERY = 30 * 60 * 5; // five minutes of frames between decisions
 const TICK_EVERY = 30; // frames between checks for a due decision, and for Holobore
 const GOD_GAIN = 0.01; // a swap must add at least 1% of income
+// Bought, the Golden switch is on (main.js:10677-10678).
+const GOLDEN_SWITCH_ON = 'Golden switch [off]';
 
 // Auras whose effect is not income: selling, discounts, drops, minigames, lumps, orbs. They are
 // never chosen, and one already in place was chosen by the player, so it is never replaced.
 const SKIP_AURAS = new Set(['Earth Shatterer', 'Master of the Armory', 'Fierce Hoarder', 'Mind Over Matter', "Dragon's Curve", 'Supreme Intellect', 'Dragon Orbs']);
 
-export function createGods({ game, settings, loop, buyer = null, log = () => {} }) {
+/**
+ * @param {object} deps
+ * @param {() => boolean} [deps.passingSwitch]  the Golden switch is on only for a click buff: the
+ *   combo system turns it off again once the buff has paid (src/systems/combos.js)
+ */
+export function createGods({ game, settings, loop, buyer = null, passingSwitch = () => false, log = () => {} }) {
     // See chooseAura in src/core/gods.js.
     //  - auraHorizon: an aura switch must repay the building it sacrifices within this many
     //    seconds of the income it adds: a number, or a function of the run's age in seconds.
@@ -52,16 +59,25 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
     //    (main.js:4692-4708), which the model cannot divide out, so under a Frenzy or a loan
     //    (x1.5 for two hours, x1.2 for two days: minigameMarket.js:350-352, 376) Muridal and
     //    Dragon Cursor looked better than they are. The game empties its buffs the same way,
-    //    by replacing the table (main.js:13828).
+    //    by replacing the table (main.js:13828);
+    //  - the Golden switch off, when the combo system has it on only for a click buff: it goes
+    //    off with the buff, or the Frenzy under it. While it is on no golden cookie spawns
+    //    (main.js:5673-5676), so the model counts none of their payouts, nor the Devastation
+    //    Godzamok gets only in their click buffs (src/core/income.js). Measured so, Godzamok looked
+    //    worth nothing and the golden cookie penalties of Jeremy and Mokalsium free: a decision in
+    //    that window took Godzamok out mid-buff, and a later one spent a second swap to put him
+    //    back. The what-if's snapshot restores the upgrade.
     // Measured this way, a decision need not wait for any of them to end.
     function whatIf(apply, revert, measure = income) {
         const golden = game.shimmerTypes.golden;
         const onScreen = golden.n;
         const buffs = game.buffs;
+        const passing = passingSwitch();
         return simulate(game, {
             apply() {
                 golden.n = 0;
                 game.buffs = {};
+                if (passing) game.Upgrades[GOLDEN_SWITCH_ON].bought = 0;
                 apply();
             },
             measure,
@@ -101,16 +117,19 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
     const keyOf = (M, id) => (id === -1 ? null : Object.keys(M.gods)[id]);
     const goldenClicked = () => {
         const golden = game.shimmerTypes.golden;
-        // None spawns on its own while the Golden switch is on (main.js:5673-5676).
-        return goldenCookiesClicked(settings, typeof golden.spawnConditions !== 'function' || !!golden.spawnConditions());
+        // None spawns on its own while the Golden switch is on (main.js:5673-5676); they spawn
+        // again once a switch on only for a click buff goes off, as the what-ifs measure.
+        const spawning = passingSwitch() || typeof golden.spawnConditions !== 'function' || !!golden.spawnConditions();
+        return goldenCookiesClicked(settings, spawning);
     };
 
     function godMoves(M) {
         const now = incomeNow();
-        const pinned = pinnedSlots(M.slot.map((id) => keyOf(M, id)), goldenClicked());
+        const skipped = skippedGods(settings);
+        const pinned = pinnedSlots(M.slot.map((id) => keyOf(M, id)), goldenClicked(), skipped);
         const moves = [];
         for (const key of Object.keys(M.gods)) {
-            if (SKIP_GODS.has(key)) continue;
+            if (skipped.has(key)) continue;
             const god = M.gods[key];
             for (let slot = 0; slot < 3; slot++) {
                 if (god.slot === slot || pinned[slot]) continue;

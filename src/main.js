@@ -45,6 +45,8 @@ export { AUTOPILOT, applyAutopilot, isAutopilotSetting } from './core/autopilot.
 export { planSeason } from './core/seasons.js';
 export { planHeavenly, slotCandidates, fillPermanentSlots, rankPermanentSlots, assignPermanentSlots } from './game/prestige.js';
 export { payoutOf as wrinklerPayout, heldValue as wrinklerHeld } from './game/wrinklers.js';
+export { saleOptions, planSale, comboOverBuff, switchPlan, offPlan } from './core/combos.js';
+export { sellableBuildings, devastationState } from './game/combos.js';
 
 export const version = __MUSHIE_VERSION__;
 
@@ -65,6 +67,7 @@ export let shimmers = null;
 export let clicker = null;
 export let wrinklers = null;
 export let seasons = null;
+export let combos = null;
 
 const MINUTE = 60 * 30; // logic frames: Game.fps is 30 (main.js:1971)
 const RETRY_FRAMES = [1 * MINUTE, 5 * MINUTE, 30 * MINUTE];
@@ -147,6 +150,7 @@ const runtime = {
         clicker = systems.clicker;
         wrinklers = systems.wrinklers;
         seasons = systems.seasons;
+        combos = systems.combos;
     },
     save: () => window.saveFCData(),
     load: (data) => window.setOverrides(data),
