@@ -35,6 +35,66 @@ export function inheritedAurasOn(s) {
     );
 }
 
+// Gods whose worth the income model cannot see, or that would work against the mod:
+// Holobore unslots itself (and empties the swaps) when a golden cookie is clicked; Godzamok pays
+// only when buildings are sold; Cyclius follows the clock, which would have the mod chase it;
+// Rigidel affects only sugar lump timing. These are the keys of the Pantheon's `gods` table; the
+// gods themselves carry no key (minigamePantheon.js:12, 123).
+export const SKIP_GODS = new Set(['asceticism', 'ruin', 'ages', 'order']);
+export const HOLOBORE = 'asceticism';
+
+/**
+ * Golden cookies are clicked as they appear: by golden cookie clicking, which clicks every one
+ * on screen (fc_main.js:1311-1315), natural ones (which spawn only while the Golden switch is
+ * off, main.js:5673-5676) and those Force the Hand of Fate makes, which every inherited casting
+ * mode casts for a free lump (fc_spells.js:313-330); or by forecast casting, which clicks the
+ * one it casts (src/systems/grimoire.js:91-93) and stands aside for those modes and the combos.
+ * @param {object} s  the mod's settings
+ * @param {boolean} naturalSpawns  golden cookies spawn on their own (the Golden switch is off)
+ */
+export function goldenCookiesClicked(s, naturalSpawns) {
+    if (on(s.autoGC) && (naturalSpawns || on(s.autoCasting))) return true;
+    return on(s.autoFate) && !on(s.autoCasting) && !combo(s);
+}
+
+/**
+ * The slots the Pantheon system must leave alone: those holding a god it never slots, which the
+ * player put there. The model gives such a god no worth it can see, so taking it out would look
+ * free. Except Holobore while golden cookies are clicked: the next click unslots him and spends
+ * every swap left (main.js:5419-5422), so he is better taken out first.
+ * @param {Array<string | null>} keys  the key of the god in each slot, null for an empty slot
+ * @param {boolean} goldenClicked  see goldenCookiesClicked
+ * @returns {boolean[]}  per slot
+ */
+export function pinnedSlots(keys, goldenClicked) {
+    return keys.map((key) => key !== null && SKIP_GODS.has(key) && !(key === HOLOBORE && goldenClicked));
+}
+
+/** The shortest horizon an aura switch is judged over, however young the run. */
+export const MIN_AURA_HORIZON = 60 * 60;
+
+/** How long after a switch the aura it left is not taken back, by default. */
+export const RETURN_BLOCK_SECONDS = 60 * 60;
+
+/**
+ * How long a new aura is expected to stay: until the next ascension, which resets the dragon
+ * (main.js:3537-3539). With nothing better to go on, a run that has lasted s seconds is expected
+ * to last about s more (the Lindy estimate), and never less than MIN_AURA_HORIZON.
+ * @param {number} runSeconds  seconds since the run began
+ */
+export function lindyHorizon(runSeconds) {
+    return Math.max(MIN_AURA_HORIZON, runSeconds);
+}
+
+/**
+ * The horizon option's value now.
+ * @param {number | ((runSeconds: number) => number)} option  seconds, or a function of the run's age
+ * @param {number} runSeconds
+ */
+export function auraHorizon(option, runSeconds) {
+    return typeof option === 'function' ? option(runSeconds) : option;
+}
+
 /**
  * The aura switch to make, or null.
  *
@@ -43,30 +103,38 @@ export function inheritedAurasOn(s) {
  *    that keeps two auras within noise of each other from alternating: from either one, the
  *    other has to be better by more than the band;
  *  - the income it adds with the building rebought repays the building's price within
- *    `paybackSeconds`;
- *  - it does not go back to the aura the last switch in that slot left, before that switch has
- *    had its payback time: coming back sooner means the first switch never earned out its
- *    building, whatever the measurements said.
+ *    `horizonSeconds`, how long the new aura is expected to stay (see lindyHorizon). An endless
+ *    horizon takes any switch that adds income once the building is rebought; a zero horizon
+ *    only switches that sacrifice nothing;
+ *  - it does not go back to the aura the last switch in that slot left within
+ *    `returnBlockSeconds` of that switch: coming back sooner means the first switch never
+ *    earned out its building, whatever the measurements said. Zero never blocks; Infinity
+ *    never goes back.
  *
  * @param {object} args
  * @param {number} args.now  income now
  * @param {Array<{slot: number, id: number, name: string, gross: number, net: number, rebuy: number}>} args.moves
  *   gross: income after the switch with every building; net: with the highest building
  *   sacrificed as well; rebuy: that building's price after the switch (0 if none is owned)
- * @param {number} args.paybackSeconds
+ * @param {number} args.horizonSeconds
+ * @param {number} [args.returnBlockSeconds]
  * @param {number} args.t  game time now, in seconds
  * @param {Object<number, {left: number, at: number}>} [args.recent]  per slot: the aura the
  *   last switch left, and when
  * @returns {object | null}  the chosen move, with `gain` (net, as a share of income now)
  */
-export function chooseAura({ now, moves, paybackSeconds, t, recent = {} }) {
+export function chooseAura({ now, moves, horizonSeconds, returnBlockSeconds = RETURN_BLOCK_SECONDS, t, recent = {} }) {
     let best = null;
     for (const move of moves) {
         const gain = (move.net - now) / now;
         if (!(gain > AURA_GAIN)) continue;
-        if (move.rebuy > 0 && !((move.gross - now) * paybackSeconds >= move.rebuy)) continue;
+        if (move.rebuy > 0) {
+            // Compared as a payback time, never as added × horizon: 0 × Infinity is NaN.
+            const added = move.gross - now;
+            if (!(added > 0 && move.rebuy / added <= horizonSeconds)) continue;
+        }
         const last = recent[move.slot];
-        if (last && last.left === move.id && t - last.at < paybackSeconds) continue;
+        if (last && last.left === move.id && t - last.at < returnBlockSeconds) continue;
         if (!best || gain > best.gain) best = { ...move, gain };
     }
     return best;
