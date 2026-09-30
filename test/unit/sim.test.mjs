@@ -217,3 +217,13 @@ test('a throwing trial restores the start and the session still closes', () => {
     assert.deepEqual(diffSnapshots(before, takeSnapshot(game)), []);
     assert.equal(game.Win, win);
 });
+
+test('a what-if that levels Santa leaves the level as it was', () => {
+    // The season system values the next Santa level (Santa's legacy is +3% per level,
+    // main.js:5015) inside a what-if.
+    const game = fakeGame();
+    game.santaLevel = 3;
+    const out = simulateEach(game, [{ apply: () => { game.santaLevel = 4; } }], () => game.santaLevel);
+    assert.deepEqual(out, [4]);
+    assert.equal(game.santaLevel, 3);
+});

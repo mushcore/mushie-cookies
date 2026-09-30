@@ -65,21 +65,7 @@ test('the pre-ascension egg routine picks Earth Shatterer only where a player co
         assert.equal(out.egg, 1, 'the egg is still bought, without the aura');
     }));
 
-test('the Halloween switch never buys a season a player could not', { skip }, () =>
-    withMod(async (game) => {
-        const out = await game.eval(() => {
-            Game.Earn(1e30);
-            // A wrinkler to trigger the inherited switch, and no Season switcher.
-            Game.elderWrath = 1;
-            Game.wrinklers[0].phase = 2;
-            Game.wrinklers[0].close = 1;
-            FrozenCookies.autoHalloween = 1;
-            autoHalloweenAction();
-            return { season: Game.season, ghostly: Game.UpgradesById[183].bought };
-        });
-        assert.equal(out.ghostly, 0);
-        assert.notEqual(out.season, 'halloween');
-    }));
+// The season switches: test/game/seasons.test.mjs ('never switches a season ... without Season switcher').
 
 test('a run the mod joins midway is measured from where it really began', { skip }, () =>
     withMod(async (game) => {

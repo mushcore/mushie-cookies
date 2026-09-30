@@ -7,6 +7,7 @@ const SCALARS = [
     'season',
     'seasonT',
     'seasonUses',
+    'santaLevel',
     'elderWrath',
     'pledges',
     'pledgeT',

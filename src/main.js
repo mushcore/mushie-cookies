@@ -29,6 +29,7 @@ export { tickMarket, restingValue, tradeDecision } from './core/market.js';
 export { gardenOf, plotTiles, chanceFunction, findRecipe } from './game/garden.js';
 export { rankHeavenly, planChips } from './core/heavenly.js';
 export { AUTOPILOT, applyAutopilot, isAutopilotSetting } from './core/autopilot.js';
+export { planSeason } from './core/seasons.js';
 export { heavenlyCandidates, planHeavenly, slotCandidates, fillPermanentSlots, rankPermanentSlots, assignPermanentSlots } from './game/prestige.js';
 
 export const version = __MUSHIE_VERSION__;
@@ -44,6 +45,7 @@ export let grimoire = null;
 export let garden = null;
 export let market = null;
 export let gods = null;
+export let seasons = null;
 
 const guards = createGuard({
     maxFailures: 5,
@@ -92,6 +94,7 @@ const runtime = {
         garden = systems.garden;
         market = systems.market;
         gods = systems.gods;
+        seasons = systems.seasons;
     },
     save: () => window.saveFCData(),
     load: (data) => window.setOverrides(data),

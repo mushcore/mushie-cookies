@@ -10,9 +10,14 @@ const PURCHASES_PER_TICK = 2; // each purchase re-ranks; two keep a tick well in
 const BULK = 10;
 const FAILED_COOLDOWN_FRAMES = 30 * 60; // a purchase the game refused is not tried again for a minute
 
-/** Upgrades whose worth the income model cannot see; bought when they cost under a minute of income. */
+/**
+ * Upgrades whose worth the income model cannot see; bought when they cost under a minute of income.
+ * A festive hat opens Santa (main.js:10260-10265, 14698); Toy workshop cuts upgrade prices, which
+ * the building-price basket cannot see (main.js:9416). Weighted sleighs only slows reindeer down,
+ * worth nothing when they are clicked on sight.
+ */
 const ENABLERS = new Set([
-    'Faberge egg', 'Omelette', '"egg"', 'Weighted sleighs', "Santa's bottomless bag", 'Dragon fang',
+    'Faberge egg', 'Omelette', '"egg"', "Santa's bottomless bag", 'Dragon fang', 'A festive hat', 'Toy workshop',
     'Dragon teddy bear', 'Sacrificial rolling pins', 'Green yeast digestives', 'Fern tea', 'Ichor syrup', 'Fortune #102',
 ]);
 
@@ -42,6 +47,15 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         failed: new Map(), // candidate key -> frame it may be tried again
         frame: 0,
     };
+    // Purchases other systems sell through the buyer (a season switch, a Santa level), so they
+    // are ranked against everything else and paid from above the reserve like any purchase.
+    // name -> () => [{key, name, price, deltaIncome, buy()}]
+    const offers = new Map();
+    const offered = () => {
+        const out = [];
+        for (const source of offers.values()) for (const c of source() || []) out.push({ ...c, kind: 'offer' });
+        return out;
+    };
 
     // A CpS buff inflates click power in a way the model cannot fully divide out (mouse upgrades
     // add a share of the buffed CpS, main.js:4692-4708), so rankings are made between buffs and
@@ -61,11 +75,15 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
 
     function rank(frame) {
         const pol = policy();
-        const candidates = listCandidates(game, pol).filter((c) => !((state.failed.get(c.key) || 0) > frame));
+        const open = (c) => !((state.failed.get(c.key) || 0) > frame);
+        const candidates = listCandidates(game, pol).filter(open);
+        const extra = offered().filter(open);
         const now = readState(game, settings);
         const income = estimateIncome(now);
-        const measured = measureCandidates(game, settings, candidates).map(estimateIncome);
-        const ranked = rankCandidates({ candidates, measured, income, bank: game.cookies });
+        const measured = measureCandidates(game, settings, candidates)
+            .map(estimateIncome)
+            .concat(extra.map((c) => ({ total: income.total + c.deltaIncome, basket: income.basket })));
+        const ranked = rankCandidates({ candidates: candidates.concat(extra), measured, income, bank: game.cookies });
         const best = ranked.find((c) => Number.isFinite(c.payback)) || null;
         // A reserve is valued against an empty bank: what it adds is what spending it would lose.
         const empty = estimateIncome({ ...now, bank: 0 });
@@ -111,6 +129,8 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
                 for (const step of candidate.steps) buyBuilding(step.building, step.missing);
                 if (candidate.upgrade.unlocked && !candidate.upgrade.bought) candidate.upgrade.buy(1);
             }
+        } else if (candidate.kind === 'offer') {
+            candidate.buy();
         }
         const spent = before - game.cookies;
         if (spent > 0) {
@@ -168,6 +188,11 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
 
     return {
         options,
+        /** Lets another system sell through the buyer; `source()` returns its purchases, measured. */
+        offer(name, source) {
+            offers.set(name, source);
+            state.stale = true;
+        },
         /** Forces a fresh ranking on the next tick or the next report. */
         invalidate() {
             state.stale = true;
