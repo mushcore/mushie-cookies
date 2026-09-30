@@ -14,8 +14,12 @@
 // CpS every ten seconds (one news ticker). Fortunes are then drawn on that record as the game
 // draws them (main.js:7565-7582: 2% of tickers, a fortune picked evenly from those left; upgrades
 // and the golden cookie are taken on sight by both policies) and the hour of CpS is paid by each
-// policy: on sight (the inherited autoTicker), or by src/core/shimmers.js fortuneChoice, which
-// takes any payout in the last ten minutes before the run ends (an ascension imminent).
+// policy: on sight (the inherited autoTicker), or by src/core/shimmers.js fortuneChoice. Its
+// "ascension imminent" is read at each ticker from the running mod as src/game/bridge.js asks it
+// (Auto Ascend on, and the ascension settling or its verdict saying ascend); these runs leave Auto
+// Ascend off, as the recorded setup did, so it is never true. Each seed draws its own fortunes; both
+// policies see the same draws. The payouts are compared in cookies: what an early payout would
+// have bought and earned since is not counted.
 import { launchWithMod } from '../../test/harness/game.mjs';
 import { fortuneChoice } from '../../src/core/shimmers.js';
 
@@ -124,7 +128,10 @@ async function record(seed) {
                     const out = [];
                     for (let i = 0; i < n; i++) {
                         window.__vt.advance(fps * 10);
-                        out.push({ bank: Game.cookies, cps: Game.cookiesPs, unbuffed: Game.unbuffedCps });
+                        const verdict = MushieCookies.ascension.verdict();
+                        const imminent =
+                            FrozenCookies.autoAscendToggle == 1 && (MushieCookies.ascension.phase() !== 'playing' || !!(verdict && verdict.ascend));
+                        out.push({ bank: Game.cookies, cps: Game.cookiesPs, unbuffed: Game.unbuffedCps, imminent });
                     }
                     return out;
                 },
@@ -154,7 +161,6 @@ function generator(seed) {
 function payout(samples, pool, policy, random) {
     let left = pool; // fortune upgrades, the golden cookie and the hour, not yet taken
     const end = samples.length;
-    const lastTen = end - 60; // ten minutes of tickers
     for (let i = 0; i < end; i++) {
         if (!(random() < 0.02) || left <= 0) continue;
         if (random() * left >= 1) {
@@ -164,7 +170,7 @@ function payout(samples, pool, policy, random) {
         const s = samples[i];
         const take =
             policy === 'on sight' ||
-            fortuneChoice({ effect: { type: 'fortune', sub: 'fortuneCPS' }, bank: s.bank, cps: s.cps, unbuffedCps: s.unbuffed, ascensionImminent: i >= lastTen }).take;
+            fortuneChoice({ effect: { type: 'fortune', sub: 'fortuneCPS' }, bank: s.bank, cps: s.cps, unbuffedCps: s.unbuffed, ascensionImminent: s.imminent }).take;
         if (take) return { paid: Math.min(s.cps * 3600, s.bank), hourOfCps: s.unbuffed * 3600 };
     }
     return { paid: 0, hourOfCps: 0 };
@@ -173,12 +179,19 @@ function payout(samples, pool, policy, random) {
 async function fortune() {
     const draws = 4000;
     const perSeed = [];
-    for (const seed of seeds) {
+    for (const [index, seed] of seeds.entries()) {
         const { pool, samples } = await record(seed);
         const final = samples[samples.length - 1];
-        const result = { seed, pool, finalHourOfCps: final.unbuffed * 3600 };
+        const result = {
+            seed,
+            pool,
+            finalHourOfCps: final.unbuffed * 3600,
+            // Tickers at which the bank covered an hour of unbuffed CpS, and at which an ascension was imminent.
+            bankCoversShare: +(samples.filter((x) => Math.min(x.cps * 3600, x.bank) >= x.unbuffed * 3600).length / samples.length).toFixed(4),
+            imminentShare: +(samples.filter((x) => x.imminent).length / samples.length).toFixed(4),
+        };
         for (const policy of ['on sight', 'policy']) {
-            const random = generator(12345);
+            const random = generator(12345 + 7919 * index); // this seed's draws, the same for both policies
             let total = 0;
             let none = 0;
             let fullHours = 0;
