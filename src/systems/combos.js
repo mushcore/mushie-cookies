@@ -255,7 +255,9 @@ export function createCombos({ game, settings, loop, buyer = null, runSeconds = 
         const priceOn = turnOn.getPrice();
         const plan = switchPlan({ ...args, priceOn });
         state.plan = plan;
-        if (!(plan.value > 0) || priceOn + plan.priceOff > free()) return;
+        // The way back need not be in hand yet: a plan worth making earns more than it costs
+        // before the moment it is turned off, and the buyer holds it from now (state.hold).
+        if (!(plan.value > 0) || priceOn > free()) return;
         const heldBefore = buyer ? buyer.reserve() : 0;
         if (!buySwitch(turnOn)) return;
         state.mode = 'combo';

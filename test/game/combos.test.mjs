@@ -432,6 +432,36 @@ test('plays the Golden switch through a whole Click frenzy that Godzamok plays: 
     }
 });
 
+// The Click frenzy's own clicks earn the way back within seconds; waiting to have both prices in
+// hand first cost the switch its first seconds, when the whole buff is still ahead.
+test('turns the Golden switch on as the click buff starts when the bank covers turning it on, not yet off', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openBakery(game);
+        await game.eval(clicking, MICE);
+        await game.eval(goldenSwitch);
+        const bank = await game.eval(() => {
+            FrozenCookies.autoGS = 1;
+            // Test fixture: a bank just above the price of turning the switch on.
+            Game.cookies = 1.05 * Game.Upgrades['Golden switch [off]'].getPrice();
+            Game.gainBuff('click frenzy', 26, 777);
+            return Game.cookies;
+        });
+        await game.advanceSeconds(0.3);
+        const early = await game.eval(switchNow);
+        assert.equal(early.on, true, `waited with ${bank} in the bank: ${JSON.stringify(early.report)}`);
+        // The buyer holds the way back, and it is taken once the buff is over.
+        assert.ok(early.report.hold > 0);
+        await game.advanceSeconds(30);
+        const after = await game.eval(switchNow);
+        assert.equal(after.on, false, JSON.stringify(after.report));
+        assert.equal(after.report.switchedOff, 1);
+        assert.deepEqual(game.errors, []);
+    } finally {
+        await game.close();
+    }
+});
+
 test('leaves the Golden switch off when the click buff does not pay for it, and turns it off at once beside a long buff', { skip }, async () => {
     const game = await launchWithMod();
     try {
