@@ -72,6 +72,22 @@ test('a building special multiplies another building\'s buff but only lengthens 
     near(value('building special', { buildingSpecials: two, buffs: [buff('High-five', 11, 60)] }), (alone + alone * 11) / 2);
 });
 
+test('a running building buff keeps its own multiplier, not the one its building would give now', () => {
+    // High-five started at 100 cursors (×11); at 200 a new one would be ×21, but the game only adds
+    // time to the running one (main.js:13765-13771), so the pick is worth ×11 for 30 s.
+    near(
+        value('building special', { buildingSpecials: [{ name: 'High-five', mult: 21 }], buffs: [buff('High-five', 11, 60)] }),
+        value('building special', { buildingSpecials: [{ name: 'High-five', mult: 11 }] })
+    );
+});
+
+test('durations are whole seconds, rounded up as the game rounds them', () => {
+    // At ×1.1 the game grants a frenzy ceil(84.7) = 85 s and a click frenzy ceil(14.3) = 15 s
+    // (main.js:5524, 5561), not 84.7 s and 14.3 s.
+    near(value('frenzy', { durationMult: 1.1 }), (value('frenzy') * 85) / 77);
+    near(value('click frenzy', { durationMult: 1.1 }), (value('click frenzy') * 15) / 13);
+});
+
 test('a building special with no building at 10 or more is a frenzy', () => {
     // The game falls back to a frenzy when no building qualifies (main.js:5501).
     near(value('building special', { buildingSpecials: [] }), value('frenzy'));
@@ -89,6 +105,18 @@ test('a good outcome is not cast onto its own running buff, which it would only 
     assert.equal(decide('building special', { buffs: [buff('Congregation', 11, 60)] }, { mana: 80 }).action, 'cast');
     // So is a buff that outlasts the running one.
     assert.equal(decide('frenzy', { buffs: [buff('Frenzy', 7, 10), buff('Congregation', 11, 200)] }, { mana: 80 }).action, 'cast');
+});
+
+test('a building special is cast onto a buff only if at least half the buildings it may pick land on one', () => {
+    // A pick whose building buff is running would only lengthen it; every other pick stacks on it.
+    const three = [{ name: 'High-five', mult: 11 }, { name: 'Congregation', mult: 11 }, { name: 'Luxuriant harvest', mult: 11 }];
+    const special = (buildingSpecials, buffs) => decide('building special', { buildingSpecials, buffs }, { mana: 80 }).action;
+    // Two of three picks land on the running High-five.
+    assert.equal(special(three, [buff('High-five', 11, 100)]), 'cast');
+    // One of two is half.
+    assert.equal(special([three[0], three[2]], [buff('High-five', 11, 100)]), 'cast');
+    // One of three is not: High-five and Congregation would each only lengthen their own.
+    assert.equal(special(three, [buff('High-five', 11, 100), buff('Congregation', 11, 100)]), 'wait');
 });
 
 test('a good outcome is held for a buff while mana is still filling', () => {

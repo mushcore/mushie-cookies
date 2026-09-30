@@ -138,30 +138,37 @@ test('outcome values match what the game grants', { skip }, () =>
             };
             const valueNow = (outcome) => MushieCookies.outcomeValue(outcome, MushieCookies.grimoire.context());
             const rows = [];
-            // A CpS buff is worth the CpS the game adds, for as long as the game grants it.
-            FrozenCookies.autoClick = 0;
-            for (const force of ['frenzy', 'blood frenzy', 'clot', 'building special']) {
+            // Durations as they are, then with Lasting fortune's ×1.1 (main.js:5461), where the game
+            // rounds each up to whole seconds: a frenzy lasts ceil(84.7) = 85 s (5524).
+            for (const lasting of [false, true]) {
+                if (lasting) Game.Upgrades['Lasting fortune'].earn();
+                const tag = lasting ? ' at ×1.1' : '';
+                // A CpS buff is worth the CpS the game adds, for as long as the game grants it.
+                FrozenCookies.autoClick = 0;
+                for (const force of ['frenzy', 'blood frenzy', 'clot', 'building special']) {
+                    fresh();
+                    const value = valueNow(force);
+                    const cps = Game.cookiesPs;
+                    const had = new Set(Object.keys(Game.buffs));
+                    popForced(force);
+                    Game.CalculateGains();
+                    const granted = Object.values(Game.buffs).find((b) => !had.has(b.name));
+                    rows.push({ force: force + tag, value, game: ((Game.cookiesPs - cps) * granted.time) / Game.fps, seconds: granted.time / Game.fps });
+                }
+                // A click frenzy is worth the click power the game adds, at the clicking speed.
+                FrozenCookies.autoClick = 1;
+                FrozenCookies.cookieClickSpeed = 50;
                 fresh();
-                const value = valueNow(force);
-                const cps = Game.cookiesPs;
-                const had = new Set(Object.keys(Game.buffs));
-                popForced(force);
+                const value = valueNow('click frenzy');
+                const power = Game.computedMouseCps;
+                popForced('click frenzy');
                 Game.CalculateGains();
-                const granted = Object.values(Game.buffs).find((b) => !had.has(b.name));
-                rows.push({ force, value, game: ((Game.cookiesPs - cps) * granted.time) / Game.fps });
+                const seconds = Game.buffs['Click frenzy'].time / Game.fps;
+                rows.push({ force: 'click frenzy' + tag, value, game: 50 * (Game.computedMouseCps - power) * seconds, seconds });
             }
-            // A click frenzy is worth the click power the game adds, at the clicking speed.
-            FrozenCookies.autoClick = 1;
-            FrozenCookies.cookieClickSpeed = 50;
-            fresh();
-            let value = valueNow('click frenzy');
-            const power = Game.computedMouseCps;
-            popForced('click frenzy');
-            Game.CalculateGains();
-            rows.push({ force: 'click frenzy', value, game: (50 * (Game.computedMouseCps - power) * Game.buffs['Click frenzy'].time) / Game.fps });
             // Lucky pays out at once.
             fresh();
-            value = valueNow('multiply cookies');
+            let value = valueNow('multiply cookies');
             let bank = Game.cookies;
             popForced('multiply cookies');
             rows.push({ force: 'multiply cookies', value, game: Game.cookies - bank });
@@ -174,6 +181,10 @@ test('outcome values match what the game grants', { skip }, () =>
             rows.push({ force: 'cookie storm drop', value, game: (Game.cookies - bank) / drops, sampled: true });
             return rows;
         }, popForced.toString());
+        // The ×1.1 pass has to reach durations that are not whole seconds before rounding.
+        const seconds = Object.fromEntries(out.filter((r) => r.seconds).map((r) => [r.force, r.seconds]));
+        assert.equal(seconds['frenzy at ×1.1'], 85);
+        assert.equal(seconds['click frenzy at ×1.1'], 15);
         for (const r of out) {
             // 3000 draws of 1 to 7 put the sampled mean within 2% of the true one (4 sd).
             const tolerance = r.sampled ? 0.02 : 1e-6;
