@@ -72,9 +72,14 @@ async function untilPlanned(game) {
 
 test("seeds are bought only with cookies above the buyer's reserve", { skip }, () =>
     withGarden({}, async (game) => {
+        await game.eval(() => {
+            FrozenCookies.autoGarden = 1;
+        });
+        await game.advanceSeconds(2);
+        await untilPlanned(game);
         const reserve = await game.eval(() => {
             const held = Game.cookiesPs * 3600;
-            Game.cookies = held; // the bank sits exactly at the reserve
+            // Set on the buyer: the garden reads it through the bridge (src/game/bridge.js).
             MushieCookies.buyer.reserve = () => held;
             window.spends = { n: 0, lowest: Infinity };
             const spend = Game.Spend;
@@ -83,12 +88,34 @@ test("seeds are bought only with cookies above the buyer's reserve", { skip }, (
                 window.spends.n++;
                 window.spends.lowest = Math.min(window.spends.lowest, Game.cookies - held);
             };
-            FrozenCookies.autoGarden = 1;
+            // Income fills the pot while the bank is held at the reserve: only the reserve can
+            // stop the garden. Each frame's CpS lands before the next pin, a thirtieth of a
+            // second of it, far less than a seed.
+            window.pinned = true;
+            Game.registerHook('logic', () => {
+                if (!window.pinned) return;
+                Game.cookies = held;
+                Game.cookiesEarned += held;
+            });
             return held;
         });
-        await game.advanceSeconds(1800);
+        await game.advanceSeconds(120);
+        const held = await game.eval(() => {
+            const M = Game.Objects['Farm'].minigame;
+            return { spends: window.spends, report: MushieCookies.garden.report(), seed: M.getCost(M.plants.bakerWheat), plants: plotPlants() };
+        });
+        assert.ok(held.report.budget >= held.seed, `fixture: the pot holds ${held.report.budget}, a seed costs ${held.seed}`);
+        assert.equal(held.spends.n, 0, `planted ${held.plants}, taking the bank ${(-held.spends.lowest / reserve * 100).toFixed(1)}% of the reserve below it`);
+        assert.equal(held.plants, 0);
+
+        // With an hour of CpS above the reserve, seeds are planted, and never below it.
+        await game.eval((reserve) => {
+            window.pinned = false;
+            Game.cookies = 2 * reserve;
+        }, reserve);
+        await game.advanceSeconds(60);
         const out = await game.eval(() => ({ spends: window.spends, report: MushieCookies.garden.report(), failures: failures() }));
-        assert.ok(out.report.planted > 0, 'once income lifts the bank above the reserve, seeds are planted');
+        assert.ok(out.report.planted > 0, 'once the bank is above the reserve, seeds are planted');
         assert.ok(out.spends.lowest >= 0, `a seed took the bank ${(-out.spends.lowest / reserve * 100).toFixed(1)}% of the reserve below it`);
         assert.deepEqual(out.failures, []);
     }));
@@ -109,7 +136,9 @@ test("seeds take no more than the garden's share of income", { skip }, () =>
         const out = await game.eval(() => ({
             seeds: window.seeds,
             earned: Game.cookiesEarned - window.earnedAt,
-            share: (MushieCookies.garden.options || {}).seedShare,
+            // A build from before the budget has no options: the share it is held to is the
+            // budget's, so its spending is measured against that rather than failing to read it.
+            share: MushieCookies.garden.options ? MushieCookies.garden.options.seedShare : 0.1,
             planted: MushieCookies.garden.report().planted,
         }));
         assert.ok(out.planted > 0, 'the garden still plants');
@@ -220,9 +249,16 @@ test('with every seed unlocked the garden is sacrificed once, for ten lumps', { 
 
 test('the garden stands aside while the inherited consistency combo is on', { skip }, () =>
     withGarden({}, async (game) => {
+        // A plan first, and seed money that registers as income after it (the pot holds at most
+        // one planting of the plan, none before there is one): nothing but the stand-aside is
+        // left to stop the planting.
+        await game.eval(() => {
+            FrozenCookies.autoGarden = 1;
+        });
+        await game.advanceSeconds(2);
+        await untilPlanned(game);
         await game.eval(() => {
             FrozenCookies.auto100ConsistencyCombo = 1; // it plants whiskerblooms of its own
-            FrozenCookies.autoGarden = 1;
         });
         await game.advanceSeconds(2);
         await game.eval(() => Game.Earn(1e25));
