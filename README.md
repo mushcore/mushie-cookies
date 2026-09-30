@@ -96,7 +96,7 @@ Cookie Monster and Frozen Cookies are known to interfere with each other, and Mu
 
 ## If something goes wrong
 
-Each part is isolated. A part that fails five times in a row is switched off and the rest keep running.
+Each part is isolated. A part that fails five times in a row is switched off and the rest keep running; a notice in the game says which part and why. It is tried again after 1, 5 and 30 minutes of play and left off if it still fails; a part that then runs for an hour gets its tries back.
 
 In the game's console:
 

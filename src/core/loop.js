@@ -4,6 +4,7 @@
  */
 export function createLoop(guards) {
     const systems = [];
+    let current = 0;
 
     /** `first`: run before every system added so far (the shimmer system, see src/systems/shimmers.js). */
     function add(name, tick, { everyFrames = 1, enabled = () => true, first = false } = {}) {
@@ -20,6 +21,7 @@ export function createLoop(guards) {
     }
 
     function run(frame) {
+        current = frame;
         // A copy: a system added by a tick, at either end, starts on the next run.
         const list = systems.slice();
         for (let i = 0; i < list.length; i++) {
@@ -28,5 +30,8 @@ export function createLoop(guards) {
         }
     }
 
-    return { add, run };
+    /** The frame last run: logic frames, which stop while the machine sleeps. */
+    const frame = () => current;
+
+    return { add, run, frame };
 }
