@@ -38,6 +38,7 @@ export { forecastFate, forecastMany } from './game/fate.js';
 export { outcomeValue, decideCast } from './core/grimoire.js';
 export { optimizeLayout } from './core/garden.js';
 export { tickMarket, restingValue, tradeDecision } from './core/market.js';
+export { levelCost, rebuyCost, trainableChain, chooseTarget, magicCap } from './core/dragon.js';
 export { gardenOf, plotTiles, chanceFunction, findRecipe, findRecipes } from './game/garden.js';
 export { rankHeavenly, planChips } from './core/heavenly.js';
 export { AUTOPILOT, applyAutopilot, isAutopilotSetting } from './core/autopilot.js';
@@ -56,6 +57,7 @@ export let grimoire = null;
 export let garden = null;
 export let market = null;
 export let gods = null;
+export let dragon = null;
 
 const guards = createGuard({
     maxFailures: 5,
@@ -104,6 +106,7 @@ const runtime = {
         garden = systems.garden;
         market = systems.market;
         gods = systems.gods;
+        dragon = systems.dragon;
     },
     save: () => window.saveFCData(),
     load: (data) => window.setOverrides(data),

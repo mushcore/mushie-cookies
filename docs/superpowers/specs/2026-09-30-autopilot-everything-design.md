@@ -27,7 +27,7 @@ Every option starts off. One switch, **Autopilot**, automates every part of the 
 | Golden, wrath and storm cookies, reindeer, news fortunes | shimmers | inherited, shares a guard with wrinkler code; to rebuild (4.2) |
 | Wrinklers | wrinklers | inherited popping with verified defects; to rebuild (4.3) |
 | Seasons, Santa, seasonal drops | seasons | nothing buys seasons or levels Santa; to build (4.4) |
-| Dragon training and petting | dragon | inherited trainer ignores reserve and horizon; petting reseeds the RNG; to rebuild (4.5) |
+| Dragon training and petting | dragon | rebuilt on branch w1/dragon: trains toward the level whose aura repays the chain's sacrifices within the run's expected length, holds Wizard tower levels for mana, pets with a private forecast; measured level with the inherited rule on income (4.5) |
 | Dragon auras, pantheon | gods | done (M8), thrash fixed in review |
 | Heavenly upgrades, permanent slots | ascension | done (M3); planner misses unlock-only upgrades; to fix (4.6) |
 | Ascension timing and the steps before it | ascension | done (M3); pre-ascension routine to rebuild (4.7) |
@@ -71,6 +71,17 @@ Measure: CpS at the end of a run with and without the planner; seasonal upgrades
 Train a level when the aura it leads to (a chain to the next rewarding level) repays the sacrificed buildings' rebuy cost before the expected ascension, within the reserve. Do not train a Wizard tower level while the grimoire holds mana above the cap the sacrifice would leave. Pet the dragon only at level 8 or more, when the current window's drop is not owned, forecasting the drop with a private generator as the fate forecast does (no reseeding of the game's generator).
 
 Measure: CpS over a run against the inherited train-when-affordable rule.
+
+Built (src/core/dragon.js, src/systems/dragon.js). Each target level is judged on the whole chain to it: the income its best aura adds (measured with the game's own calculation, one aura at a time; the Dragon cookie from level 26; the second slot at 27) times the expected time left, against the rebuy cost of every unit the chain sacrifices (the game's getSumPrice sum with modifyBuildingPrice) plus the building an aura switch costs. The expected time left is how long the run has lasted, at least an hour. A gain that needs an aura switch counts only if it clears the gods system's 2% switch threshold. Egg levels spend only above the buyer's reserve. While the mod casts, a Wizard tower level waits until the grimoire's mana is at or under the cap the sacrifice leaves. The chain is recomputed each second and a decision is taken again as soon as it changes. Petting pets once a second from level 8 while the quarter hour's drop is missing; the drop is forecast by the game's shuffle on a private generator. `levelsGained()` and `onLevelGained(fn)` let the gods system re-pick auras on the frame a level is gained (the hook in gods.js is not made yet). The inherited training and petting are deleted; the inherited rule is kept as `MushieCookies.dragon.options.rule = 'eager'` for comparison.
+
+Measured with `tools/dev/dragon.mjs` (golden cookies off, a run started just after an ascension with the heavenly prestige multipliers and the dragon owned, buyer, clicking and gods on; 3 seeds; measured rule divided by the inherited rule, same seed):
+
+| Start (seeds d1, d2, d3) | Cookies baked over the run | Final CpS | Radiant Appetite learned, measured vs inherited |
+|---|---|---|---|
+| prestige 10^6, grimoire and forecast casting on, 3 h (commit 874e7d7) | 0.98x, 1.01x, 1.03x (geometric mean 1.01) | 0.95x, 1.00x, 0.98x; averaged over the 10-minute samples 0.98x, 1.02x, 1.05x | 714 vs 716 s, 644 vs 634 s, 338 vs 628 s |
+| prestige 10^4, 4 h (commit c8158ee, before decisions followed chain changes) | 1.04x, 0.99x, 1.00x (geometric mean 1.01) | 1.02x, 0.96x, 1.00x | reached by neither; the measured rule stayed at level 7, the inherited one went to 16 |
+
+The two rules are level on income: every difference is inside the few percent that the order of purchases moves a luck-free run by (the same rule differs by 5% between seeds at prestige 10^4). The measured rule does not sacrifice for auras worth nothing to income: with golden cookies off, the inherited rule went on to levels 20-22 at prestige 10^6 and to 16 at 10^4 for golden cookie auras. The measured rule trains the chain to Radiant Appetite in one burst when the hundredth Prism arrives; in seed d3 it got there 290 s sooner because nothing had been sacrificed on the way. Casts were the same under both rules (10, 8, 10). Under both, the gods system equipped Radiant Appetite only at its next five-minute look (600-900 s); the level signal is there for it to do so at once. Levels 25-27 were not reached in these runs, so the horizon test on the last levels is covered by the game tests only. A third set (prestige 10^6 without the grimoire) was cut short when the shared machine was too loaded to launch browsers.
 
 ### 4.6 Heavenly planner
 

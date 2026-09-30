@@ -7,6 +7,7 @@ import { createGrimoire } from '../systems/grimoire.js';
 import { createGarden } from '../systems/garden.js';
 import { createMarket } from '../systems/market.js';
 import { createGods } from '../systems/gods.js';
+import { createDragon } from '../systems/dragon.js';
 
 const CHAIN_REACH = 15;
 
@@ -67,6 +68,8 @@ export function startSystems({ game, loop, legacy, log }) {
     const grimoire = createGrimoire({ game, settings, loop, log });
     const garden = createGarden({ game, settings, loop, log, reserve: () => buyer.reserve() });
     const market = createMarket({ game, settings, loop, log, reserve: () => buyer.reserve() });
-    const gods = createGods({ game, settings, loop, log, buyer });
-    return { buyer, ascension, lumps, grimoire, garden, market, gods };
+    // The dragon trains before the gods pick auras; `dragon` tells them when a level is gained.
+    const dragon = createDragon({ game, settings, loop, log, buyer, reserve: () => buyer.reserve() });
+    const gods = createGods({ game, settings, loop, log, buyer, dragon });
+    return { buyer, ascension, lumps, grimoire, garden, market, gods, dragon };
 }

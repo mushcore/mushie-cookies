@@ -1468,16 +1468,6 @@ function FCStart() {
         FrozenCookies.autoLoanBot = 0;
     }
 
-    if (FrozenCookies.autoDragonBot) {
-        clearInterval(FrozenCookies.autoDragonBot);
-        FrozenCookies.autoDragonBot = 0;
-    }
-
-    if (FrozenCookies.petDragonBot) {
-        clearInterval(FrozenCookies.petDragonBot);
-        FrozenCookies.petDragonBot = 0;
-    }
-
     if (FrozenCookies.autoDragonAura0Bot) {
         clearInterval(FrozenCookies.autoDragonAura0Bot);
         FrozenCookies.autoDragonAura0Bot = 0;
@@ -1624,19 +1614,7 @@ function FCStart() {
         );
     }
 
-    if (FrozenCookies.autoDragon) {
-        FrozenCookies.autoDragonBot = setInterval(
-            MushieCookies.guard("legacy:autoDragonAction", autoDragonAction),
-            FrozenCookies.frequency
-        );
-    }
-
-    if (FrozenCookies.petDragon) {
-        FrozenCookies.petDragonBot = setInterval(
-            MushieCookies.guard("legacy:petDragonAction", petDragonAction),
-            FrozenCookies.frequency * 10
-        );
-    }
+    // autoDragon and petDragon are read by src/systems/dragon.js on the mod's loop.
 
     if (FrozenCookies.autoDragonAura0) {
         FrozenCookies.autoDragonAura0Bot = setInterval(
