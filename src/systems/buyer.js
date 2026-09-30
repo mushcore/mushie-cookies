@@ -224,6 +224,22 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
     // No store while ascending: the animation and the heavenly screen come first.
     loop.add('buyer', tick, { everyFrames: 3, enabled: () => !!settings.autoBuy && !game.OnAscend && !game.AscendTimer });
 
+    /**
+     * With Autobuy off nothing ranks on the buyer's own tick, so a reader brings the ranking and
+     * the reserve up to date. The frame does not advance without the tick, so this re-ranks only
+     * when the store changed, not every few seconds for every reader.
+     */
+    let reading = false; // a candidate that asks for the reserve while ranking gets the last one
+    function current() {
+        if (settings.autoBuy || reading) return;
+        reading = true;
+        try {
+            refreshIfStale(state.frame);
+        } finally {
+            reading = false;
+        }
+    }
+
     return {
         options,
         /** Lets another system sell through the buyer; `source()` returns its purchases, measured. */
@@ -236,17 +252,15 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
             state.stale = true;
         },
         ranking() {
+            current();
             return state.ranked;
         },
         income() {
             return state.income;
         },
-        /**
-         * Cookies no other system may spend: the reserve and what others asked to keep. With
-         * Autobuy off nothing ranks on the buyer's own tick, so the reserve is brought up to date here.
-         */
+        /** Cookies no other system may spend: the reserve and what others asked to keep. */
         reserve() {
-            if (!settings.autoBuy) refreshIfStale(state.frame);
+            current();
             return holding();
         },
         /** No purchase and no re-rank for up to `frames` frames, or until release(holder). */
