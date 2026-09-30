@@ -32,7 +32,7 @@ Every option starts off. One switch, **Autopilot**, automates every part of the 
 | Heavenly upgrades, permanent slots | ascension, heavenly | rebuilt in wave one (4.6): unlock-only upgrades bought for what they lead to, parents first; permanent slots by the income lost until the buyer rebuys the upgrade. Luck-free, 8 game hours, one run per start: projected prestige ×1.00, ×2.96 and ×46.2 from starts of 10^3, 10^6 and 10^9, heavenly upgrades owned 15/15, 25→41 and 27→63 |
 | Ascension timing and the steps before it | ascension | done (M3); pre-ascension routine runs only for the mod's own ascension, wrinklers paid before the egg; the rest of 4.7 to rebuild |
 | Sugar lumps: harvest, spend, Sugar frenzy | lumps | done (wave one): harvest, golden-lump timing and Sugar frenzy moved into the lump system, inherited harvest and Rigidel/Dragon's Curve steps removed, every target holds for Sugar baking once it is owned. Luck-free harness: 1.043 harvests a game day, as the inherited click (1.000 left to fall); a golden lump paid 2.9× to 4.9× the ripe harvest over three bakery stages, cookies over 3.5 h ×1.03 to ×1.19; Sugar frenzy timed to the rate rule gave ×1.09 and ×1.12 log-prestige per second of run (×1.13 and ×1.26 prestige per run, from starting prestiges of 1 and 3 million; it fired 1.2 h before the rule's ascension), while one switched on at the start of the run inflated the run average and the rule ascended after 1.3 h and 5.3 h (×0.35 and ×0.81); on a save with Sugar baking and 100 lumps the inherited order spent 99 (CpS ×0.51), the hold none |
-| Grimoire | grimoire | done (M5); double-cast and holding the forced cookie to add (4.9) |
+| Grimoire | grimoire | done (M5). Double cast built on branch w2/doublecast (4.9), Autopilot on. From a late bakery, against casting one at a time, same seed: without natural golden cookies 3.1× to 16.8× the cookies over 8 game hours (4 seeds, geometric mean 6.1); with them, paired, 1.00× to 1.22× over 4 hours (4 seeds), with no double cast at all, since a natural boost would give the second outcome a buff anyway; the 1.22× is the cookies kept for the buy-back changing purchases. Holding the forced cookie still to add (4.9) |
 | Garden | garden | done (M6), reserve fixed in review; harvest-combo mode to add (4.10) |
 | Stock market trading | market | done (M7) |
 | Bank office, brokers, loans | market | not automated; to build (4.11) |
@@ -128,6 +128,37 @@ Measure: lumps per day and CpS against the current lump system.
 Double-cast Force the Hand of Fate by selling Wizard towers to lower the mana cap, when the forecast pair is worth more than the towers' rebuy cost. Hold the forced golden cookie up to its lifetime to land it on a buff.
 
 Measure: cookies per cast across seeds, reported with the spread.
+
+**Double cast: built on branch `w2/doublecast`.** Setting: Double Cast FTHOF (`autoFTHOFCombo`), default off, Autopilot on. It turns on forecast casting with double casts. The inherited combo (`autoFTHOFComboBot`) no longer runs.
+
+- When forecast casting is about to cast, it also forecasts the cast after that. The forecast uses the fail chance that cast will have: its own cookie is popped first, and a double cast starts only with no golden cookie on screen. It also uses the buildings the sale will leave.
+- It sells the fewest Wizard towers that make the second cast affordable. Max magic and spell cost come from the game's formulas (minigameGrimoire.js:263-267, 339-345) for any tower count, level and Supreme Intellect. Current magic is cut to the new max. At level 1 this needs 307 towers or more.
+- It double-casts when the pair adds more than the towers' round trip (a sale refunds a quarter) and the delay the spent mana puts on every later cast.
+  - The pair adds the second outcome's worth on the first one's buff, less what it would be worth cast later on its own.
+  - "Later on its own" means the way forecast casting casts it. The outcome is held for the first CpS boost it would be cast on, until the bar is full. Boosts come from natural golden cookies, when they are clicked (autoGC). Their spawn interval and outcome odds come from the income model (src/game/measure.js).
+  - The average cast behind the mana penalty is valued the same way.
+  - Outcome values use the shared buff classifier (src/core/buffs.js), the measured click rate, and the golden cookie gain multiplier and storm-drop reach. They count what a CpS buff multiplies besides buildings: clicks under a running click frenzy, and a running storm's drops.
+- The sequence runs cast, pop, hold the buyer, sell. When the game recomputes max magic (every fifth frame), it forecasts again, casts, pops, buys the towers back in the same frame, and releases the buyer. The towers are bought back whenever the second cast is dropped.
+- While the pair is forecast and mana fills, the buyer keeps the cookies the buy-back would lose, on top of its reserve. It does this only for a pair still worth doubling on the buffs that will be running once mana is full. From the sale to the buy-back it keeps the whole buy-back price, so no other spender can take the refund.
+- The buyer has two new claims for this. `hold` stops purchases and re-ranks, and lapses after 30 frames. `keep` sets cookies aside on top of the reserve, and every spender respects it through `reserve()`.
+
+Measured with `tools/dev/doublecast.mjs`. The fixture is a late bakery: prestige 1e15, 450 Wizard towers at level 1 to start, and the golden cookie upgrades. Buying, clicking, golden cookie clicking and forecast casting are all on. Each seed is run with Double Cast on and with it off, and the table gives on divided by off.
+
+| Runs | Commit | Double cast on ÷ off (cookies earned) | Double casts |
+|---|---|---|---|
+| No natural golden cookies, 8 game hours, seeds dcn1 to dcn4 | b64912e; 3e8546e gives the same dcn4 run to the cookie | 3.96×, 6.77×, 3.11×, 16.8× (geometric mean 6.1) | 3, 1, 1, 4 |
+| Natural golden cookies, paired, 4 game hours, seeds dcg1 to dcg4 | 3e8546e | 1.22×, 1.00×, 1.00×, 1.00× | none |
+| The same, before natural boosts were counted, seeds dcg1 to dcg3 | b64912e | 1.21×, 0.46×, 0.68× | 0, 1, 1 |
+
+Without natural golden cookies, the Hand of Fate outcomes follow the spell count. Both variants of a seed therefore see the same outcomes, and the comparison is luck-free.
+
+With natural golden cookies, the runs are paired: natural cookies and storm drops draw from generators of their own, seeded by the seed. Without that pairing, the variants' golden cookies part at the first purchase they make differently, because each purchase draws Math.random for its sound. Unpaired runs gave 0.16× to 1.00× even in seeds with no double cast.
+
+At this stage of a run, golden cookies come often enough that the held second outcome usually finds a natural Frenzy or building special anyway. So the final build made no double cast in 16 golden hours. Before natural boosts were counted, doubling a click frenzy onto the spell's frenzy lost the bigger natural buff that outcome would have found on its own, and lost the towers' round trip as well.
+
+Seed dcg1 parted from single casting in hour 1 with no double cast. The cookies kept for a pair while mana filled changed what the buyer bought, and its 1.22× comes from that.
+
+Not measured: early-run bakeries with fewer golden cookie upgrades, where natural boosts are rarer and double casts should fire with golden cookies on.
 
 ### 4.10 Garden harvest mode
 
