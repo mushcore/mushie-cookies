@@ -31,7 +31,6 @@ function lateBakery(heavenlyOwned) {
     Game.CalculateGains();
 }
 
-const plannedNames = (plan) => plan.buy.map((b) => b.name);
 const before = (names, a, b) => names.indexOf(a) >= 0 && names.indexOf(b) > names.indexOf(a);
 
 test('M2: upgrades that only lead somewhere are bought for what they lead to, parents first', { skip }, () =>
@@ -39,6 +38,7 @@ test('M2: upgrades that only lead somewhere are bought for what they lead to, pa
         const out = await game.eval(() => {
             lateBakery(['Legacy', 'Heavenly cookies', 'Wrinkly cookies', 'Sacrilegious corruption', 'Elder spice', 'Unholy bait', 'Starter kit', 'Starter kitchen']);
             Game.lumps = 100; // test fixture: a jar held for Sugar baking
+            FrozenCookies.autoSeasons = 1; // the season planner collects what Season switcher opens
             Game.CalculateGains();
             const snapshot = MushieCookies.takeSnapshot(Game);
             const plan = MushieCookies.planHeavenly(Game, FrozenCookies, 1e10, 1e10, { runSeconds: 86400 });
@@ -69,12 +69,40 @@ test('M2: Golden switch and Residual luck are bought on the way to Pet the drago
         const out = await game.eval(() => {
             lateBakery(['Legacy', 'Heavenly cookies', 'How to bake your dragon', 'Heavenly luck', 'Lasting fortune', 'Decisive fate', 'Divine discount', 'Divine sales', 'Divine bakeries']);
             Game.dragonLevel = 10; // test fixture: a dragon trained past the level petting needs
+            FrozenCookies.petDragon = 1;
+            FrozenCookies.autoFortune = 1;
             Game.CalculateGains();
             const plan = MushieCookies.planHeavenly(Game, FrozenCookies, 1e12, 1e12, { runSeconds: 86400 });
             return plan.buy.map((b) => b.name);
         });
         for (const [a, b] of [['Golden switch', 'Residual luck'], ['Residual luck', 'Pet the dragon'], ['Residual luck', 'Distilled essence of redoubled luck'], ['Distilled essence of redoubled luck', 'Fortune cookies']]) {
             assert.ok(before(out, a, b), `${a} before ${b}: ${out.join(', ')}`);
+        }
+    }));
+
+test('an unlock is worth nothing while the system that would use what it opens is off', { skip }, () =>
+    withMod(async (game) => {
+        const plan = (on) =>
+            game.eval((on) => {
+                // Seasons are switched by the season planner, the dragon's drops come from petting,
+                // fortunes from clicking the news ticker, and Sugar frenzy from the lump system.
+                for (const name of ['autoSeasons', 'petDragon', 'autoFortune', 'sugarFrenzy']) FrozenCookies[name] = on ? 1 : 0;
+                return MushieCookies.planHeavenly(Game, FrozenCookies, 1e13, 1e13, { runSeconds: 86400 }).buy.map((b) => ({ name: b.name, for: b.for }));
+            }, on);
+        await game.eval(() => {
+            lateBakery(['Legacy', 'Heavenly cookies', 'How to bake your dragon', 'Wrinkly cookies', 'Stevia Caelestis', 'Sugar baking']);
+            Game.dragonLevel = 10;
+            Game.lumps = 100;
+            Game.CalculateGains();
+        });
+        const off = await plan(false);
+        const on = await plan(true);
+        const bought = (list, name) => list.some((b) => b.name === name && b.for === name);
+        for (const name of ['Season switcher', 'Starsnow', 'Keepsakes', 'Pet the dragon', 'Fortune cookies', 'Sugar craving']) {
+            assert.ok(!bought(off, name), `${name} bought for itself with its user off: ${off.map((b) => b.name).join(', ')}`);
+        }
+        for (const name of ['Season switcher', 'Pet the dragon', 'Fortune cookies', 'Sugar craving']) {
+            assert.ok(on.some((b) => b.name === name), `${name} not bought with its user on: ${on.map((b) => b.name).join(', ')}`);
         }
     }));
 

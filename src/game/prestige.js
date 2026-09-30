@@ -21,6 +21,19 @@ const DRAGON_DROPS = ['Dragon scale', 'Dragon claw', 'Dragon fang', 'Dragon tedd
 /** Pet the dragon drops these only at dragon level 8 or more (main.js:14957). */
 const DRAGON_DROP_LEVEL = 8;
 
+/**
+ * An unlock is worth what it opens only while the system that uses it is on: the season planner
+ * switches seasons to collect their drops (spec 4.4), petting takes the dragon's drops (4.5),
+ * fortunes are clicked from the news ticker, and the lump system takes Sugar frenzy (4.8).
+ */
+const USED_WHEN = {
+    'Season switcher': (settings) => settings.autoSeasons == 1,
+    'Pet the dragon': (settings) => settings.petDragon == 1,
+    'Fortune cookies': (settings) => settings.autoFortune == 1,
+    'Sugar craving': (settings) => settings.sugarFrenzy == 1,
+};
+const used = (name, settings) => !USED_WHEN[name] || USED_WHEN[name](settings);
+
 /** Every heavenly upgrade as a node of the tree the planner walks, shown or not at `prestige`. */
 function readTree(game, prestige) {
     const saved = game.prestige;
@@ -59,14 +72,15 @@ function seasonDropLists(game) {
  * - Pet the dragon: the dragon's drops, once the dragon reaches level 8 (main.js:14944-14970);
  * - Fortune cookies: the fortune upgrades the news ticker offers (main.js:7565-7581);
  * - Season switcher: the seasonal drops a run can then collect (main.js:10330, 12415).
- * Measured once, on the living bakery, before any what-if.
+ * Each only while the system that uses it is on (USED_WHEN). Measured once, on the living bakery,
+ * before any what-if.
  */
-function opensByUpgrade(game) {
+function opensByUpgrade(game, settings) {
     const cookies = game.cookiesEarned;
     const affordable = (u) => u && !u.bought && u.getPrice() <= OPEN_PRICE_SHARE * cookies;
     const out = new Map();
     const add = (name, upgrade) => {
-        if (!affordable(upgrade)) return;
+        if (!used(name, settings) || !affordable(upgrade)) return;
         if (!out.has(name)) out.set(name, new Set());
         out.get(name).add(upgrade);
     };
@@ -143,8 +157,10 @@ export function planHeavenly(game, settings, chips, prestigeAfter = game.prestig
     const horizonSeconds = options.runSeconds > 0 ? options.runSeconds : Math.max(0, (Date.now() - game.startDate) / 1000);
     const slotValues = (options.slotRanking || rankPermanentSlots(game, settings, options)).map((c) => c.value);
     const ownedSlots = SLOT_UPGRADES.filter((name) => game.Upgrades[name] && game.Upgrades[name].bought).length;
-    const opens = opensByUpgrade(game);
-    const dropShares = measureSeasonDrops(game, settings);
+    const opens = opensByUpgrade(game, settings);
+    // The season boosts and Keepsakes speed up drops only the season planner collects.
+    const dropShares = used('Season switcher', settings) ? measureSeasonDrops(game, settings) : {};
+    const frenzySeconds = used('Sugar craving', settings) ? horizonSeconds : 0;
     const buildings = buildingShares(game);
     const lumpsOn = game.canLumps();
     const tree = readTree(game, prestigeAfter);
@@ -178,7 +194,7 @@ export function planHeavenly(game, settings, chips, prestigeAfter = game.prestig
         return bundles.map((b, i) => {
             const after = measured[i + 1];
             let share = before.total > 0 ? (after.total - before.total) / before.total : 0;
-            share += fixedShare(b.members.map((m) => m.name), { dropShares, horizonSeconds });
+            share += fixedShare(b.members.map((m) => m.name), { dropShares, horizonSeconds: frenzySeconds });
             // Each slot in the bundle holds the next upgrade down the slot ranking.
             let slot = ownedSlots + plannedSlots;
             for (const m of b.members) if (SLOT_UPGRADES.includes(m.name)) share += slotValues[slot++] || 0;
