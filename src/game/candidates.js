@@ -60,7 +60,7 @@ function upgradeCandidate(game, upgrade) {
  * A locked upgrade that buying a few more buildings would unlock, as one purchase: the buildings
  * and the upgrade together. `needs` maps building ids to the count that unlocks it.
  */
-function chainCandidate(game, upgrade, needs) {
+function chainCandidate(game, upgrade, needs, reach = Infinity) {
     const steps = [];
     for (const [id, count] of needs) {
         const building = game.ObjectsById[id];
@@ -69,6 +69,8 @@ function chainCandidate(game, upgrade, needs) {
     }
     if (!steps.length) return null;
     const total = steps.reduce((sum, s) => sum + s.missing, 0);
+    // Out of reach: skip before pricing, which loops once per missing building (main.js:7797).
+    if (total > reach) return null;
     const price = steps.reduce((sum, s) => sum + s.building.getSumPrice(s.missing), 0) + upgrade.getPrice();
     return {
         key: `chain:${upgrade.id}`,
@@ -146,8 +148,8 @@ export function listCandidates(game, policy) {
                 if (!STORE_POOLS.has(upgrade.pool) || NEVER_BUY.has(upgrade.id) || policy.excludedUpgrades.has(upgrade.id)) continue;
                 // Fortunes come from the news ticker, whatever the building counts say.
                 if (upgrade.tier === 'fortune') continue;
-                const chain = chainCandidate(game, upgrade, needs);
-                if (!chain || chain.missing > policy.chainReach) continue;
+                const chain = chainCandidate(game, upgrade, needs, policy.chainReach);
+                if (!chain) continue;
                 if (chain.steps.some((s) => limits[s.building.id] !== undefined && s.building.amount + s.missing > limits[s.building.id])) continue;
                 out.push(chain);
             }

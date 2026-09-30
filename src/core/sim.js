@@ -57,14 +57,21 @@ export function takeSnapshot(game) {
 }
 
 export function restoreSnapshot(game, snap) {
-    GROUPS.forEach((group, g) => {
+    // A trial changes a handful of the ~2,000 fields; writing only those that differ is several
+    // times faster than writing them all, and restores the same state.
+    for (let g = 0; g < GROUPS.length; g++) {
+        const fields = GROUPS[g].fields;
         const { list, values } = snap.groups[g];
         const { items } = list;
-        const width = group.fields.length;
+        const width = fields.length;
         for (let i = 0; i < items.length; i++) {
-            for (let f = 0; f < width; f++) items[i][group.fields[f]] = values[i * width + f];
+            const item = items[i];
+            for (let f = 0; f < width; f++) {
+                const value = values[i * width + f];
+                if (item[fields[f]] !== value) item[fields[f]] = value;
+            }
         }
-    });
+    }
     for (const key of SCALARS) game[key] = snap[key];
 }
 
