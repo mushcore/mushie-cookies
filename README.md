@@ -21,6 +21,8 @@ Each part is also a separate switch in the **Mushie Cookies** menu, and each is 
 | Garden | Breeds every seed by asking the game which neighbours produce which plant, then sacrifices the garden for 10 sugar lumps and starts again. | Auto Garden |
 | Stock market | Trades with buy and sell prices derived by simulating the game's exact price model (the port matches the game bit for bit); spends only what the buyer is not holding. | Auto Trading |
 | Pantheon and dragon | Slots gods and picks auras by what they add to income, the way a player drags a god or confirms an aura. | Auto Gods & Auras |
+| Dragon training | Trains the dragon toward the level whose aura (Radiant Appetite, the second slot) repays the buildings the levels on the way sacrifice, within the time the run is expected to last. Spends only what the buyer is not holding, and holds a Wizard tower level until the grimoire has spent the mana it would lose. | Dragon Upgrading |
+| Dragon petting | Pets the dragon from level 8 while the quarter hour's drop is missing, forecasting the drop without touching the game's random numbers. | Dragon Petting |
 
 ## What it will and will not do
 
@@ -42,6 +44,7 @@ From the harness, against the inherited Frozen Cookies logic or against doing no
 | Stock market | 1.95× the profit of the published "buy at 50%, sell at 125% of resting value" rule on a price history the search never saw (bank levels 1 and 5, 5% broker overhead; 1.92× over every bank level and overhead). Simulated profit per share of storage, not profit measured in the game |
 | Buying | On par with the inherited logic for pure purchase order (0.96× to 1.03×, luck removed); the gains are correctness and a four times faster simulation |
 | Garden | 8 of 34 seeds in the first six game hours from a fresh seed log, 27 by 48 hours; one seed, with a bank so large that seed prices never held it back |
+| Dragon training | Level with the inherited "train whatever is affordable" rule on income: 0.98x to 1.03x the cookies over three game hours (three seeds, golden cookies off, grimoire casting on) and 0.99x to 1.04x over four hours at a lower prestige, both inside the harness's run-to-run spread. Radiant Appetite came within 10 s of the inherited rule's in two seeds and 290 s sooner in the third. It skips the sacrifices for auras worth nothing to income and never clamps the grimoire's mana |
 
 A single run is dominated by golden cookie luck, so strategies are compared with golden cookies switched off (which makes runs deterministic) or across several seeds.
 
