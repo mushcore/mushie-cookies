@@ -6,19 +6,24 @@
 // aura), and only when it is clearly worth what it costs: a swap, or a building sacrificed.
 import { simulate } from '../core/sim.js';
 import { estimateIncome } from '../core/income.js';
-import { chooseAura, inheritedGodsOn, inheritedAurasOn, lindyHorizon, auraHorizon, RETURN_BLOCK_SECONDS } from '../core/gods.js';
+import {
+    chooseAura,
+    inheritedGodsOn,
+    inheritedAurasOn,
+    lindyHorizon,
+    auraHorizon,
+    RETURN_BLOCK_SECONDS,
+    SKIP_GODS,
+    HOLOBORE,
+    pinnedSlots,
+    goldenCookiesClicked,
+} from '../core/gods.js';
 import { readState } from '../game/measure.js';
 
 const DECIDE_EVERY = 30 * 60 * 5; // five minutes of frames between decisions
-const TICK_EVERY = 30; // frames between checks for a due decision
+const TICK_EVERY = 30; // frames between checks for a due decision, and for Holobore
 const GOD_GAIN = 0.01; // a swap must add at least 1% of income
 
-// Gods whose worth the income model cannot see, or that would work against the mod:
-// Holobore unslots itself (and empties the swaps) when a golden cookie is clicked; Godzamok pays
-// only when buildings are sold; Cyclius follows the clock, which would have the mod chase it;
-// Rigidel affects only sugar lump timing. These are the keys of the Pantheon's `gods` table; the
-// gods themselves carry no key (minigamePantheon.js:12, 123).
-const SKIP_GODS = new Set(['asceticism', 'ruin', 'ages', 'order']);
 // Auras whose effect is not income: selling, discounts, drops, minigames, lumps, orbs. They are
 // never chosen, and one already in place was chosen by the player, so it is never replaced.
 const SKIP_AURAS = new Set(['Earth Shatterer', 'Master of the Armory', 'Fierce Hoarder', 'Mind Over Matter', "Dragon's Curve", 'Supreme Intellect', 'Dragon Orbs']);
@@ -32,7 +37,7 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
     const options = { auraHorizon: lindyHorizon, returnBlockSeconds: RETURN_BLOCK_SECONDS };
     const runSeconds = () => Math.max(0, (Date.now() - game.startDate) / 1000);
     const invalidate = () => buyer && buyer.invalidate();
-    const state = { swaps: 0, auraChanges: 0, last: null, dueAt: DECIDE_EVERY, recent: {} };
+    const state = { swaps: 0, unslotted: 0, auraChanges: 0, last: null, dueAt: DECIDE_EVERY, recent: {} };
     const income = () => estimateIncome(readState(game, settings)).total;
 
     // Every what-if measures the bakery as it is between golden cookies and buffs, so that a
@@ -93,19 +98,46 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
         M.slotHovered = -1;
     }
 
+    const keyOf = (M, id) => (id === -1 ? null : Object.keys(M.gods)[id]);
+    const goldenClicked = () => {
+        const golden = game.shimmerTypes.golden;
+        // None spawns on its own while the Golden switch is on (main.js:5673-5676).
+        return goldenCookiesClicked(settings, typeof golden.spawnConditions !== 'function' || !!golden.spawnConditions());
+    };
+
     function godMoves(M) {
         const now = incomeNow();
+        const pinned = pinnedSlots(M.slot.map((id) => keyOf(M, id)), goldenClicked());
         const moves = [];
         for (const key of Object.keys(M.gods)) {
             if (SKIP_GODS.has(key)) continue;
             const god = M.gods[key];
             for (let slot = 0; slot < 3; slot++) {
-                if (god.slot === slot) continue;
+                if (god.slot === slot || pinned[slot]) continue;
                 const after = measureGodMove(M, god, slot);
                 moves.push({ god, key, slot, gain: (after - now) / now });
             }
         }
         return moves;
+    }
+
+    // A Holobore the player slotted while golden cookies are clicked is taken out at once, back
+    // to the roster, which is free (minigamePantheon.js:271-277): the next click would unslot him
+    // anyway and spend every swap left (main.js:5419-5422), and it restarts the swap timer even
+    // with none left (minigamePantheon.js:194-199).
+    function releaseHolobore() {
+        const M = game.Objects['Temple'].minigame;
+        if (!M || !M.gods) return;
+        const god = M.gods[HOLOBORE];
+        if (god.slot === -1 || !goldenClicked()) return;
+        const slot = god.slot;
+        dragGod(M, god, -1);
+        if (god.slot === -1 && M.slot[slot] === -1) {
+            state.unslotted++;
+            invalidate();
+            state.last = `took ${god.name} out of the ${['diamond', 'ruby', 'jade'][slot]} slot before a golden cookie click spends every swap`;
+            log(`gods: ${state.last}`);
+        }
     }
 
     function pantheon() {
@@ -203,11 +235,14 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
     loop.add(
         'gods',
         (frame) => {
-            if (game.OnAscend || frame < state.dueAt) return;
-            state.dueAt = frame + DECIDE_EVERY;
+            if (game.OnAscend) return;
             // Inherited options that slot gods or pick auras on their own, or run combos around
             // them, would fight this system; while one is on, it stands aside.
-            if (!inheritedGodsOn(settings)) pantheon();
+            const ownsPantheon = !inheritedGodsOn(settings);
+            if (ownsPantheon) releaseHolobore();
+            if (frame < state.dueAt) return;
+            state.dueAt = frame + DECIDE_EVERY;
+            if (ownsPantheon) pantheon();
             if (!inheritedAurasOn(settings)) auras(frame);
         },
         { everyFrames: TICK_EVERY, enabled: () => settings.autoGods == 1 }
@@ -222,7 +257,7 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
             return { gods, auras: measureAuras().moves };
         },
         report() {
-            return { swaps: state.swaps, auraChanges: state.auraChanges, last: state.last };
+            return { swaps: state.swaps, unslotted: state.unslotted, auraChanges: state.auraChanges, last: state.last };
         },
     };
 }

@@ -35,6 +35,41 @@ export function inheritedAurasOn(s) {
     );
 }
 
+// Gods whose worth the income model cannot see, or that would work against the mod:
+// Holobore unslots itself (and empties the swaps) when a golden cookie is clicked; Godzamok pays
+// only when buildings are sold; Cyclius follows the clock, which would have the mod chase it;
+// Rigidel affects only sugar lump timing. These are the keys of the Pantheon's `gods` table; the
+// gods themselves carry no key (minigamePantheon.js:12, 123).
+export const SKIP_GODS = new Set(['asceticism', 'ruin', 'ages', 'order']);
+export const HOLOBORE = 'asceticism';
+
+/**
+ * Golden cookies are clicked as they appear: by golden cookie clicking, which clicks every one
+ * on screen (fc_main.js:1311-1315), natural ones (which spawn only while the Golden switch is
+ * off, main.js:5673-5676) and those Force the Hand of Fate makes, which every inherited casting
+ * mode casts for a free lump (fc_spells.js:313-330); or by forecast casting, which clicks the
+ * one it casts (src/systems/grimoire.js:91-93) and stands aside for those modes and the combos.
+ * @param {object} s  the mod's settings
+ * @param {boolean} naturalSpawns  golden cookies spawn on their own (the Golden switch is off)
+ */
+export function goldenCookiesClicked(s, naturalSpawns) {
+    if (on(s.autoGC) && (naturalSpawns || on(s.autoCasting))) return true;
+    return on(s.autoFate) && !on(s.autoCasting) && !combo(s);
+}
+
+/**
+ * The slots the Pantheon system must leave alone: those holding a god it never slots, which the
+ * player put there. The model gives such a god no worth it can see, so taking it out would look
+ * free. Except Holobore while golden cookies are clicked: the next click unslots him and spends
+ * every swap left (main.js:5419-5422), so he is better taken out first.
+ * @param {Array<string | null>} keys  the key of the god in each slot, null for an empty slot
+ * @param {boolean} goldenClicked  see goldenCookiesClicked
+ * @returns {boolean[]}  per slot
+ */
+export function pinnedSlots(keys, goldenClicked) {
+    return keys.map((key) => key !== null && SKIP_GODS.has(key) && !(key === HOLOBORE && goldenClicked));
+}
+
 /** The shortest horizon an aura switch is judged over, however young the run. */
 export const MIN_AURA_HORIZON = 60 * 60;
 

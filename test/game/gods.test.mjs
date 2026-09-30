@@ -292,6 +292,111 @@ test('a CpS debuff does not hold decisions back', { skip }, async () => {
     }
 });
 
+/** Runs in the page: drags gods into slots the way a player does, each drop spending a swap. */
+function playerSlots(pairs) {
+    const M = Game.Objects['Temple'].minigame;
+    for (const [key, slot] of pairs) {
+        M.dragGod(M.gods[key]);
+        M.slotHovered = slot;
+        M.dropGod();
+        M.slotHovered = -1;
+    }
+}
+
+test('gods the system never slots keep the slots the player put them in', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        // Rigidel and Holobore are worth nothing and 15% to the income model: removing Rigidel
+        // looked free. Nothing clicks golden cookies, so Holobore stays put too.
+        await game.eval(playerSlots, [
+            ['order', 0],
+            ['asceticism', 1],
+        ]);
+        const before = await game.eval(() => {
+            FrozenCookies.autoGC = 0;
+            FrozenCookies.autoFate = 0;
+            FrozenCookies.autoWorshipToggle = 0;
+            FrozenCookies.autoGods = 1;
+            const M = Game.Objects['Temple'].minigame;
+            return { swaps: M.swaps, keys: M.slot.map((id) => (id === -1 ? null : Object.keys(M.gods)[id])) };
+        });
+        assert.deepEqual(before.keys, ['order', 'asceticism', null]);
+        await game.advanceSeconds(11 * 60);
+        const after = await game.eval(godsNow);
+        assert.deepEqual(after.keys.slice(0, 2), ['order', 'asceticism'], `slots now ${after.keys.join(', ')}: ${after.report.last}`);
+        // The system still works around them: the swap left goes to the free slot.
+        assert.equal(after.report.swaps, 1, JSON.stringify(after.report));
+        assert.ok(after.keys[2] !== null, `slots now ${after.keys.join(', ')}`);
+        assert.equal(before.swaps - after.swaps, after.report.swaps, 'each slotting spent one swap');
+    } finally {
+        await game.close();
+    }
+});
+
+test('while golden cookies are clicked, Holobore is taken out before a click takes every swap with him', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        await game.eval(playerSlots, [
+            ['order', 0],
+            ['asceticism', 1],
+        ]);
+        const before = await game.eval(() => {
+            FrozenCookies.autoGC = 1;
+            FrozenCookies.autoWorshipToggle = 0;
+            FrozenCookies.autoGods = 1;
+            return Game.Objects['Temple'].minigame.swaps;
+        });
+        assert.equal(before, 1, 'the player spent two of the three swaps');
+        await game.advanceSeconds(2);
+        // A golden cookie, clicked as it appears (fc_main.js:1311-1315). With Holobore slotted it
+        // would unslot him and take the swap left.
+        await game.eval(() => {
+            window.__cookie = new Game.shimmer('golden');
+            window.__cookie.life = Game.fps * 60; // it cannot fade before it is clicked
+        });
+        await game.advanceSeconds(2);
+        const out = await game.eval(godsNow);
+        const gone = await game.eval(() => !Game.shimmers.includes(window.__cookie));
+        assert.equal(gone, true, 'the golden cookie was clicked');
+        assert.equal(out.swaps, 1, `the click cost the swap left: ${JSON.stringify(out.report)}`);
+        assert.deepEqual(out.keys, ['order', null, null], `slots now ${out.keys.join(', ')}`);
+        assert.equal(out.report.unslotted, 1, 'the system took Holobore out; taking a god out of a slot is free (minigamePantheon.js:271-277)');
+
+        // The swap left goes to the best god for a free slot; Rigidel keeps his.
+        await game.advanceSeconds(5 * 60);
+        const after = await game.eval(godsNow);
+        assert.equal(after.keys[0], 'order', `slots now ${after.keys.join(', ')}`);
+        assert.ok(!after.keys.includes('asceticism'));
+        assert.equal(after.report.swaps, 1, JSON.stringify(after.report));
+        assert.equal(after.swaps, 0);
+    } finally {
+        await game.close();
+    }
+});
+
+test('with the Golden switch on, a slotted Holobore stays even with golden cookie clicking on', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        await game.eval(playerSlots, [['asceticism', 1]]);
+        await game.eval(() => {
+            // No golden cookie spawns while the switch is on (main.js:5673-5676).
+            Game.Upgrades['Golden switch [off]'].earn();
+            FrozenCookies.autoGC = 1;
+            FrozenCookies.autoWorshipToggle = 0;
+            FrozenCookies.autoGods = 1;
+        });
+        await game.advanceSeconds(6 * 60);
+        const after = await game.eval(godsNow);
+        assert.equal(after.keys[1], 'asceticism', `slots now ${after.keys.join(', ')}: ${after.report.last}`);
+        assert.equal(after.report.unslotted, 0);
+    } finally {
+        await game.close();
+    }
+});
+
 test('picks the dragon aura that adds the most income and pays the game\'s price for it', { skip }, async () => {
     const game = await launchWithMod();
     try {
