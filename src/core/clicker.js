@@ -2,6 +2,7 @@
  * The clicker's decisions. Pure: when to call the game's click handler next, whether a click
  * buff is running, and how many clicks a second the income model should count on.
  */
+import { classifyBuffs } from './buffs.js';
 
 /**
  * The game counts a click only when the last counted one is at least 20 ms old by Date.now(),
@@ -39,10 +40,7 @@ export function delayAfterCall({ accepted, now, lastClick, gap, frameMs }) {
  * finger, which pays every click the CpS it stopped (main.js:4746, 5556).
  */
 export function clickBuffRunning(buffs) {
-    for (const buff of Object.values(buffs)) {
-        if (buff.multClick > 1 || buff.name === 'Cursed finger') return true;
-    }
-    return false;
+    return classifyBuffs(buffs).some((c) => c.clickMult > 1 || c.fixedClick !== null);
 }
 
 /**

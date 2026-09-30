@@ -1,7 +1,7 @@
 // The buyer: ranks everything for sale by the income it adds, keeps a reserve for golden
 // cookies when that pays, and buys. Runs on the loop; reads settings live.
 import { estimateIncome } from '../core/income.js';
-import { rankCandidates, chooseReserve, decide, withoutBought } from '../core/buyer.js';
+import { rankCandidates, chooseReserve, decide } from '../core/buyer.js';
 import { clickBuffRunning } from '../core/clicker.js';
 import { readState, measureCandidates } from '../game/measure.js';
 import { listCandidates } from '../game/candidates.js';
@@ -10,10 +10,6 @@ const RERANK_FRAMES = 150; // five seconds
 const PURCHASES_PER_TICK = 2; // each purchase re-ranks; two keep a tick well inside a frame
 const BULK = 10;
 const FAILED_COOLDOWN_FRAMES = 30 * 60; // a purchase the game refused is not tried again for a minute
-// A golden cookie's CpS buff lasts minutes at most (Frenzy: 77 s times the duration upgrades);
-// Sugar frenzy lasts an hour and a loan hours (main.js:11043, minigameMarket.js:376), too long
-// to buy on from an old ranking.
-const SHORT_BUFF_SECONDS = 10 * 60;
 
 /** Upgrades whose worth the income model cannot see; bought when they cost under a minute of income. */
 const ENABLERS = new Set([
@@ -51,12 +47,11 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         frame: 0,
     };
 
-    // A CpS buff inflates click power in a way the model cannot fully divide out (mouse upgrades
-    // add a share of the buffed CpS, main.js:4692-4708), so rankings are made between buffs and
-    // the last one is kept while a buff runs.
-    const cpsBuffRunning = () => Object.values(game.buffs).some((b) => b.multCpS && b.multCpS !== 1);
-    const shortCpsBuffRunning = () =>
-        Object.values(game.buffs).some((b) => b.multCpS && b.multCpS !== 1 && b.time <= SHORT_BUFF_SECONDS * game.fps);
+    // CpS buffs need no care: readState reads every income unbuffed (src/game/measure.js), so a
+    // ranking made during a Frenzy is the one made without it, and the buyer ranks and buys
+    // through CpS buffs as between them. Buying on down the ranking it had through a short CpS
+    // buff instead, without ranking after each purchase, earned 0.81x and 0.65x the cookies over
+    // two game hours (luck-free, a forced 77 s Frenzy every 10 minutes or 154 s every 5).
     // While a click buff runs each click is worth hundreds of ordinary ones, and a ranking pass
     // (hundreds of what-ifs inside Game.Logic) holds the page's one thread while the clicker's
     // timer waits: in the game's runtime, during a Click frenzy with a rich bank, the clicker got
@@ -106,7 +101,6 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
         const due = state.stale || !state.income || frame - state.rankedAt >= RERANK_FRAMES || state.stamp !== stampOf();
         if (!due) return;
         if (state.income && clickBuff()) return; // even a stale ranking waits for the clicks
-        if (state.income && cpsBuffRunning() && !state.stale) return;
         rank(frame);
     }
 
@@ -179,10 +173,7 @@ export function createBuyer({ game, settings, policy, loop, extraReserve = () =>
             state.last = { choice, reserve: state.reserve };
             if (!choice) break;
             if (!buy(choice)) break;
-            // During a short CpS buff the ranking is left out of date (refreshIfStale redoes it
-            // once the buff ends) and buying goes on down it, less what this purchase changed.
-            if (shortCpsBuffRunning()) state.ranked = withoutBought(state.ranked, choice);
-            else rank(frame);
+            rank(frame);
         }
         enablers();
     }

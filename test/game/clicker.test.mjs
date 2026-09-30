@@ -154,44 +154,29 @@ test('during a click frenzy the buyer neither buys nor re-ranks; it catches up w
         assert.ok(e.purchases - d.purchases > 0, 'with click priority off, it buys during the frenzy');
     }));
 
-test('during a CpS buff the buyer keeps buying from the last ranking and re-ranks after it', { skip }, () =>
-    withGame(async (game) => {
-        await game.eval(() => {
-            Game.Earn(1e9);
-            FrozenCookies.autoBuy = 1;
-            FCStart();
-        });
-        await game.advanceSeconds(20);
-        await game.eval(() => {
-            Game.Earn(1e12);
-            Game.gainBuff('frenzy', 30, 7);
-        });
-        await game.advance(3); // the frenzy began between rankings
-        const a = await game.eval(() => MushieCookies.buyer.activity());
-        await game.advanceSeconds(25);
-        const b = await game.eval(() => MushieCookies.buyer.activity());
-        assert.ok(b.purchases - a.purchases > 0, 'still buying during the frenzy');
-        assert.equal(b.ranks - a.ranks, 0, 'without re-ranking after each purchase');
-        await game.advanceSeconds(10);
-        const c = await game.eval(() => MushieCookies.buyer.activity());
-        assert.ok(c.ranks - b.ranks > 0, 're-ranked once the frenzy ended');
-    }));
-
-test('a long CpS buff (an hour of Sugar frenzy) is not waited out: the buyer re-ranks after purchases as usual', { skip }, () =>
-    withGame(async (game) => {
-        await game.eval(() => {
-            Game.Earn(1e9);
-            FrozenCookies.autoBuy = 1;
-            FCStart();
-        });
-        await game.advanceSeconds(20);
-        await game.eval(() => {
-            Game.Earn(1e12);
-            Game.gainBuff('sugar frenzy', 3600, 3); // what a sugar lump buys (main.js:11043)
-        });
-        const a = await game.eval(() => MushieCookies.buyer.activity());
-        await game.advanceSeconds(25);
-        const b = await game.eval(() => MushieCookies.buyer.activity());
-        assert.ok(b.purchases - a.purchases > 0, 'buying');
-        assert.ok(b.ranks - a.ranks > 0, 'and re-ranking after purchases');
-    }));
+// readState reads every income unbuffed, so a ranking made during a CpS buff is right, and the
+// buyer ranks after each purchase through it as between buffs (test/game/measure.test.mjs).
+for (const [label, buff] of [
+    ['a Frenzy', ['frenzy', 30, 7]],
+    ['an hour of Sugar frenzy', ['sugar frenzy', 3600, 3]], // what a sugar lump buys (main.js:11043)
+]) {
+    test(`during ${label} the buyer buys and re-ranks after each purchase as usual`, { skip }, () =>
+        withGame(async (game) => {
+            await game.eval(() => {
+                Game.Earn(1e9);
+                FrozenCookies.autoBuy = 1;
+                FCStart();
+            });
+            await game.advanceSeconds(20);
+            await game.eval((b) => {
+                Game.Earn(1e12);
+                Game.gainBuff(...b);
+            }, buff);
+            await game.advance(3); // the buff began between rankings
+            const a = await game.eval(() => MushieCookies.buyer.activity());
+            await game.advanceSeconds(25);
+            const b = await game.eval(() => MushieCookies.buyer.activity());
+            assert.ok(b.purchases - a.purchases > 0, 'buying during the buff');
+            assert.ok(b.ranks - a.ranks >= b.purchases - a.purchases, `${b.ranks - a.ranks} rankings for ${b.purchases - a.purchases} purchases`);
+        }));
+}
