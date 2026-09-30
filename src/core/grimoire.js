@@ -2,8 +2,9 @@
  * When to cast Force the Hand of Fate. Pure.
  *
  * The next outcome is known (src/game/fate.js). What remains is timing: an outcome is worth more
- * when it lands on a buff that is already running, and mana spent now is mana not regenerating.
- * Values are in cookies; figures come from main.js:5493-5602 and 13862-13972.
+ * when it lands on a buff that is already running, less under a debuff it can wait out, and mana
+ * spent now is mana not regenerating. Values are in cookies; figures come from main.js:5493-5602
+ * and 13862-13972.
  *
  * A buff is filed by name, and granting one that is already running only adds the new time to
  * it: the running buff keeps its multiplier (Game.gainBuff, main.js:13765-13771; every golden
@@ -119,6 +120,31 @@ export function outcomeValue(outcome, ctx) {
     }
 }
 
+/** The buffs still running `t` seconds from now, with the time they will have left then. */
+const runningAfter = (buffs, t) => buffs.filter((b) => b.secondsLeft > t).map((b) => ({ ...b, secondsLeft: b.secondsLeft - t }));
+
+/**
+ * The most an outcome would be worth held until a running debuff (a CpS multiplier below 1) ends,
+ * as { value, seconds, name } of that debuff, or null with none running. A debuff only delays
+ * what an outcome is worth: a Cursed finger stops CpS (main.js:5159, 13932) and pays clicks its
+ * own power (4744), so a storm drop cast under it pays nothing (5599) and a Lucky 13 cookies
+ * (5536), yet either is worth its full amount once the finger ends.
+ */
+function afterDebuffs(outcome, ctx) {
+    const buffs = ctx.buffs || [];
+    let best = null;
+    for (const debuff of buffs.filter((b) => cpsMultOf(b) < 1)) {
+        const value = outcomeValue(outcome, { ...ctx, buffs: runningAfter(buffs, debuff.secondsLeft) });
+        if (!best || value > best.value) best = { value, seconds: debuff.secondsLeft, name: debuff.name };
+    }
+    return best;
+}
+
+// Mana regenerates max(0.002, √(magic / max(max magic, 100))) × 0.002 a frame, 30 frames a
+// second, and stops at the maximum (minigameGrimoire.js:486-488): what each second of waiting
+// with mana full throws away.
+const fullManaRegen = (maxMana) => Math.max(0.002, Math.sqrt(maxMana / Math.max(maxMana, 100))) * 0.002 * 30;
+
 /** How long an outcome's effect lasts, for deciding whether a running buff covers it. */
 const EFFECT_SECONDS = { frenzy: 77, 'building special': 30, 'click frenzy': 13, 'blood frenzy': 6 };
 
@@ -152,9 +178,19 @@ export function decideCast({ next, mana, maxMana, fateCost, skipCost, ctx }) {
     if (value === Infinity) return mana >= fateCost ? out('cast', 'a free sugar lump') : out('wait', 'mana for a sugar lump');
     if (mana < fateCost) return out('wait', 'not enough mana');
 
+    // A debuff never makes an outcome one to burn: only one worthless whenever it is cast is.
+    const later = afterDebuffs(next.outcome, ctx);
+    const holding = later && `holding ${next.outcome} until ${later.name} ends`;
     if (value <= 0) {
+        if (later && later.value > 0) return out('wait', holding);
         return mana >= skipCost ? out('skip', `the next cast would be ${next.outcome}`) : out('wait', 'mana to skip');
     }
+    const full = mana >= maxMana - 1;
+    // Waiting costs nothing while mana is filling. Once it is full, each second waited is
+    // regeneration lost, counted as that share of a cast worth what this one would be: a Cursed
+    // finger or a clot is waited out, a loan's hours of interest are not.
+    const waitCost = full && later ? (later.value * fullManaRegen(maxMana) * later.seconds) / fateCost : 0;
+    if (later && later.value - value > waitCost) return out('wait', holding);
 
     const buffs = ctx.buffs || [];
     const specials = ctx.buildingSpecials || [];
@@ -166,6 +202,6 @@ export function decideCast({ next, mana, maxMana, fateCost, skipCost, ctx }) {
     if (landed.length && landed.length * 2 >= picks.length) {
         return out('cast', `${next.outcome} on a running ×${landed[0].mult.toFixed(1)} buff`);
     }
-    if (mana >= maxMana - 1) return out('cast', `${next.outcome}, mana is full`);
+    if (full) return out('cast', `${next.outcome}, mana is full`);
     return out('wait', `holding ${next.outcome} for a buff`);
 }

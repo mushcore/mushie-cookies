@@ -234,6 +234,42 @@ test('a forecast frenzy is held, not cast onto a Frenzy it would only lengthen',
         assert.equal(report.decision.action, 'wait');
     }));
 
+test('a forecast storm drop is held through a Cursed finger, not burnt, and cast when the finger ends', { skip }, () =>
+    withGrimoire(async (game) => {
+        const setup = await game.eval((pop) => {
+            const M = Game.Objects['Wizard tower'].minigame;
+            Game.shimmerTypes.golden.spawnConditions = () => false;
+            // Burn casts until the next one is a storm drop, which a Cursed finger (CpS 0,
+            // main.js:13932) makes worth nothing now and a full four minutes of CpS once it ends.
+            for (let i = 0; i < 200 && MushieCookies.forecastFate(Game, M, 0).outcome !== 'cookie storm drop'; i++) {
+                M.magic = M.magicM;
+                M.castSpell(M.spells["haggler's charm"]);
+            }
+            Game.killBuffs();
+            new Function(`return (${pop})`)()('cursed finger');
+            // Full, so nothing but the finger stands between the drop and a cast.
+            M.magic = M.magicM;
+            Object.assign(FrozenCookies, { autoFate: 1, autoCasting: 0, autoFTHOFCombo: 0, auto100ConsistencyCombo: 0, autoClick: 0 });
+            return { next: MushieCookies.forecastFate(Game, M, 0).outcome, finger: Game.buffs['Cursed finger'].time / Game.fps };
+        }, popForced.toString());
+        assert.equal(setup.next, 'cookie storm drop');
+        const read = () => game.eval(() => ({ report: MushieCookies.grimoire.report(), finger: !!Game.buffs['Cursed finger'] }));
+        // Half the finger: ten ticks, each with the drop worth nothing if cast now.
+        await game.advanceSeconds(setup.finger / 2);
+        const during = await read();
+        assert.ok(during.finger, 'the finger should still be running');
+        assert.equal(during.report.skips, 0, 'a storm drop was burnt because the finger made it worth nothing now');
+        assert.equal(during.report.casts, 0, `cast under the finger: ${during.report.last && during.report.last.reason}`);
+        assert.equal(during.report.decision.action, 'wait');
+        await game.advanceSeconds(setup.finger / 2 + 2);
+        const after = await read();
+        assert.ok(!after.finger, 'the finger should have ended');
+        assert.equal(after.report.skips, 0);
+        assert.equal(after.report.casts, 1);
+        assert.equal(after.report.last.outcome, 'cookie storm drop');
+        assert.deepEqual(game.errors, []);
+    }));
+
 test('forecasting does not disturb the game\'s own random numbers', { skip }, () =>
     withGrimoire(async (game) => {
         const out = await game.eval(() => {

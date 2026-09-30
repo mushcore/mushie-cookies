@@ -112,3 +112,55 @@ test('a free sugar lump is cast at once', () => {
 test('not enough mana means wait', () => {
     assert.equal(decide('frenzy', { buffs: [buff('Congregation', 11, 60)] }, { mana: 10 }).action, 'wait');
 });
+
+// A Cursed finger stops CpS (multCpS 0, main.js:13932, 5159) and pays each click its own power
+// instead of the click's (4744), so under one a storm or storm drop pays nothing, a Lucky 13
+// cookies (5536), and a click frenzy nothing once the finger outlasts its 13 s.
+const finger = (secondsLeft) => buff('Cursed finger', 0, secondsLeft, { power: 1 });
+
+test('a good outcome is held through a Cursed finger, never burnt, full mana or not', () => {
+    for (const outcome of ['cookie storm', 'cookie storm drop', 'click frenzy', 'multiply cookies', 'frenzy', 'building special']) {
+        for (const m of [80, 100]) {
+            const out = decide(outcome, { buffs: [finger(14)] }, { mana: m });
+            assert.equal(out.action, 'wait', `${outcome} at ${m} mana: ${out.action}, ${out.reason}`);
+            assert.match(out.reason, /until Cursed finger ends/);
+        }
+    }
+    // A backfire worth having is held the same way.
+    const blood = decideCast({ next: { success: false, outcome: 'blood frenzy' }, ...mana, ctx: { ...ctx, buffs: [finger(14)] } });
+    assert.equal(blood.action, 'wait');
+});
+
+test('once the debuff has ended, the held outcome is cast', () => {
+    for (const outcome of ['cookie storm', 'cookie storm drop', 'click frenzy', 'multiply cookies']) {
+        assert.equal(decide(outcome, {}, { mana: 100 }).action, 'cast', outcome);
+    }
+});
+
+test('a good outcome is burnt only if it is worthless whenever it is cast', () => {
+    // Nothing clicks, so a click frenzy is worth nothing with or without the finger; blab never is.
+    assert.equal(decide('click frenzy', { click: 0, buffs: [finger(14)] }).action, 'skip');
+    assert.equal(decide('blab', { buffs: [finger(14)] }).action, 'skip');
+    // A bad outcome stays bad after the finger.
+    const backfire = (outcome) => decideCast({ next: { success: false, outcome }, ...mana, ctx: { ...ctx, buffs: [finger(14)] } }).action;
+    assert.equal(backfire('clot'), 'skip');
+    assert.equal(backfire('ruin cookies'), 'skip');
+});
+
+test('a debuff beside a boost: the outcome waits for the debuff to end while the boost runs on', () => {
+    // Now the click frenzy would land on ×7 halved for 10 of its 13 s; in 10 s, on ×7 throughout.
+    const out = decide('click frenzy', { buffs: [buff('Frenzy', 7, 60), buff('Clot', 0.5, 10)] }, { mana: 80 });
+    assert.equal(out.action, 'wait');
+    // A boost that ends with the debuff leaves nothing better to wait for.
+    assert.equal(decide('click frenzy', { buffs: [buff('Frenzy', 7, 10), buff('Clot', 0.5, 10)] }, { mana: 100 }).action, 'cast');
+});
+
+test('with mana full, a debuff is waited out only when it ends soon enough to be worth the lost regeneration', () => {
+    // A clot halves a frenzy for 66 of its 77 s; 66 s of regeneration is a small part of a cast.
+    assert.equal(decide('frenzy', { buffs: [buff('Clot', 0.5, 66)] }, { mana: 100 }).action, 'wait');
+    // A modest loan's interest quarters CpS for 4 hours (minigameMarket.js:350): holding a full
+    // grimoire through it would lose many casts' worth of regeneration.
+    const interest = buff('Loan 1 (interest)', 0.25, 4 * 3600);
+    assert.equal(decide('frenzy', { buffs: [interest] }, { mana: 100 }).action, 'cast');
+    assert.equal(decide('multiply cookies', { buffs: [interest] }, { mana: 100 }).action, 'cast');
+});
