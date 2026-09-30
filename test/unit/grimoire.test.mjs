@@ -112,3 +112,13 @@ test('a free sugar lump is cast at once', () => {
 test('not enough mana means wait', () => {
     assert.equal(decide('frenzy', { buffs: [buff('Congregation', 11, 60)] }, { mana: 10 }).action, 'wait');
 });
+
+test('a cookie storm is worth every drop the shimmer system clicks, at the game frame rate and gain', () => {
+    // 7 s × 30 frames × half the frames × 4 minutes of CpS a drop (main.js:5257-5261, 5599).
+    const all = value('cookie storm', { stormReach: 1, fps: 30, gainMult: 1 });
+    near(all, 1000 * 240 * 7 * 30 * 0.5);
+    near(value('cookie storm', { stormReach: 0.5, fps: 30, gainMult: 1 }), all / 2);
+    near(value('cookie storm', { stormReach: 1, fps: 60, gainMult: 1 }), all * 2);
+    near(value('cookie storm', { stormReach: 1, fps: 30, gainMult: 1.1 }), all * 1.1);
+    near(value('cookie storm drop', { gainMult: 1.1 }), 1000 * 240 * 1.1);
+});

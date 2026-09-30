@@ -121,3 +121,15 @@ test('no golden cookie income is expected while golden cookies cannot spawn', { 
         assert.equal(out.spawns, false);
         assert.equal(out.off, Infinity);
     }));
+
+test('storm drops are counted at the game frame rate, all of them when the shimmer system clicks', { skip }, () =>
+    withGame(async (game) => {
+        const out = await game.eval(() => ({
+            on: MushieCookies.readState(Game, { autoGC: 1 }).golden,
+            off: MushieCookies.readState(Game, { autoGC: 0 }).golden,
+            fps: Game.fps,
+        }));
+        assert.equal(out.on.fps, out.fps);
+        assert.equal(out.on.stormReach, 1);
+        assert.equal(out.off.stormReach, 0.5, 'by hand, the inherited guess of half');
+    }));

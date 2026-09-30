@@ -55,6 +55,9 @@ export function createGrimoire({ game, settings, loop, log = () => {} }) {
             clicksPerSecond: now.clicksPerSecond,
             bank: game.cookies,
             durationMult: now.golden.durationMult,
+            fps: now.golden.fps,
+            gainMult: now.golden.gainMult,
+            stormReach: now.golden.stormReach,
             buildingSpecials: buildingSpecials(),
             buffs: runningBuffs(),
         };
