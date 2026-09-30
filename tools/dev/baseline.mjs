@@ -4,6 +4,7 @@
 // leaves the buying logic as the difference being measured.
 // The third argument lets an older build be measured (for example a milestone's dist built in a
 // separate worktree), so later milestones can be compared against it on any seed.
+import path from 'node:path';
 import { launchGame, BUILT_MOD } from '../../test/harness/game.mjs';
 
 const hours = Number(process.argv[2] || 2);
@@ -44,7 +45,8 @@ try {
     }
     const out = {
         seed,
-        mod: modFile === BUILT_MOD ? 'current build' : modFile,
+        // A name, never the path: baselines are committed to a public repo.
+        mod: modFile === BUILT_MOD ? 'current build' : path.relative(process.cwd(), modFile).replace(/^(\.\.[\\/])+/, '').replace(/\\/g, '/'),
         settings: { autoBuy: 1, autoGC: 1, autoClick: 1, cookieClickSpeed: 50 },
         goldenCookies: !noGolden,
         wallSeconds: Math.round((Date.now() - started) / 1000),
