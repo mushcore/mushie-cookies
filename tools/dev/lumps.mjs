@@ -11,11 +11,19 @@
 //                                                 the start, one in the last hour (where the system aims)
 //   node tools/dev/lumps.mjs hold                 a save with Sugar baking and 100 lumps: the inherited
 //                                                 spending order against the hold
-//   node tools/dev/lumps.mjs run <hours> [seeds...]  Sugar frenzy off and on through the rate rule's
-//                                                 ascension, from a high-prestige start
+//   node tools/dev/lumps.mjs run <hours> [seed] [--prestige=1e6,3e6]
+//                                                 Sugar frenzy off, by the lump system's rule, and at the
+//                                                 start of the run, through the rate rule's ascension,
+//                                                 from a high-prestige start
+//   golden and frenzy take --earn=N, the cookies the fixture bakery is built from.
 import { launchWithMod } from '../../test/harness/game.mjs';
 
-const [mode = 'harvest', ...rest] = process.argv.slice(2);
+const [mode = 'harvest', ...args] = process.argv.slice(2);
+const rest = args.filter((a) => !a.startsWith('--'));
+// --earn=N: the cookies the fixture bakery is built from (golden, frenzy). Luck-free runs of one
+// bakery come out the same on every seed, so the spread worth reporting is across bakeries.
+const earnArg = args.find((a) => a.startsWith('--earn='));
+const EARN = earnArg ? Number(earnArg.split('=')[1]) : 1e16;
 const DEFAULT_SEEDS = ['lumps-a', 'lumps-b', 'lumps-c'];
 
 const fmt = (n) => (Number.isFinite(n) ? (Math.abs(n) >= 1e5 || (Math.abs(n) < 1e-2 && n !== 0) ? n.toExponential(3) : n.toFixed(3)) : String(n));
@@ -152,7 +160,7 @@ async function golden(seeds) {
     for (const seed of seeds) {
         for (const variant of variants) {
             const row = await withGame(seed, async (game) => {
-                await game.eval(bakery, { earn: 1e16 });
+                await game.eval(bakery, { earn: EARN });
                 await game.eval(instrumentHarvests);
                 await game.eval((v) => {
                     Game.computeLumpTimes();
@@ -194,7 +202,7 @@ async function golden(seeds) {
         payoutSecondsGain: spread(pairs.map((p) => p.payoutSecondsGain)),
     };
     process.stderr.write(`system/inherited: payout ${describe(summary.payoutRatio)}; cookies earned ${describe(summary.earnedRatio)}; end CpS ${describe(summary.cpsRatio)}\n`);
-    return { mode: 'golden', rows, pairs, summary };
+    return { mode: 'golden', earn: EARN, rows, pairs, summary };
 }
 
 // --- frenzy -----------------------------------------------------------------------------------
@@ -212,7 +220,7 @@ async function frenzy(seeds) {
     for (const seed of seeds) {
         for (const variant of variants) {
             const row = await withGame(seed, async (game) => {
-                await game.eval(bakery, { earn: 1e16, levels: 10, sugarCraving: true });
+                await game.eval(bakery, { earn: EARN, levels: 10, sugarCraving: true });
                 await game.advanceSeconds(2); // the game unlocks Sugar frenzy on its next check
                 await game.eval(() => { window.__start = { earned: Game.cookiesEarned, cps: Game.unbuffedCps }; });
                 let used = 0;
@@ -245,7 +253,7 @@ async function frenzy(seeds) {
         `cookies over ${HOURS} h against no frenzy: at the start ${describe(summary.startOverNone)}, in the last hour ${describe(summary.endOverNone)}\n` +
             `gain in hours of the no-frenzy run's final CpS: start ${describe(summary.startGainHoursOfEndCps)}, end ${describe(summary.endGainHoursOfEndCps)}\n`
     );
-    return { mode: 'frenzy', hours: HOURS, rows, summary };
+    return { mode: 'frenzy', earn: EARN, hours: HOURS, rows, summary };
 }
 
 // --- hold -------------------------------------------------------------------------------------
@@ -293,16 +301,19 @@ async function hold() {
 // --- run ----------------------------------------------------------------------------------------
 // From just after an ascension at a high prestige (test fixture: the chips' bonus makes a run
 // reach the rate rule in game hours rather than days), play with buying, clicking, lumps and the
-// ascension on until the rule's ascension completes, with Sugar frenzy off and on. The ascension's
+// ascension on until the rule's ascension completes: Sugar frenzy off, switched on by the lump
+// system's rule, or switched on as soon as it is offered (the start of the run). The ascension's
 // own objective is the log-prestige gained per second of run plus overhead (core/ascension.js).
-async function run(hours, seeds) {
+// Luck-free runs from one start come out the same on every seed; the spread is across starting
+// prestiges (--prestige=1e6,3e6).
+async function run(hours, seed, prestiges) {
     const rows = [];
-    for (const seed of seeds) {
-        for (const frenzyOn of [0, 1]) {
+    const variants = ['off', 'rule', 'start'];
+    for (const p0 of prestiges) {
+        for (const variant of variants) {
             const row = await withGame(seed, async (game) => {
-                await game.eval((on) => {
+                await game.eval(({ p, on }) => {
                     Game.shimmerTypes.golden.spawnConditions = () => false;
-                    const p = 1e6;
                     Game.cookiesReset = Game.HowManyCookiesReset(p);
                     Game.prestige = p;
                     Game.heavenlyChips = 0;
@@ -316,7 +327,17 @@ async function run(hours, seeds) {
                     Object.assign(FrozenCookies, { autoBuy: 1, autoAscendToggle: 1, autoSL: 1, autoLumps: 1, sugarFrenzy: on, autoClick: 1, cookieClickSpeed: 50 });
                     FCStart();
                     window.__run = { p0: p, start: Game.startDate, frenzyAt: null, ascendedAt: null, prestigeAfter: null, reason: null };
-                }, frenzyOn);
+                }, { p: p0, on: variant === 'rule' ? 1 : 0 });
+                if (variant === 'start') {
+                    await game.advanceSeconds(2); // the game offers Sugar frenzy on its next check
+                    await game.eval(() => {
+                        const ask = Game.prefs.askLumps;
+                        Game.prefs.askLumps = 0;
+                        Game.Upgrades['Sugar frenzy'].buy(); // as a player clicks the switch
+                        Game.prefs.askLumps = ask;
+                        if (Game.Upgrades['Sugar frenzy'].bought) window.__run.frenzyAt = Date.now();
+                    });
+                }
                 for (let q = 1; q <= hours * 4; q++) {
                     await game.advanceSeconds(900);
                     const done = await game.eval(() => {
@@ -339,7 +360,8 @@ async function run(hours, seeds) {
             const runSeconds = row.ascendedAt ? (row.ascendedAt - row.start) / 1000 : null;
             const out = {
                 seed,
-                frenzy: frenzyOn,
+                p0,
+                variant,
                 ascended: !!row.ascendedAt,
                 runHours: runSeconds && runSeconds / 3600,
                 frenzyHoursIn: row.frenzyAt ? (row.frenzyAt - row.start) / 3600000 : null,
@@ -350,18 +372,23 @@ async function run(hours, seeds) {
                 lastVerdict: row.reason,
             };
             rows.push(out);
-            process.stderr.write(`${seed} frenzy=${frenzyOn}: ${JSON.stringify(out)}\n`);
+            process.stderr.write(`p0=${p0} ${variant}: ${JSON.stringify(out)}\n`);
         }
     }
-    const pairs = [...new Set(rows.map((r) => r.seed))].map((seed) => {
-        const off = rows.find((r) => r.seed === seed && !r.frenzy);
-        const on = rows.find((r) => r.seed === seed && r.frenzy);
-        return { seed, yieldRatio: on.yieldPerSecond && off.yieldPerSecond ? on.yieldPerSecond / off.yieldPerSecond : null, prestigeRatio: on.prestigeGained / off.prestigeGained };
-    });
-    const complete = pairs.filter((p) => p.yieldRatio !== null);
-    const summary = complete.length ? { yieldRatio: spread(complete.map((p) => p.yieldRatio)), prestigeRatio: spread(complete.map((p) => p.prestigeRatio)) } : null;
-    if (summary) process.stderr.write(`frenzy on/off: yield per second ${describe(summary.yieldRatio)}; prestige per run ${describe(summary.prestigeRatio)}\n`);
-    return { mode: 'run', hours, rows, pairs, summary };
+    const summary = {};
+    for (const variant of ['rule', 'start']) {
+        const ratios = prestiges
+            .map((p0) => {
+                const off = rows.find((r) => r.p0 === p0 && r.variant === 'off');
+                const v = rows.find((r) => r.p0 === p0 && r.variant === variant);
+                return off.yieldPerSecond && v.yieldPerSecond ? { y: v.yieldPerSecond / off.yieldPerSecond, p: v.prestigeGained / off.prestigeGained } : null;
+            })
+            .filter(Boolean);
+        if (!ratios.length) continue;
+        summary[variant] = { yieldRatio: spread(ratios.map((r) => r.y)), prestigeRatio: spread(ratios.map((r) => r.p)) };
+        process.stderr.write(`${variant} against off: yield per second ${describe(summary[variant].yieldRatio)}; prestige per run ${describe(summary[variant].prestigeRatio)}\n`);
+    }
+    return { mode: 'run', hours, seed, prestiges, rows, summary };
 }
 
 const seedsFrom = (args) => (args.length ? args : DEFAULT_SEEDS);
@@ -370,7 +397,11 @@ if (mode === 'harvest') result = await harvest(seedsFrom(rest));
 else if (mode === 'golden') result = await golden(seedsFrom(rest).slice(0, rest.length || 2));
 else if (mode === 'frenzy') result = await frenzy(seedsFrom(rest).slice(0, rest.length || 2));
 else if (mode === 'hold') result = await hold();
-else if (mode === 'run') result = await run(Number(rest[0] || 24), seedsFrom(rest.slice(1)).slice(0, rest.length > 1 ? undefined : 2));
+else if (mode === 'run') {
+    const prestigeArg = args.find((a) => a.startsWith('--prestige='));
+    const prestiges = prestigeArg ? prestigeArg.split('=')[1].split(',').map(Number) : [1e6];
+    result = await run(Number(rest[0] || 24), rest[1] || DEFAULT_SEEDS[0], prestiges);
+}
 else {
     console.error(`unknown mode ${mode}`);
     process.exit(1);
