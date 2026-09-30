@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     ENABLER_SHARE,
-    rankHeavenly,
+    fixedShare,
     planChips,
     closure,
     planTree,
@@ -14,48 +14,6 @@ import {
     seasonBoostShare,
     rankSlots,
 } from '../../src/core/heavenly.js';
-
-const income = { total: 1000 };
-const after = (mult) => ({ total: 1000 * mult });
-
-test('ranks by income share per chip', () => {
-    const candidates = [
-        { id: 1, name: 'Heavenly cookies', price: 3 },
-        { id: 2, name: 'Kitten angels', price: 9000 },
-        { id: 3, name: 'Heavenly key', price: 25000000 },
-    ];
-    const measured = [after(1.1), after(1.5), after(1.25)];
-    const ranked = rankHeavenly({ candidates, measured, income });
-    assert.deepEqual(ranked.map((c) => c.name), ['Heavenly cookies', 'Kitten angels', 'Heavenly key']);
-    assert.ok(Math.abs(ranked[0].share - 0.1) < 1e-9);
-    assert.ok(Math.abs(ranked[0].valuePerChip - 0.1 / 3) < 1e-9);
-});
-
-test('enablers the model cannot see get their fixed share, and Legacy comes first', () => {
-    const candidates = [
-        { id: 1, name: 'Legacy', price: 1 },
-        { id: 2, name: 'Heavenly cookies', price: 3 },
-        { id: 3, name: 'How to bake your dragon', price: 9 },
-        { id: 4, name: 'Twin Gates of Transcendence', price: 1 },
-    ];
-    const measured = [after(1), after(1.1), after(1), after(1)];
-    const ranked = rankHeavenly({ candidates, measured, income });
-    assert.equal(ranked[0].name, 'Legacy');
-    assert.ok(ranked.find((c) => c.name === 'How to bake your dragon').share > 0);
-    assert.ok(ranked.find((c) => c.name === 'Twin Gates of Transcendence').valuePerChip < ranked[1].valuePerChip);
-});
-
-test('a fixed share adds to what is measured: it stands only for what the model cannot see', () => {
-    const candidates = [{ id: 1, name: 'How to bake your dragon', price: 9 }];
-    const [c] = rankHeavenly({ candidates, measured: [after(3)], income });
-    assert.ok(Math.abs(c.share - 2.5) < 1e-9, `share ${c.share}`);
-});
-
-test('a bundle is credited with the fixed share of every member and any extra it is given', () => {
-    const candidates = [{ id: 7, name: 'Belphegor', price: 8, members: ['Twin Gates of Transcendence', 'Belphegor'], extra: 0.01 }];
-    const [c] = rankHeavenly({ candidates, measured: [after(1.1)], income });
-    assert.ok(Math.abs(c.share - (0.1 + 0.02 + 0.02 + 0.01)) < 1e-9, `share ${c.share}`);
-});
 
 test('shares the planner now measures carry no fixed share (M2: guesses replaced by what-ifs)', () => {
     for (const name of ['Season switcher', 'Box of brand biscuits', 'Box of macarons', 'Tin of british tea biscuits', 'Tin of butter cookies', 'Permanent upgrade slot I', 'Permanent upgrade slot V']) {
@@ -69,6 +27,31 @@ test('shares the planner now measures carry no fixed share (M2: guesses replaced
 // A small heavenly tree in the shape of the game's (main.js:10815-11483).
 const node = (id, name, price, parents = [], extra = {}) => ({ id, name, price, parents, owned: false, shown: true, ...extra });
 const valueBy = (worth) => (planned, bundles) => bundles.map((b) => b.members.reduce((s, m) => s + (worth[m.name] || 0), 0));
+
+test('ranks by income share per chip: what the chips cover goes to the most per chip first', () => {
+    const tree = [node(1, 'Heavenly cookies', 3), node(2, 'Kitten angels', 9000), node(3, 'Heavenly key', 25000000)];
+    const plan = planTree({ tree, chips: 9003, value: valueBy({ 'Heavenly cookies': 0.1, 'Kitten angels': 0.5, 'Heavenly key': 0.25 }) });
+    assert.deepEqual(plan.buy.map((b) => b.name), ['Heavenly cookies', 'Kitten angels']);
+    assert.ok(Math.abs(plan.buy[0].share - 0.1) < 1e-12);
+    assert.equal(plan.left, 0);
+});
+
+test('fixed shares stand only for what the model cannot see, summed over a bundle', () => {
+    assert.ok(Math.abs(fixedShare(['Twin Gates of Transcendence', 'Belphegor']) - 0.04) < 1e-12);
+    assert.equal(fixedShare(['Heavenly cookies']), 0, 'a measured upgrade has no fixed share');
+    assert.ok(Math.abs(fixedShare(['Starsnow'], { dropShares: { christmas: 0.2 } }) - 0.005) < 1e-12);
+    assert.ok(Math.abs(fixedShare(['Sugar craving'], { horizonSeconds: 86400 }) - 2 / 24) < 1e-12);
+    assert.equal(fixedShare(['Sugar craving']), 0, 'no horizon, no frenzy');
+});
+
+test('Legacy comes first: nothing else is reachable without it', () => {
+    const tree = [node(1, 'Legacy', 1), node(2, 'Heavenly cookies', 3, [1]), node(3, 'How to bake your dragon', 9, [1]), node(4, 'Twin Gates of Transcendence', 1, [1])];
+    const measured = { 'Heavenly cookies': 0.1 };
+    const value = (planned, bundles) => bundles.map((b) => b.members.reduce((s, m) => s + (measured[m.name] || 0), 0) + fixedShare(b.members.map((m) => m.name)));
+    const plan = planTree({ tree, chips: 14, value });
+    assert.equal(plan.buy[0].name, 'Legacy');
+    assert.deepEqual(plan.buy.map((b) => b.name).sort(), ['Heavenly cookies', 'How to bake your dragon', 'Legacy', 'Twin Gates of Transcendence']);
+});
 
 test('closure lists every ancestor still missing, parents first, each once', () => {
     const tree = [

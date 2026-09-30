@@ -27,9 +27,9 @@ export { outcomeValue, decideCast } from './core/grimoire.js';
 export { optimizeLayout } from './core/garden.js';
 export { tickMarket, restingValue, tradeDecision } from './core/market.js';
 export { gardenOf, plotTiles, chanceFunction, findRecipe } from './game/garden.js';
-export { rankHeavenly, planChips, planTree, rankSlots } from './core/heavenly.js';
+export { planChips, planTree, rankSlots } from './core/heavenly.js';
 export { AUTOPILOT, applyAutopilot, isAutopilotSetting } from './core/autopilot.js';
-export { heavenlyCandidates, planHeavenly, slotCandidates, fillPermanentSlots, rankPermanentSlots, assignPermanentSlots } from './game/prestige.js';
+export { planHeavenly, slotCandidates, fillPermanentSlots, rankPermanentSlots, assignPermanentSlots } from './game/prestige.js';
 
 export const version = __MUSHIE_VERSION__;
 

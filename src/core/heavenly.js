@@ -49,27 +49,6 @@ export const ENABLER_SHARE = {
     Lucifer: 0.02,
 };
 
-/**
- * @param {object} args
- * @param {Array<{id, name, price, members?: string[], extra?: number}>} args.candidates
- *        `members`: names of every upgrade in the bundle (default: the candidate alone);
- *        `extra`: share measured outside the income model (lumps, slots, season drops)
- * @param {Array<{total: number}>} args.measured  income after each candidate, aligned
- * @param {{total: number}} args.income           income now
- * @returns candidates with `share` (relative income gain) and `valuePerChip`, best first
- */
-export function rankHeavenly({ candidates, measured, income }) {
-    const ranked = candidates.map((candidate, i) => {
-        const measuredShare = income.total > 0 ? (measured[i].total - income.total) / income.total : 0;
-        const members = candidate.members || [candidate.name];
-        const fixed = members.reduce((sum, name) => sum + (ENABLER_SHARE[name] || 0), 0);
-        const share = measuredShare + fixed + (candidate.extra || 0);
-        return { ...candidate, share, valuePerChip: valuePerChip(share, candidate.price) };
-    });
-    ranked.sort(byValue);
-    return ranked;
-}
-
 function valuePerChip(share, price) {
     return price > 0 ? share / price : share > 0 ? Infinity : 0;
 }
@@ -297,6 +276,25 @@ export function seasonBoostShare(name, dropShares) {
     if (!boost) return 0;
     const drops = dropShares[boost.drops];
     return drops > 0 ? (boost.rate / 2) * drops : 0;
+}
+
+/**
+ * The part of a bundle's share that comes from outside the income model's what-if: the fallback
+ * shares, the season boosts and Sugar frenzy, summed over its members.
+ *
+ * @param {string[]} names  the bundle's members
+ * @param {object} [context]
+ * @param {Object<string, number>} [context.dropShares]  share each season's drops add
+ * @param {number} [context.horizonSeconds]              length of the run ahead
+ */
+export function fixedShare(names, { dropShares = {}, horizonSeconds = 0 } = {}) {
+    let share = 0;
+    for (const name of names) {
+        share += ENABLER_SHARE[name] || 0;
+        share += seasonBoostShare(name, dropShares);
+        if (name === 'Sugar craving') share += sugarFrenzyShare(horizonSeconds);
+    }
+    return share;
 }
 
 /**

@@ -5,7 +5,7 @@
 import { simulateEach } from '../core/sim.js';
 import { estimateIncome } from '../core/income.js';
 import { readState } from './measure.js';
-import { ENABLER_SHARE, planTree, lumpsPerDay, lumpValue, lumpShare, sugarFrenzyShare, seasonBoostShare, rankSlots } from '../core/heavenly.js';
+import { planTree, fixedShare, lumpsPerDay, lumpValue, lumpShare, rankSlots } from '../core/heavenly.js';
 
 // One step buys one bundle; the tree has about 130 upgrades, so this never cuts a plan short.
 const MAX_PLAN_STEPS = 200;
@@ -20,28 +20,6 @@ const OPEN_PRICE_SHARE = 0.1;
 const DRAGON_DROPS = ['Dragon scale', 'Dragon claw', 'Dragon fang', 'Dragon teddy bear'];
 /** Pet the dragon drops these only at dragon level 8 or more (main.js:14957). */
 const DRAGON_DROP_LEVEL = 8;
-
-/**
- * Prestige upgrades that could be bought once everything in `planned` is bought, as shown at
- * `prestige`: some are only shown at certain prestige levels (Lucky digit and its line).
- */
-export function heavenlyCandidates(game, planned = new Set(), prestige = game.prestige) {
-    const saved = game.prestige;
-    game.prestige = prestige;
-    try {
-        const out = [];
-        for (const upgrade of game.PrestigeUpgrades) {
-            if (upgrade.bought || planned.has(upgrade)) continue;
-            if (upgrade.showIf && !upgrade.showIf()) continue;
-            const parentsMet = (upgrade.parents || []).every((p) => p === -1 || p.bought || planned.has(p));
-            if (!parentsMet) continue;
-            out.push({ id: upgrade.id, name: upgrade.name, price: upgrade.getPrice(), upgrade });
-        }
-        return out;
-    } finally {
-        game.prestige = saved;
-    }
-}
 
 /** Every heavenly upgrade as a node of the tree the planner walks, shown or not at `prestige`. */
 function readTree(game, prestige) {
@@ -200,13 +178,10 @@ export function planHeavenly(game, settings, chips, prestigeAfter = game.prestig
         return bundles.map((b, i) => {
             const after = measured[i + 1];
             let share = before.total > 0 ? (after.total - before.total) / before.total : 0;
+            share += fixedShare(b.members.map((m) => m.name), { dropShares, horizonSeconds });
+            // Each slot in the bundle holds the next upgrade down the slot ranking.
             let slot = ownedSlots + plannedSlots;
-            for (const m of b.members) {
-                share += ENABLER_SHARE[m.name] || 0;
-                share += seasonBoostShare(m.name, dropShares);
-                if (m.name === 'Sugar craving') share += sugarFrenzyShare(horizonSeconds);
-                if (SLOT_UPGRADES.includes(m.name)) share += slotValues[slot++] || 0;
-            }
+            for (const m of b.members) if (SLOT_UPGRADES.includes(m.name)) share += slotValues[slot++] || 0;
             if (lumpsOn) {
                 const lump = lumpValue({ lumps: game.lumps, sugarBaking: after.sugarBaking, buildings });
                 share += lumpShare({ perDayBefore: perDay(before), perDayAfter: perDay(after), value: lump, horizonSeconds });
