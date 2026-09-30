@@ -35,8 +35,9 @@ const FIRST_SHOPPING_LIST = [
  */
 export function createAscension({ game, settings, loop, extras = () => 0, prepare = () => {}, buyer = null, log = () => {} }) {
     // 'rate' is the rule this system is built on; 'double' (ascend once prestige would double,
-    // the inherited rule) is kept so the two can be compared in the harness.
-    const options = { rule: 'rate' };
+    // the inherited rule) is kept so the two can be compared in the harness. `firstTarget`
+    // overrides the first ascension's prestige target (null: the starter set's price).
+    const options = { rule: 'rate', firstTarget: null };
     const state = {
         phase: 'playing', // then 'settling' after collecting, then 'ascending'
         run: null, // { resets, startDate, start: {t, projected} }
@@ -55,6 +56,7 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
     const runSeconds = () => Math.max(0, (Date.now() - game.startDate) / 1000);
 
     function firstTarget() {
+        if (options.firstTarget) return options.firstTarget;
         let total = 0;
         for (const name of FIRST_SHOPPING_LIST) {
             const upgrade = game.Upgrades[name];

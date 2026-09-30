@@ -1,6 +1,6 @@
 // Plays a fresh save with nothing but the Autopilot, the way a new player would install the mod
 // and walk away, and reports every system each game hour.
-// Usage: node tools/dev/autopilot.mjs <gameHours> [seed] [--no-golden] [--every=hours] > out.json
+// Usage: node tools/dev/autopilot.mjs <gameHours> [seed] [--no-golden] [--every=hours] [--first-target=prestige] > out.json
 import { launchWithMod } from '../../test/harness/game.mjs';
 
 const hours = Number(process.argv[2] || 24);
@@ -8,6 +8,8 @@ const seed = process.argv[3] && !process.argv[3].startsWith('--') ? process.argv
 const noGolden = process.argv.includes('--no-golden');
 const everyArg = process.argv.find((a) => a.startsWith('--every='));
 const every = everyArg ? Number(everyArg.split('=')[1]) : 1;
+const targetArg = process.argv.find((a) => a.startsWith('--first-target='));
+const firstTarget = targetArg ? Number(targetArg.split('=')[1]) : null;
 
 const game = await launchWithMod({ seed, autopilot: true });
 if (!game) {
@@ -57,6 +59,7 @@ function snapshot() {
 const fmt = (n) => (Number.isFinite(n) ? n.toExponential(2) : String(n));
 try {
     if (noGolden) await game.eval(() => { Game.shimmerTypes.golden.spawnConditions = () => false; });
+    if (firstTarget) await game.eval((t) => { MushieCookies.ascension.options.firstTarget = t; }, firstTarget);
     const points = [];
     const started = Date.now();
     for (let h = every; h <= hours; h += every) {
@@ -71,7 +74,7 @@ try {
                 ` wr=${p.wrinklers}${p.promptOpen ? ' PROMPT' : ''} | ${p.phase}: ${p.verdict}${p.failures.length ? ' | FAIL ' + p.failures.join('; ') : ''}\n`
         );
     }
-    console.log(JSON.stringify({ seed, goldenCookies: !noGolden, wallSeconds: Math.round((Date.now() - started) / 1000), errors: game.errors.slice(0, 20), points }, null, 1));
+    console.log(JSON.stringify({ seed, firstTarget, goldenCookies: !noGolden, wallSeconds: Math.round((Date.now() - started) / 1000), errors: game.errors.slice(0, 20), points }, null, 1));
 } finally {
     await game.close();
 }
