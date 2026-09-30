@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LOANS, incomeOver, loanValue, chooseLoan, secondsToAscension, comboProfile, castTimes, loanOccasion } from '../../src/core/loans.js';
+import { LOANS, incomeOver, loanValue, chooseLoan, secondsToAscension, comboProfile, castTimes, loanOccasion, incomeMultiple, loanFactor } from '../../src/core/loans.js';
 import { BUFF_FIXTURES, buffFromFixture } from '../fixtures/buffs.mjs';
 
 const close = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
@@ -141,7 +141,70 @@ test('casts are timed at the soonest the mana covers them, with the game\'s rege
     assert.deepEqual(castTimes({ mana: 0, maxMana: 100, cost: 60, count: 3, window: 60 }), [], 'nothing inside the window');
 });
 
-test("only an income spike or the run's end makes a loan worth looking at, as the shared classifier reads the buffs", () => {
+test('a combo forecast inside the interest counts against the loan, one inside the boost for it', () => {
+    // 26 s at 1001 a second: 1000 a second above the expected 1, 26,000 in all.
+    const combo = { profile: [{ seconds: 26, perSecond: 1001 }] };
+    const pawn = loanValue({ loan: loan2, expected: 1, bank: 0 });
+    // Ten minutes on falls in the pawnshop loan's 40 minutes at a tenth: 90% of it is lost.
+    const hit = loanValue({ loan: loan2, expected: 1, bank: 0, ahead: [{ inSeconds: 600, ...combo }] });
+    assert.ok(close(hit.cost - pawn.cost, 0.9 * 26000));
+    assert.ok(close(hit.gain, pawn.gain));
+    const later = loanValue({ loan: loan2, expected: 1, bank: 0, ahead: [{ inSeconds: 3000, ...combo }] });
+    assert.ok(close(later.net, pawn.net), 'after the interest it changes nothing');
+    const ended = loanValue({ loan: loan2, expected: 1, bank: 0, secondsLeft: 500, ahead: [{ inSeconds: 600, ...combo }] });
+    assert.ok(close(ended.cost, 0.9 * (500 - 40.2)), 'nor after the run');
+    // An hour on falls in the modest loan's two hours at ×1.5.
+    const modest = loanValue({ loan: loan1, expected: 1, bank: 0 });
+    const boosted = loanValue({ loan: loan1, expected: 1, bank: 0, ahead: [{ inSeconds: 3600, ...combo }] });
+    assert.ok(close(boosted.gain - modest.gain, 0.5 * 26000));
+    assert.ok(close(boosted.cost, modest.cost));
+});
+
+test('a pawnshop loan waits when the next combo forecast would fall in its interest', () => {
+    // Two combos alike, ten minutes apart. Taken on the first, the loan's 40 minutes at a tenth
+    // would cost 90% of the second; taken on the second, nothing.
+    const now = { profile: [{ seconds: 26, perSecond: 1000 }], expected: 1, bank: 1000, secondsLeft: Infinity };
+    const same = { profile: [{ seconds: 26, perSecond: 1000 }] };
+    assert.equal(chooseLoan({ loans: [loan2], now, spendable: 1000, ahead: [{ inSeconds: 600, ...same }] }), null);
+    // When the second is the one being valued, none follows it: it is taken.
+    assert.equal(chooseLoan({ loans: [loan2], now, spendable: 1000, ahead: [] }).loan.id, 2);
+});
+
+test('the income a loan scales is what the run has earned lately, in seconds of its CpS at the time', () => {
+    // One sample a minute for two hours; CpS doubles every hour, and a combo worth half an hour
+    // of the CpS of its time lands every half hour. Counted in cookies, the combos of two hours
+    // ago look a quarter of the size of the next ones; counted in seconds of CpS, each is the
+    // same, as each is worth as much to the run by the time the combos to come land.
+    const samples = [];
+    let earned = 0;
+    for (let t = 0; t <= 7200; t += 60) {
+        const cps = 100 * Math.pow(2, t / 3600);
+        samples.push({ t, earned, cps, factor: 1 });
+        earned += cps * 60 + (t % 1800 === 0 && t < 7200 ? cps * 1800 : 0);
+    }
+    // Over the last two hours: every second made a second of CpS, and four combos half an hour each.
+    assert.ok(close(incomeMultiple(samples, 7200), 1 + (4 * 1800) / 7200));
+    // Over the last half hour, one combo (the one at its start).
+    assert.ok(close(incomeMultiple(samples, 1800), 1 + 1800 / 1800));
+    assert.equal(incomeMultiple(samples.slice(0, 3), 7200), 0, 'too little history to say');
+    assert.equal(incomeMultiple([], 7200), 0);
+    // Earned under a pawnshop loan's interest: a tenth of the CpS, read back to the whole.
+    const owed = [0, 60, 120, 180, 240, 300, 360].map((t) => ({ t, earned: t * 10, cps: 100, factor: 0.1 }));
+    assert.ok(close(incomeMultiple(owed, 7200), 1));
+});
+
+test('what was earned under a loan or its interest is read back to the income they scale', () => {
+    // Earnings under a pawnshop loan's interest are a tenth of the income it scales; read as they
+    // are, every loan taken makes the next look cheaper.
+    const buff = (type) => buffFromFixture(BUFF_FIXTURES.find((row) => row.type === type));
+    assert.equal(loanFactor({}), 1);
+    assert.equal(loanFactor({ a: buff('frenzy'), b: buff('sugar frenzy') }), 1, 'other buffs are the income itself');
+    assert.ok(close(loanFactor({ a: buff('loan 2 interest') }), 0.1));
+    assert.ok(close(loanFactor({ a: buff('loan 1'), b: buff('loan 2 interest'), c: buff('frenzy') }), 0.15));
+    assert.ok(close(loanFactor({ a: buff('loan 3 interest') }), 0.8));
+});
+
+test('only an income spike makes a loan worth looking at, as the shared classifier reads the buffs', () => {
     const buff = (type) => buffFromFixture(BUFF_FIXTURES.find((row) => row.type === type));
     const loans = [loan1, loan2];
     // A long boost multiplies CpS for hours or days (Sugar frenzy, a loan the player took, a
@@ -154,8 +217,9 @@ test("only an income spike or the run's end makes a loan worth looking at, as th
     assert.equal(loanOccasion({ buffs: {}, loans }), null);
     assert.equal(loanOccasion({ buffs: { a: buff('sugar frenzy'), b: buff('frenzy') }, loans }), 'combo');
     assert.equal(loanOccasion({ buffs: { x: buff('click frenzy') }, loans }), 'combo');
-    // With no spike, only a run forecast to end inside the longest boost it could take.
-    assert.equal(loanOccasion({ buffs: {}, loans, secondsLeft: 7000 }), 'run end');
-    assert.equal(loanOccasion({ buffs: {}, loans, secondsLeft: 7300 }), null);
-    assert.equal(loanOccasion({ buffs: {}, loans: [loan2], secondsLeft: 7000 }), null);
+    // The run's end is no occasion. Taken when the ascension was forecast inside loan 1's two
+    // hours, the loan's boost held the run up and its interest then ended it, hours early and
+    // with the interest running (no Debt evasion): x0.05 and x0.11 the prestige of the run
+    // without it (tools/dev/bank.mjs --prestige=1e6 and 3e6, luck-free).
+    assert.equal(loanOccasion({ buffs: {}, loans, secondsLeft: 600 }), null);
 });

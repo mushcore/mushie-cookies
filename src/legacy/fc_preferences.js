@@ -134,7 +134,7 @@ FrozenCookies.preferenceValues = {
         default: 0,
     },
     autoLoan: {
-        hint: "Take a loan only when a combo or the end of the run makes it worth more than its downpayment and interest.",
+        hint: "Take a loan only when a combo makes it worth more than its downpayment and interest. None is taken for the end of the run: measured, that loses.",
         display: ["Auto-Loans OFF", "Consider loans 1 and 2", "Consider all 3 loans"],
         default: 0,
     },

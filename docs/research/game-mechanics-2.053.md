@@ -141,11 +141,11 @@ per good:
 
 | Loan | Unlock (`market:1090-1095`) | Boost | Then | Downpayment |
 |---|---|---|---|---|
-| 1 | officeLevel ≥ 2 | CpS ×1.5 for 2 min | ×0.25 for 4 min | 20% of bank |
+| 1 | officeLevel ≥ 2 | CpS ×1.5 for 2 h | ×0.25 for 4 h | 20% of bank |
 | 2 | officeLevel ≥ 4 | ×2 for 0.67 min | ×0.1 for 40 min | 40% |
 | 3 | officeLevel ≥ 5 | ×1.2 for 2 days | ×0.8 for 5 days | 50% |
 
-Cannot retake while the loan or its interest buff is active. Interest is triggered by the loan buff's `onDie`.
+Durations are stored in minutes (`60*2` for loan 1) and passed as minutes × 60 seconds (`market:376,380`; the tooltip's `sayTime(60*loan[2]*fps)` at `:361` agrees). Cannot retake while the loan or its interest buff is active. Interest is triggered by the loan buff's `onDie`, which the ascension's `killBuffs` never runs (`main.js:3492`, `13827`): a loan running at an ascension is never charged, and the game awards Debt evasion for it (`main.js:3489`).
 
 **Reset**: `M.reset` zeroes office level, brokers, stock and profit on every ascension, not only hard reset (`market:763-796`).
 

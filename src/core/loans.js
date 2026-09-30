@@ -8,7 +8,7 @@
  * click, main.js:4692-4708), or a run that ends before its interest does (the reset clears every
  * buff without running a loan's onDie, main.js:3492 and 13827, so no interest is charged).
  */
-import { incomeSpikeRunning } from './buffs.js';
+import { incomeSpikeRunning, classifyBuffs } from './buffs.js';
 
 /**
  * The three loans. The game stores durations in minutes and passes minutes × 60 as seconds
@@ -46,14 +46,23 @@ export function incomeOver(profile, expected, from, to) {
  * @param {number} args.expected     income it would scale per second on average, with no buff known
  * @param {number} args.bank
  * @param {number} [args.secondsLeft=Infinity]  until the run ends; nothing after that counts
+ * @param {Array<{inSeconds: number, profile}>} [args.ahead]  combos forecast to come
  * @returns {{gain: number, cost: number, net: number}}
  */
-export function loanValue({ loan, profile = [], expected, bank, secondsLeft = Infinity }) {
+export function loanValue({ loan, profile = [], expected, bank, secondsLeft = Infinity, ahead = [] }) {
     const boostEnd = Math.min(loan.seconds, secondsLeft);
     const interestEnd = Math.min(loan.seconds + loan.interestSeconds, secondsLeft);
-    const gain = (loan.mult - 1) * incomeOver(profile, expected, 0, boostEnd);
-    // Interest scales the same income down; a combo that lands then is the forecast check's job.
-    const interest = interestEnd > loan.seconds ? (1 - loan.interestMult) * expected * (interestEnd - loan.seconds) : 0;
+    let gain = (loan.mult - 1) * incomeOver(profile, expected, 0, boostEnd);
+    let interest = interestEnd > loan.seconds ? (1 - loan.interestMult) * expected * (interestEnd - loan.seconds) : 0;
+    // A combo forecast to land while the loan runs is scaled with everything else: up during the
+    // boost, down during the interest, where one combo can cost more than the loan made.
+    for (const combo of ahead) {
+        const seconds = combo.profile.reduce((s, p) => s + p.seconds, 0);
+        const above = incomeOver(combo.profile, 0, 0, seconds) - expected * seconds;
+        if (!(above > 0)) continue;
+        if (combo.inSeconds < boostEnd) gain += (loan.mult - 1) * above;
+        else if (combo.inSeconds >= loan.seconds && combo.inSeconds < interestEnd) interest += (1 - loan.interestMult) * above;
+    }
     // The downpayment is a share of the whole bank (minigameMarket.js:375), gone for good.
     const cost = loan.downpayment * bank + interest;
     return { gain, cost, net: gain - cost };
@@ -61,20 +70,24 @@ export function loanValue({ loan, profile = [], expected, bank, secondsLeft = In
 
 /**
  * What could make a loan pay now, before any valuation: 'combo' while an income spike runs (the
- * shared classifier, src/core/buffs.js), 'run end' when the run is forecast to end inside the
- * longest boost of `loans` (its interest is then never charged), else null. A long boost (Sugar
- * frenzy, a loan, a golden lump's blessing) is no combo: it lasts hours or days, and on it every
- * loan loses as on ordinary income.
+ * shared classifier, src/core/buffs.js), else null. A long boost (Sugar frenzy, a loan, a golden
+ * lump's blessing) is no combo: it lasts hours or days, and on it every loan loses as on ordinary
+ * income.
+ *
+ * The run's end is no occasion either. An ascension clears a loan's interest unpaid (the reset
+ * kills buffs without their onDie, main.js:3492 and 13827; the game awards "Debt evasion" for
+ * it, main.js:3489), so a player may fairly time a loan to it. Measured, it loses: loan 1 taken
+ * when the ascension system's end was forecast inside its two hours kept the run's growth above
+ * its average, so the run went on until the boost ended; the interest then collapsed CpS and the
+ * ascension came at once, 14 minutes into the interest, hours before the run without the loan
+ * ended (x0.05 and x0.11 the prestige gained, x0.25 and x0.51 per second; tools/dev/bank.mjs
+ * --prestige, luck-free, two starting prestiges).
  * @param {object} args
  * @param {object|Array<object>} args.buffs  Game.buffs
- * @param {number} [args.secondsLeft=Infinity]  until the run is forecast to end
- * @param {Array<object>} args.loans  the loans that could be taken
  * @param {number} [args.fps=30]
  */
-export function loanOccasion({ buffs, secondsLeft = Infinity, loans, fps = 30 }) {
-    if (incomeSpikeRunning(buffs, { fps })) return 'combo';
-    if (loans.length && secondsLeft <= Math.max(...loans.map((l) => l.seconds))) return 'run end';
-    return null;
+export function loanOccasion({ buffs, fps = 30 }) {
+    return incomeSpikeRunning(buffs, { fps }) ? 'combo' : null;
 }
 
 /**
@@ -131,6 +144,48 @@ export function castTimes({ mana, maxMana, cost, count, window }) {
     return times;
 }
 
+const LOAN_TYPES = new Set(['loan 1', 'loan 1 interest', 'loan 2', 'loan 2 interest', 'loan 3', 'loan 3 interest']);
+
+/**
+ * The factor running loans and their interest put on CpS, 1 with none (the shared classifier's
+ * multipliers, src/core/buffs.js). What is earned under them, divided by it, is the income they
+ * scale: read as it is, the earnings under one loan's interest make the next loan look cheap.
+ * @param {object|Array<object>} buffs  Game.buffs
+ */
+export function loanFactor(buffs, { fps } = {}) {
+    return classifyBuffs(buffs, { fps })
+        .filter((c) => LOAN_TYPES.has(c.type))
+        .reduce((m, c) => m * c.cpsMult, 1);
+}
+
+const MIN_RATE_SECONDS = 5 * 60; // less history than this says nothing about a rate
+
+/**
+ * Seconds of unbuffed CpS the run has earned a second over the last `seconds` of `samples`,
+ * combos and clicks and all, or 0 with less than five minutes of history. Each stretch between
+ * samples is counted in seconds of the CpS of its time, with the loans' own factor taken out:
+ * CpS grows as the run reinvests, so a combo counted in cookies looks smaller the longer ago it
+ * landed, while each one, counted this way, is worth as much to the run by the time the combos
+ * of a loan's interest land. The smaller CpS and factor at either end are used, which reads more
+ * rather than less.
+ * @param {Array<{t: number, earned: number, cps: number, factor: number}>} samples  oldest first;
+ *   t in seconds of play, cps unbuffed, factor loanFactor's
+ */
+export function incomeMultiple(samples, seconds) {
+    if (!samples.length) return 0;
+    const last = samples[samples.length - 1];
+    const from = samples.findIndex((s) => s.t >= last.t - seconds);
+    if (!(last.t - samples[from].t >= MIN_RATE_SECONDS)) return 0;
+    let sum = 0;
+    for (let i = from + 1; i < samples.length; i++) {
+        const a = samples[i - 1];
+        const b = samples[i];
+        const scale = Math.min(a.cps, b.cps) * Math.min(a.factor, b.factor);
+        if (scale > 0) sum += Math.max(0, b.earned - a.earned) / scale;
+    }
+    return sum / (last.t - samples[from].t);
+}
+
 const ETA_WINDOW_SECONDS = 30 * 60; // how far back the trend is fitted
 const ETA_MIN_SAMPLES = 10;
 
@@ -166,11 +221,12 @@ export function secondsToAscension(samples) {
 /**
  * Which loan to take now, or null for none.
  *
- * A loan is taken only when it is worth more than it costs, its downpayment comes out of what
- * the buyer is not holding (and out of what it is saving for only when the loan returns more per
- * cookie-second than that purchase), and no combo forecast inside its window (boost and interest,
- * while it cannot be taken again, minigameMarket.js:374) would be worth more to take it on. Of
- * the loans that qualify, the most valuable.
+ * A loan is taken only when it is worth more than it costs, the combos forecast to land in its
+ * boost and its interest counted in, its downpayment comes out of what the buyer is not holding
+ * (and out of what it is saving for only when the loan returns more per cookie-second than that
+ * purchase), and no combo forecast inside its window (boost and interest, while it cannot be
+ * taken again, minigameMarket.js:374) would be worth more to take it on. Of the loans that
+ * qualify, the most valuable.
  *
  * @param {object} args
  * @param {Array<object>} args.loans       loans that can be taken now (office level, none running)
@@ -187,14 +243,22 @@ export function chooseLoan({ loans, now, spendable, committed = 0, buyerReturn =
     for (const loan of loans) {
         const down = loan.downpayment * now.bank;
         if (down > spendable) continue;
-        const value = loanValue({ loan, ...now, secondsLeft });
+        const value = loanValue({ loan, ...now, secondsLeft, ahead });
         if (!(value.net > 0)) continue;
         if (down > spendable - committed && !(value.net / (down * Math.min(loan.seconds, secondsLeft)) > buyerReturn)) continue;
         const window = loan.seconds + loan.interestSeconds;
+        // Taken on a combo to come instead, the loan is valued from there, with the combos after it.
         const better = ahead.some(
             (combo) =>
                 combo.inSeconds < Math.min(window, secondsLeft) &&
-                loanValue({ loan, profile: combo.profile, expected: now.expected, bank: now.bank, secondsLeft: secondsLeft - combo.inSeconds }).net > value.net
+                loanValue({
+                    loan,
+                    profile: combo.profile,
+                    expected: now.expected,
+                    bank: now.bank,
+                    secondsLeft: secondsLeft - combo.inSeconds,
+                    ahead: ahead.filter((c) => c.inSeconds > combo.inSeconds).map((c) => ({ ...c, inSeconds: c.inSeconds - combo.inSeconds })),
+                }).net > value.net
         );
         if (better) continue;
         if (!best || value.net > best.net) best = { loan, ...value };

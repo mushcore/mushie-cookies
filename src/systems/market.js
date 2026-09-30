@@ -5,7 +5,7 @@
 // purchase, unless the trade returns more per cookie than that purchase (src/core/bank.js).
 import { restingValue, tradeDecision } from '../core/market.js';
 import { OFFICES, officeIncome, overhead as overheadWith, brokerIncome, brokerWorthHiring, expectedRunLeft, tradeReturn, marketBudget } from '../core/bank.js';
-import { LOANS, chooseLoan, secondsToAscension, comboProfile, castTimes, loanOccasion } from '../core/loans.js';
+import { LOANS, chooseLoan, secondsToAscension, comboProfile, castTimes, loanOccasion, incomeMultiple, loanFactor } from '../core/loans.js';
 import { classifyBuffs, unbuffedFactors } from '../core/buffs.js';
 import { estimateIncome } from '../core/income.js';
 import { simulate } from '../core/sim.js';
@@ -16,7 +16,10 @@ import table from '../data/market-thresholds.json';
 
 const TICK_EVERY = 30; // frames; the market itself ticks once a minute
 const SAMPLE_SECONDS = 60; // growth, earnings and the ascension forecast are sampled once a minute
-const GROWTH_SECONDS = 30 * 60; // the window CpS growth and earnings are measured over
+const GROWTH_SECONDS = 30 * 60; // the window CpS growth is measured over
+// The window a loan reads the run's earnings over. Its interest lasts 40 minutes to 5 days and
+// scales every combo that lands in it; a half hour right after one sees none.
+const EARNED_SECONDS = 2 * 60 * 60;
 const FILL_WEIGHT = 0.05; // each buy signal's weight in the running fill estimate
 const MIN_VOLUME_SECONDS = 3600; // buy volume is averaged over at least an hour
 const FORECAST_CASTS = 20; // Force the Hand of Fate outcomes looked at for combos ahead
@@ -108,8 +111,14 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
         const t = now();
         if (t - state.lastSampleAt < SAMPLE_SECONDS) return;
         state.lastSampleAt = t;
-        state.samples.push({ t, raw: game.cookiesPsRawHighest, earned: game.cookiesEarned });
-        while (state.samples.length > 2 && state.samples[1].t <= t - GROWTH_SECONDS) state.samples.shift();
+        state.samples.push({
+            t,
+            raw: game.cookiesPsRawHighest,
+            earned: game.cookiesEarned,
+            cps: game.unbuffedCps,
+            factor: loanFactor(game.buffs, { fps: game.fps }), // what running loans put on CpS
+        });
+        while (state.samples.length > 2 && state.samples[1].t <= t - EARNED_SECONDS) state.samples.shift();
         // A first ascension waits for a prestige target, not for growth to slow (src/core/ascension.js).
         const verdict = ascension && settings.autoAscendToggle == 1 && game.prestige > 0 ? ascension.verdict() : null;
         if (verdict && verdict.startDate === game.startDate && Number.isFinite(verdict.instantRate) && Number.isFinite(verdict.averageRate)) {
@@ -120,18 +129,10 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
 
     /** Rate the run's raw CpS record is rising at, per second, over the last half hour. */
     function growth() {
-        const first = state.samples[0];
         const last = state.samples[state.samples.length - 1];
+        const first = last && state.samples.find((s) => s.t >= last.t - GROWTH_SECONDS);
         if (!first || !(first.raw > 0) || !(last.t - first.t >= SAMPLE_SECONDS * 5)) return 0;
         return Math.max(0, Math.log(last.raw / first.raw) / (last.t - first.t));
-    }
-
-    /** Cookies earned per second over the last half hour: combos, clicks and all. */
-    function earnedRate() {
-        const first = state.samples[0];
-        const last = state.samples[state.samples.length - 1];
-        if (!first || !(last.t - first.t >= SAMPLE_SECONDS * 5)) return 0;
-        return Math.max(0, (last.earned - first.earned) / (last.t - first.t));
     }
 
     /** The buyer's next purchase other than the market's own offers: what money in the market is taken from. */
@@ -366,17 +367,31 @@ export function createMarket({ game, settings, loop, reserve = () => 0, buyer = 
             (l) => l.id <= allowed && M.officeLevel >= l.office && !game.hasBuff(`Loan ${l.id}`) && !game.hasBuff(`Loan ${l.id} (interest)`)
         );
         if (!loans.length) return;
+        // Nothing but a combo can make a loan pay. The run's end cannot: a loan taken for its
+        // interest to be cleared at the ascension (Debt evasion) was measured to lose (src/core/loans.js).
+        if (!loanOccasion({ buffs: game.buffs, fps: game.fps })) {
+            state.loan = { taken: null, reason: "no combo running; a loan at the run's end was measured to lose, so none is taken for it" };
+            return;
+        }
+        // A combo's loan is still valued only until the forecast end: interest the ascension clears
+        // is never charged (main.js:3492, 13827).
         const secondsLeft = settings.autoAscendToggle == 1 ? secondsToAscension(state.gaps) : Infinity;
-        // Nothing but a combo or the run's end in sight can make a loan pay (src/core/loans.js).
-        if (!loanOccasion({ buffs: game.buffs, secondsLeft, loans, fps: game.fps })) {
-            state.loan = { taken: null, reason: 'no combo running and no ascension in sight' };
+        // How many combos land in an interest window is read from the run's own earnings; until
+        // they cover the window read, a loan would be taken blind. With a forced combo every 30
+        // minutes, the first ones, taken before any was seen, lost the most (tools/dev/bank.mjs).
+        const history = state.samples.length ? state.samples[state.samples.length - 1].t - state.samples[0].t : 0;
+        if (history < EARNED_SECONDS) {
+            state.loan = { taken: null, reason: `the run's earnings are read over two hours before any loan (${Math.floor(history / 60)} minutes so far)` };
             return;
         }
         const live = readState(game, settings);
         const share = clickCpsShare();
         const buffs = runningBuffs();
         const profile = comboProfile({ buffs, cps: game.unbuffedCps, clicksPerSecond: live.clicksPerSecond, clickShare: share });
-        const expected = Math.max(estimateIncome(live).total, earnedRate());
+        // What the loan and its interest scale on average: the income model's figure, or, if more,
+        // what the run has earned over the last two hours in seconds of its CpS, at today's CpS:
+        // combos it cannot forecast included, loans' own factor taken out (src/core/loans.js).
+        const expected = Math.max(estimateIncome(live).total, incomeMultiple(state.samples, EARNED_SECONDS) * game.unbuffedCps);
         const window = Math.max(...loans.map((l) => l.seconds + l.interestSeconds));
         const next = buyerNext();
         const choice = chooseLoan({

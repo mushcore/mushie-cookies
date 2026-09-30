@@ -199,6 +199,22 @@ test('a loan is taken only on a combo it pays for, and its downpayment never tou
         await game.eval(() => Game.killBuff('Sugar frenzy')); // test fixture: its hour is up
         await game.advanceSeconds(1);
 
+        // A combo ten minutes into the market's reading of the run: how many combos a loan's
+        // interest would land on is not known yet, so no loan. Test fixture: the combo of the
+        // phases below, with room above the reserve.
+        await game.eval(() => {
+            Game.gainBuff('frenzy', 77, 7);
+            Game.gainBuff('blood frenzy', 40, 666);
+            Game.cookies = MushieCookies.buyer.reserve() * 1.8;
+        });
+        await game.advanceSeconds(1);
+        const early = await game.eval(() => ({ loans: window.__loans.length, loan: MushieCookies.market.report().loan }));
+        assert.equal(early.loans, 0, `a loan was taken before the run's earnings were read: ${JSON.stringify(early.loan)}`);
+        assert.match(String(early.loan && early.loan.reason), /two hours/);
+        // Two hours more of ordinary income, so the combo above drops out of the earnings read.
+        await game.eval(() => ['Frenzy', 'Elder frenzy'].forEach((name) => Game.killBuff(name)));
+        await game.advanceSeconds(2 * 60 * 60 + 60);
+
         // A combo worth the pawnshop loan, with a bank whose free part is smaller than either
         // downpayment: no loan. The combo pays by CpS alone, clicking off: with clicks in a Click
         // frenzy the bank rises past any downpayment within a second while the buyer stands aside
@@ -243,6 +259,57 @@ test('a loan is taken only on a combo it pays for, and its downpayment never tou
         const ticks = out.loans.map((l) => l.T);
         assert.equal(new Set(ticks).size, ticks.length, `two loans were taken in the same frame: ${JSON.stringify(out.loans)}`);
         assert.ok(out.loans.some((l) => l.id === 2), `the pawnshop loan should pay on this combo, so only the reserve stopped it before: ${JSON.stringify(out.report.loan)}`);
+        assert.deepEqual(failures(out.status), []);
+        assert.deepEqual(game.errors, []);
+    }));
+
+// A loan's interest scales every combo that lands in it: the pawnshop loan's 40 minutes at a
+// tenth (minigameMarket.js:351) can cost a whole combo. Measured with a forced combo every 30
+// minutes, loans taken on combos while the run's earnings were read over the last half hour lost
+// cookies (tools/dev/bank.mjs --combo=30); the income a loan scales is now what the run has
+// earned over the last two hours.
+test('a loan is not taken on a combo when the combos the run has had lately would fall in its interest', { skip }, () =>
+    withBank(async (game) => {
+        // Test fixture: nothing is bought or clicked, so every combo is the same size; an Elder
+        // frenzy on a Frenzy (x4662 for 40 s) every ten minutes for 90 minutes, then 45 quiet ones.
+        // Trading stays on, as in play: the market samples the run's earnings while it runs.
+        await game.eval(() => {
+            Game.Objects['Bank'].minigame.officeLevel = 4;
+            window.__loans = [];
+            const M = Game.Objects['Bank'].minigame;
+            const takeLoan = M.takeLoan;
+            M.takeLoan = function (id, interest) {
+                const ok = takeLoan.apply(M, arguments);
+                if (ok && !interest) window.__loans.push(id);
+                return ok;
+            };
+            Object.assign(FrozenCookies, { autoBuy: 0, autoClick: 0, autoMarket: 1, autoLoan: 0 });
+            FCStart();
+        });
+        const combo = () =>
+            game.eval(() => {
+                Game.gainBuff('frenzy', 77, 7);
+                Game.gainBuff('blood frenzy', 40, 666);
+            });
+        for (let i = 0; i < 9; i++) {
+            await combo();
+            await game.advanceSeconds(600);
+        }
+        await game.advanceSeconds(35 * 60);
+        // The same combo with loans on. Doubled for 39 s it is worth some 180,000 s of CpS; the
+        // last two hours earned about 8 of them, 200 s of CpS a second, so 40 minutes at a tenth
+        // would cost some 450,000. Over the last half hour, none: it would look like 2,160. Test
+        // fixture: a bank of 2,000 s of CpS above the reserve, so the downpayment (0.4 of it)
+        // weighs little and fits.
+        await game.eval(() => {
+            Game.cookies = Math.max(MushieCookies.buyer.reserve() * 2, MushieCookies.buyer.reserve() + Game.unbuffedCps * 2000);
+            FrozenCookies.autoLoan = 1;
+        });
+        await combo();
+        await game.advanceSeconds(2);
+        const out = await game.eval(() => ({ loans: window.__loans.slice(), loan: MushieCookies.market.report().loan, status: MushieCookies.status() }));
+        assert.deepEqual(out.loans, [], `a loan was taken whose interest the run's combos would pay: ${JSON.stringify(out.loan)}`);
+        assert.match(String(out.loan && out.loan.reason), /no loan is worth/);
         assert.deepEqual(failures(out.status), []);
         assert.deepEqual(game.errors, []);
     }));
