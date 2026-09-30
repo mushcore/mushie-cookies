@@ -192,3 +192,28 @@ test('with mana full, a debuff is waited out only when it ends soon enough to be
     assert.equal(decide('frenzy', { buffs: [interest] }, { mana: 100 }).action, 'cast');
     assert.equal(decide('multiply cookies', { buffs: [interest] }, { mana: 100 }).action, 'cast');
 });
+
+// With a Cursed finger beside a long debuff (loan interest, a 15-minute clot), the finger is
+// still waited out: the end to wait for is the one worth most net of the wait, not the latest.
+const interest = (secondsLeft, mult) => buff('Loan 1 (interest)', mult, secondsLeft);
+
+test('beside a long debuff, a good outcome still waits out the Cursed finger at full mana', () => {
+    for (const long of [interest(14400, 0.25), interest(2400, 0.1), buff('Clot', 0.5, 900)]) {
+        for (const outcome of ['multiply cookies', 'building special', 'frenzy']) {
+            const out = decide(outcome, { bank: 1e12, buffs: [finger(14), long] });
+            assert.equal(out.action, 'wait', `${outcome} beside ${long.name}: ${out.reason}`);
+            assert.match(out.reason, /until Cursed finger ends/, `${outcome} beside ${long.name}`);
+        }
+    }
+});
+
+test('an outcome worth nothing under the finger names the finger it waits for, not the longest debuff', () => {
+    const out = decide('cookie storm drop', { buffs: [finger(14), interest(14400, 0.25)] });
+    assert.equal(out.action, 'wait');
+    assert.match(out.reason, /until Cursed finger ends/);
+});
+
+test('with only a long debuff running and mana full, the cast is not held for hours', () => {
+    const out = decide('frenzy', { buffs: [interest(14400, 0.25)] });
+    assert.equal(out.action, 'cast', out.reason);
+});

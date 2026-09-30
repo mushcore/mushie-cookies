@@ -124,20 +124,23 @@ export function outcomeValue(outcome, ctx) {
 const runningAfter = (buffs, t) => buffs.filter((b) => b.secondsLeft > t).map((b) => ({ ...b, secondsLeft: b.secondsLeft - t }));
 
 /**
- * The most an outcome would be worth held until a running debuff (a CpS multiplier below 1) ends,
- * as { value, seconds, name } of that debuff, or null with none running. A debuff only delays
+ * What an outcome would be worth held until each running debuff (a CpS multiplier below 1) ends,
+ * as [{ value, seconds, name }], soonest first; empty with none running. A debuff only delays
  * what an outcome is worth: a Cursed finger stops CpS (main.js:5159, 13932) and pays clicks its
  * own power (4744), so a storm drop cast under it pays nothing (5599) and a Lucky 13 cookies
- * (5536), yet either is worth its full amount once the finger ends.
+ * (5536), yet either is worth its full amount once the finger ends. Every end is kept, because
+ * beside a long debuff (hours of loan interest) the short one is the one worth waiting for.
  */
 function afterDebuffs(outcome, ctx) {
     const buffs = ctx.buffs || [];
-    let best = null;
-    for (const debuff of buffs.filter((b) => cpsMultOf(b) < 1)) {
-        const value = outcomeValue(outcome, { ...ctx, buffs: runningAfter(buffs, debuff.secondsLeft) });
-        if (!best || value > best.value) best = { value, seconds: debuff.secondsLeft, name: debuff.name };
-    }
-    return best;
+    return buffs
+        .filter((b) => cpsMultOf(b) < 1)
+        .map((debuff) => ({
+            value: outcomeValue(outcome, { ...ctx, buffs: runningAfter(buffs, debuff.secondsLeft) }),
+            seconds: debuff.secondsLeft,
+            name: debuff.name,
+        }))
+        .sort((a, b) => a.seconds - b.seconds);
 }
 
 // Mana regenerates max(0.002, √(magic / max(max magic, 100))) × 0.002 a frame, 30 frames a
@@ -179,18 +182,25 @@ export function decideCast({ next, mana, maxMana, fateCost, skipCost, ctx }) {
     if (mana < fateCost) return out('wait', 'not enough mana');
 
     // A debuff never makes an outcome one to burn: only one worthless whenever it is cast is.
-    const later = afterDebuffs(next.outcome, ctx);
-    const holding = later && `holding ${next.outcome} until ${later.name} ends`;
+    const ends = afterDebuffs(next.outcome, ctx);
+    const holding = (end) => `holding ${next.outcome} until ${end.name} ends`;
     if (value <= 0) {
-        if (later && later.value > 0) return out('wait', holding);
+        const worth = ends.find((end) => end.value > 0); // the soonest end at which it pays
+        if (worth) return out('wait', holding(worth));
         return mana >= skipCost ? out('skip', `the next cast would be ${next.outcome}`) : out('wait', 'mana to skip');
     }
     const full = mana >= maxMana - 1;
     // Waiting costs nothing while mana is filling. Once it is full, each second waited is
     // regeneration lost, counted as that share of a cast worth what this one would be: a Cursed
-    // finger or a clot is waited out, a loan's hours of interest are not.
-    const waitCost = full && later ? (later.value * fullManaRegen(maxMana) * later.seconds) / fateCost : 0;
-    if (later && later.value - value > waitCost) return out('wait', holding);
+    // finger or a clot is waited out, a loan's hours of interest are not. The end to wait for is
+    // the one worth most net of its own wait.
+    const waitCost = (end) => (full ? (end.value * fullManaRegen(maxMana) * end.seconds) / fateCost : 0);
+    let later = null;
+    for (const end of ends) {
+        const net = end.value - waitCost(end);
+        if (net > value && (!later || net > later.net)) later = { ...end, net };
+    }
+    if (later) return out('wait', holding(later));
 
     const buffs = ctx.buffs || [];
     const specials = ctx.buildingSpecials || [];
