@@ -247,6 +247,11 @@ FrozenCookies.preferenceValues = {
         default: 0,
         extras: '<a class="option" id="manaMax" onclick="updateManaMax(\'manaMax\');">${manaMax} max Mana</a>',
     },
+    autoMarket: {
+        hint: "Trade the stock market with prices derived by simulating the game's own price model; spends only cookies the buyer is not holding.",
+        display: ["Auto Trading OFF", "Auto Trading ON"],
+        default: 0,
+    },
     autoGarden: {
         hint: "Unlock every garden seed by breeding, then sacrifice the garden for 10 sugar lumps, and repeat.",
         display: ["Auto Garden OFF", "Auto Garden ON"],
