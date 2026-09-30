@@ -178,35 +178,115 @@ test('stands aside while an inherited combo that swaps gods and auras is running
     }
 });
 
+/** Runs in the page: the system's report, the gods in the three slots by key, the running buffs. */
+function godsNow() {
+    const M = Game.Objects['Temple'].minigame;
+    return {
+        report: MushieCookies.gods.report(),
+        keys: M.slot.map((id) => (id === -1 ? null : Object.keys(M.gods)[id])),
+        swaps: M.swaps,
+        buffs: Object.keys(Game.buffs),
+    };
+}
+
+/**
+ * Two mouse upgrades and clicking: each click adds 2% of CpS, and the game reads the buffed CpS
+ * (main.js:4692-4693), so a CpS buff raises what clicking earns. With no buff Jeremy is the best
+ * god here and Muridal the next; valued under a x1.5 CpS buff, Muridal is the best.
+ */
+function clickingBakery() {
+    Game.Upgrades['Plastic mouse'].earn();
+    Game.Upgrades['Iron mouse'].earn();
+    FrozenCookies.autoClick = 1;
+    FrozenCookies.cookieClickSpeed = 35;
+    FrozenCookies.autoWorshipToggle = 0;
+    FrozenCookies.autoDragonToggle = 0;
+}
+
 test('a CpS buff does not make a clicking god look worth a swap', { skip }, async () => {
     const game = await launchWithMod();
     try {
         await openTemple(game);
+        await game.eval(clickingBakery);
         await game.eval(() => {
-            // One mouse upgrade: each click adds 1% of CpS, and the game reads the buffed CpS
-            // (main.js:4692). Between buffs Jeremy is the best god here; under a Frenzy the model
-            // sees seven times the clicking and Muridal wins.
-            Game.Upgrades['Plastic mouse'].earn();
-            FrozenCookies.autoClick = 1;
-            FrozenCookies.cookieClickSpeed = 50;
             FrozenCookies.autoGods = 1;
-            FrozenCookies.autoWorshipToggle = 0;
             Game.gainBuff('frenzy', 20 * 60, 7);
         });
         await game.advanceSeconds(6 * 60);
-        const during = await game.eval(() => MushieCookies.gods.report());
-        assert.equal(during.swaps, 0, `swapped during the Frenzy: ${during.last}`);
+        const during = await game.eval(godsNow);
+        assert.equal(during.report.swaps, 1, `the decision is made during the Frenzy: ${JSON.stringify(during.report)}`);
+        assert.deepEqual(during.keys, ['industry', null, null], 'and it is the best god between buffs');
 
         await game.eval(() => {
             Game.buffs['Frenzy'].time = 0;
         });
         await game.advanceSeconds(60);
-        const after = await game.eval(() => {
-            const M = Game.Objects['Temple'].minigame;
-            return { report: MushieCookies.gods.report(), keys: M.slot.map((id) => (id === -1 ? null : Object.keys(M.gods)[id])) };
-        });
+        const after = await game.eval(godsNow);
         assert.equal(after.report.swaps, 1, JSON.stringify(after.report));
-        assert.deepEqual(after.keys, ['industry', null, null], 'once the buff is over, the best god between buffs');
+        assert.deepEqual(after.keys, ['industry', null, null], 'nothing to undo once the buff is over');
+    } finally {
+        await game.close();
+    }
+});
+
+test('a long CpS buff changes neither what gods and auras are worth nor which god is chosen', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        await game.eval(clickingBakery);
+        const plans = await game.eval(() => {
+            Game.dragonLevel = 20; // auras 0 to 16 (Dragon's Fortune) can be chosen: level >= id + 4
+            const plain = MushieCookies.gods.plan();
+            // A modest loan: x1.5 CpS for two hours (minigameMarket.js:350, 376), longer than
+            // anything worth waiting out.
+            Game.gainBuff('loan 1', 2 * 60 * 60, 1.5);
+            const loaned = MushieCookies.gods.plan();
+            // The what-ifs put the buffs back: the loan still multiplies CpS.
+            const restored = !!Game.hasBuff('Loan 1') && Math.abs(Game.cookiesPs / Game.unbuffedCps - 1.5) < 1e-9;
+            FrozenCookies.autoGods = 1;
+            return { plain, loaned, restored };
+        });
+        assert.equal(plans.restored, true, 'the buffs are restored after the what-ifs');
+        // A payback is Infinity (null here) for an aura that adds nothing once the building is rebought.
+        const close = (a, b) => a === b || Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+        assert.ok(plans.plain.gods.length > 0 && plans.plain.auras.length > 0, 'gods and auras are measured');
+        for (const m of plans.plain.gods) {
+            const l = plans.loaned.gods.find((x) => x.god === m.god && x.slot === m.slot);
+            assert.ok(l && close(l.gain, m.gain), `${m.god} in slot ${m.slot}: +${(m.gain * 100).toFixed(3)}% with no buff, +${l && (l.gain * 100).toFixed(3)}% under the loan`);
+        }
+        for (const m of plans.plain.auras) {
+            const l = plans.loaned.auras.find((x) => x.id === m.id && x.slot === m.slot);
+            assert.ok(l && close(l.gain, m.gain) && close(l.payback, m.payback), `${m.name}: ${JSON.stringify(m)} with no buff, ${JSON.stringify(l)} under the loan`);
+        }
+        const best = plans.plain.gods.reduce((a, b) => (b.gain > a.gain ? b : a));
+        assert.ok(best.gain > 0.01, 'a god is worth a swap');
+
+        await game.advanceSeconds(6 * 60);
+        const after = await game.eval(godsNow);
+        assert.ok(after.buffs.includes('Loan 1'), 'the loan is still running');
+        const expected = [null, null, null];
+        expected[best.slot] = best.god;
+        assert.deepEqual(after.keys, expected, `chose ${after.report.last}; the best with no buff is ${best.god} in slot ${best.slot}`);
+    } finally {
+        await game.close();
+    }
+});
+
+test('a CpS debuff does not hold decisions back', { skip }, async () => {
+    const game = await launchWithMod();
+    try {
+        await openTemple(game);
+        await game.eval(clickingBakery);
+        await game.eval(() => {
+            FrozenCookies.autoGods = 1;
+            // A pawnshop loan's interest: x0.1 CpS for 40 minutes (minigameMarket.js:351, 380).
+            Game.gainBuff('loan 2 interest', 40 * 60, 0.1);
+        });
+        await game.advanceSeconds(6 * 60);
+        const after = await game.eval(godsNow);
+        assert.ok(after.buffs.includes('Loan 2 (interest)'), 'the interest is still being paid');
+        assert.equal(after.report.swaps, 1, `no decision while the interest ran: ${JSON.stringify(after.report)}`);
+        assert.deepEqual(after.keys, ['industry', null, null], 'the best god with no buff or debuff');
     } finally {
         await game.close();
     }

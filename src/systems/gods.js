@@ -10,8 +10,7 @@ import { chooseAura, inheritedGodsOn, inheritedAurasOn } from '../core/gods.js';
 import { readState } from '../game/measure.js';
 
 const DECIDE_EVERY = 30 * 60 * 5; // five minutes of frames between decisions
-const RETRY_EVERY = 30; // a decision put off by a golden cookie or a buff is retried each second
-const BUFF_WAIT_FRAMES = 30 * 60 * 60; // buffs ending within an hour are waited out
+const TICK_EVERY = 30; // frames between checks for a due decision
 const GOD_GAIN = 0.01; // a swap must add at least 1% of income
 
 // Gods whose worth the income model cannot see, or that would work against the mod:
@@ -32,17 +31,28 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
     const state = { swaps: 0, auraChanges: 0, last: null, dueAt: DECIDE_EVERY, recent: {} };
     const income = () => estimateIncome(readState(game, settings)).total;
 
-    // Every what-if runs with no golden cookie on screen. Each one on screen multiplies CpS by
-    // 1 + 1.23 × Dragon's Fortune (main.js:5108-5110) for the seconds it is there, which is next
-    // to none with golden cookies clicked as they appear (the income model assumes as much,
-    // src/game/measure.js:105). Counted, it made Dragon's Fortune look worth a building whenever
-    // a golden cookie happened to be on screen, and not worth one once it was gone.
+    // Every what-if measures the bakery as it is between golden cookies and buffs, so that a
+    // move is judged by what it adds for as long as it stays, not for the seconds or hours a
+    // passing effect lasts:
+    //  - no golden cookie on screen. Each one on screen multiplies CpS by 1 + 1.23 × Dragon's
+    //    Fortune (main.js:5108-5110) for the seconds it is there, which is next to none with
+    //    golden cookies clicked as they appear (the income model assumes as much,
+    //    src/game/measure.js:105). Counted, it made Dragon's Fortune look worth a building
+    //    whenever a golden cookie happened to be on screen, and not worth one once it was gone;
+    //  - no buff or debuff. The mouse upgrades add a share of the buffed CpS to click power
+    //    (main.js:4692-4708), which the model cannot divide out, so under a Frenzy or a loan
+    //    (x1.5 for two hours, x1.2 for two days: minigameMarket.js:350-352, 376) Muridal and
+    //    Dragon Cursor looked better than they are. The game empties its buffs the same way,
+    //    by replacing the table (main.js:13828).
+    // Measured this way, a decision need not wait for any of them to end.
     function whatIf(apply, revert, measure = income) {
         const golden = game.shimmerTypes.golden;
         const onScreen = golden.n;
+        const buffs = game.buffs;
         return simulate(game, {
             apply() {
                 golden.n = 0;
+                game.buffs = {};
                 apply();
             },
             measure,
@@ -51,26 +61,12 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
                     revert();
                 } finally {
                     golden.n = onScreen;
+                    game.buffs = buffs;
                 }
             },
         });
     }
     const incomeNow = () => whatIf(() => {}, () => {});
-
-    // Measured while a golden cookie is on screen or a buff runs, a move that pays only for those
-    // seconds looks as if it paid all the time: a CpS buff multiplies click power through the
-    // mouse upgrades, which add a share of the buffed CpS (main.js:4692-4708) that the model
-    // cannot divide out, so Muridal and Dragon Cursor win mid-Frenzy. Buffs that last longer than
-    // BUFF_WAIT_FRAMES are not waited for: a retirement loan runs for days (minigameMarket.js:352).
-    function unsettled() {
-        if (game.shimmers.length) return true;
-        for (const buff of Object.values(game.buffs)) {
-            const cps = buff.multCpS === undefined ? 1 : buff.multCpS;
-            const click = buff.multClick === undefined ? 1 : buff.multClick;
-            if ((cps !== 1 || click !== 1) && buff.time <= BUFF_WAIT_FRAMES) return true;
-        }
-        return false;
-    }
 
     // --- Pantheon -----------------------------------------------------------------------------
     function measureGodMove(M, god, slot) {
@@ -196,14 +192,14 @@ export function createGods({ game, settings, loop, buyer = null, log = () => {} 
     loop.add(
         'gods',
         (frame) => {
-            if (game.OnAscend || frame < state.dueAt || unsettled()) return;
+            if (game.OnAscend || frame < state.dueAt) return;
             state.dueAt = frame + DECIDE_EVERY;
             // Inherited options that slot gods or pick auras on their own, or run combos around
             // them, would fight this system; while one is on, it stands aside.
             if (!inheritedGodsOn(settings)) pantheon();
             if (!inheritedAurasOn(settings)) auras(frame);
         },
-        { everyFrames: RETRY_EVERY, enabled: () => settings.autoGods == 1 }
+        { everyFrames: TICK_EVERY, enabled: () => settings.autoGods == 1 }
     );
 
     return {
