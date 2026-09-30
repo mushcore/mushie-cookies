@@ -410,6 +410,32 @@ test('with Sugar frenzy running, a click frenzy that gains nothing from the cast
         assert.deepEqual(game.errors, []);
     }));
 
+test('what a pair waiting for mana kept is let go when the grimoire stops: switched off, or standing aside for an inherited casting mode', { skip }, () =>
+    withLateBakery(async (game) => {
+        await game.eval(burnTo, ['frenzy', 'click frenzy']);
+        const state = () => game.eval(() => ({ kept: MushieCookies.buyer.kept('grimoire'), reserve: MushieCookies.buyer.reserve(), casts: MushieCookies.grimoire.report().casts }));
+        await game.eval(() => {
+            // Enough for the cast, not full: forecast casting holds the frenzy for a buff.
+            const M = Game.Objects['Wizard tower'].minigame;
+            M.magic = M.magicM - 5;
+        });
+        const left = [];
+        for (const off of [{ autoFate: 0, autoFTHOFCombo: 0 }, { autoCasting: 1 }]) {
+            await game.eval(settings, {});
+            await game.advance(16);
+            const during = await state();
+            assert.equal(during.casts, 0);
+            assert.ok(during.kept > 0, 'precondition: the buy-back is kept while the pair waits for mana');
+            await game.eval(settings, off);
+            await game.advance(16);
+            const after = await state();
+            // A keep left behind stays in buyer.reserve() for every spender, for a feature that is off.
+            if (!(after.kept === 0 && after.reserve < during.reserve)) left.push(`${JSON.stringify(off)}: kept ${after.kept}, reserve ${after.reserve} (was ${during.reserve})`);
+        }
+        assert.deepEqual(left, []);
+        assert.deepEqual(game.errors, []);
+    }));
+
 test('Double Cast FTHOF runs forecast casting with double casts; the inherited combo casts nothing', { skip }, () =>
     withLateBakery(async (game) => {
         // A good outcome next, one that pairs with nothing: the inherited combo would cast Haggler's

@@ -54,6 +54,8 @@ export function createGrimoire({ game, settings, loop, buyer = null, log = () =>
     // double-cast. The inherited double-cast combo is gone: its setting turns on double casting here.
     const inheritedCasting = () => settings.autoCasting != 0 || settings.auto100ConsistencyCombo == 1;
     const doubling = () => settings.autoFTHOFCombo == 1;
+    const active = () => (settings.autoFate == 1 || doubling()) && !inheritedCasting();
+    const kept = () => (buyer ? buyer.kept(HOLDER) : 0);
     const tower = () => game.Objects['Wizard tower'];
 
     /** Every running buff, by name, since an outcome only lengthens a buff of its own name. */
@@ -125,7 +127,7 @@ export function createGrimoire({ game, settings, loop, buyer = null, log = () =>
         const refund = sold ? t.getReverseSumPrice(sold) : 0;
         const rebuyLoss = sold ? refund / t.getSellMultiplier() - refund : 0;
         // What this system asked the buyer to keep is its own to spend.
-        const mine = buyer ? buyer.kept(HOLDER) : 0;
+        const mine = kept();
         const decision = decideDouble({
             first: next,
             second,
@@ -160,6 +162,12 @@ export function createGrimoire({ game, settings, loop, buyer = null, log = () =>
     function tick(frame) {
         const grimoire = tower().minigame;
         if (state.sequence) return step(grimoire);
+        // Switched off, or standing aside for an inherited casting mode: no pair waits for mana
+        // any more, and a keep left behind would stay in buyer.reserve() for every spender.
+        if (!active()) {
+            if (buyer) buyer.keep(HOLDER, 0);
+            return;
+        }
         if (frame % TICK_EVERY) return;
         if (!grimoire || !grimoire.spells || game.OnAscend) return;
         const ctx = context();
@@ -291,8 +299,9 @@ export function createGrimoire({ game, settings, loop, buyer = null, log = () =>
 
     // Every frame, since the second cast of a double follows the first within a few; the
     // decisions themselves are made every TICK_EVERY frames. A double cast under way finishes even
-    // if the setting is switched off meanwhile, so the towers are never left sold.
-    loop.add('grimoire', tick, { enabled: () => !!state.sequence || ((settings.autoFate == 1 || doubling()) && !inheritedCasting()) });
+    // if the setting is switched off meanwhile, so the towers are never left sold, and a tick
+    // runs once more after it is switched off to let go of what it kept.
+    loop.add('grimoire', tick, { enabled: () => !!state.sequence || active() || kept() > 0 });
 
     return {
         report() {
