@@ -239,6 +239,8 @@ function setOverrides(gameSaveData) {
         FrozenCookies.orbMax = preferenceParse("orbMax", 0);
 
         // Restore some possibly broken settings
+        // Auto Rigidel (autoSL 2) is gone; a player who chose it still wants the harvest.
+        if (FrozenCookies.autoSL == 2) FrozenCookies.autoSL = 1;
         if (
             !FrozenCookies.autoFTHOFCombo &&
             autoFTHOFComboAction.autobuyyes == 1
@@ -1240,20 +1242,7 @@ function autoCookieBody() {
         }
         FrozenCookies.hc_gain += changeAmount;
     }
-    if (FrozenCookies.autoSL == 1) {
-        var started = Game.lumpT;
-        var ripeAge = Math.ceil(Game.lumpRipeAge);
-        if (
-            Date.now() - started >= ripeAge &&
-            Game.dragonLevel >= 21 &&
-            FrozenCookies.dragonsCurve
-        ) {
-            autoDragonsCurve();
-        } else if (Date.now() - started >= ripeAge) {
-            Game.clickLump();
-        }
-    }
-    if (FrozenCookies.autoSL == 2) autoRigidel();
+    // Sugar lumps are harvested by the lump system (src/systems/lumps.js).
     if (FrozenCookies.autoWrinkler == 1) {
         var popCount = 0;
         var popList = shouldPopWrinklers();

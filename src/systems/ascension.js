@@ -203,5 +203,9 @@ export function createAscension({ game, settings, loop, extras = () => 0, prepar
         },
         /** For tests: the current history of projected prestige. */
         history: () => state.history.slice(),
+        /** The last growth verdict (shouldAscend), or null before the first; cheap, for other systems. */
+        verdict: () => state.verdict,
+        /** 'playing', 'settling' (collected, about to ascend) or 'ascending'. */
+        phase: () => state.phase,
     };
 }
